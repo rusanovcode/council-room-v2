@@ -611,6 +611,17 @@ button.square {
   line-height: 1;
 }
 .pinned-hint-close:hover { color: var(--red); }
+/* Bold the whole docked hint field */
+.pinned-hint-title { font-weight: 700; }
+.pinned-hint-body .tt-text { font-weight: 700; }
+/* Tone: yellow = ready for next round, green = round done (all resolved), blinking red = user action required */
+.pinned-hint.tone-warn .pinned-hint-title { color: var(--amber); }
+.pinned-hint.tone-ok .pinned-hint-title { color: var(--green); }
+.pinned-hint.tone-danger .pinned-hint-title { animation: pinnedBlink 1.1s ease-in-out infinite; }
+@keyframes pinnedBlink {
+  0%, 100% { color: #ffffff; }
+  50% { color: var(--red); }
+}
 
 #langToggle {
   font-family: var(--mono);

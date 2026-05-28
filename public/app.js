@@ -343,36 +343,48 @@ function hideTooltip() {
   }
 }
 
-// Pin the current next-step coach (lightbulb) guidance into the docked bottom panel.
-function pinCoach() {
-  const step = computeNextStep();
+// Render the docked bottom panel from the live coach state (kept current so its
+// tone/colour reflects the actual situation, not a stale snapshot).
+function renderPinnedHint() {
   const panel = $("pinnedHint");
-  const body = $("pinnedHintBody");
-  if (!step || !panel || !body) return;
+  if (!panel) return;
+  if (!coachPinned) { panel.classList.add("hidden"); return; }
+  const step = computeNextStep();
+  if (!step) { panel.classList.add("hidden"); return; }
   $("pinnedHintTitle").textContent = step.title;
+  const body = $("pinnedHintBody");
   body.innerHTML = "";
   const textDiv = document.createElement("div");
   textDiv.className = "tt-text";
   textDiv.textContent = step.body;
   body.appendChild(textDiv);
   panel.classList.remove("hidden");
+  panel.classList.toggle("tone-danger", step.tone === "danger");
+  panel.classList.toggle("tone-ok", step.tone === "ok");
+  panel.classList.toggle("tone-warn", step.tone === "warn");
+}
+
+// Pin button on the floating coach → dock guidance at the bottom, hide floating.
+function pinCoach() {
+  if (!computeNextStep()) return;
   coachPinned = true;
+  renderPinnedHint();
   renderNextStep();
 }
 
 // Pin button on the docked panel → restore the floating coach (unfold).
 function unpinCoach() {
-  $("pinnedHint").classList.add("hidden");
   coachPinned = false;
   nextStepDismissed = false;
+  $("pinnedHint").classList.add("hidden");
   renderNextStep();
 }
 
 // Close (×) on the docked panel → fully close; floating stays dismissed (💡 reopen remains).
 function closeCoachPinned() {
-  $("pinnedHint").classList.add("hidden");
   coachPinned = false;
   nextStepDismissed = true;
+  $("pinnedHint").classList.add("hidden");
   renderNextStep();
 }
 
@@ -463,6 +475,7 @@ function render() {
   renderKnowledge();
   renderSettings();
   renderNextStep();
+  renderPinnedHint();
   updateTerminalsVisibility();
   $("cliInfo").textContent = currentState.cli
     ? `codex: ${currentState.cli.codex}\nclaude: ${currentState.cli.claude}\nworkdir: ${currentState.workdir}`
@@ -520,7 +533,7 @@ function computeNextStep() {
     // No open one, but stack has items
     const allResolved = subtasks.every((st) => st.status === "resolved");
     if (allResolved) {
-      return { title: t("coach.allDone.title"), body: t("coach.allDone.body"), action: null };
+      return { title: t("coach.allDone.title"), body: t("coach.allDone.body"), action: null, tone: "ok" };
     }
     return {
       title: t("coach.step2.title"),
@@ -550,10 +563,11 @@ function computeNextStep() {
         title: t("coach.resolveReady.title"),
         body: t("coach.resolveReady.body"),
         action: { label: t("coach.resolveReady.action"), target: "resolveSubtask" },
+        tone: "ok",
       };
     }
     if (statuses.some((st) => st === "block")) {
-      return { title: t("coach.block.title"), body: t("coach.block.body"), action: null };
+      return { title: t("coach.block.title"), body: t("coach.block.body"), action: null, tone: "danger" };
     }
     const facts = lastTwo.flatMap((m) => parseListLine(m.text, "New facts"));
     const risks = lastTwo.flatMap((m) => parseListLine(m.text, "New risks"));
@@ -571,6 +585,7 @@ function computeNextStep() {
     title: t("coach.runRound.title"),
     body: t("coach.runRound.body", { kbCount }),
     action: { label: t("coach.runRound.action"), target: "runRound" },
+    tone: "warn",
   };
 }
 
