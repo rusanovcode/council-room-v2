@@ -455,7 +455,8 @@ function serveStatic(req, res) {
   }
   const ext = path.extname(file).toLowerCase();
   const types = { ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8" };
-  res.writeHead(200, { "content-type": types[ext] || "text/plain; charset=utf-8" });
+  // Local dev tool — never cache, so frontend edits show up on a normal reload.
+  res.writeHead(200, { "content-type": types[ext] || "text/plain; charset=utf-8", "cache-control": "no-store" });
   fs.createReadStream(file).pipe(res);
 }
 

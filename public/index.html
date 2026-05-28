@@ -67,7 +67,7 @@
 
         <div id="conversation" class="conversation"></div>
 
-        <section id="terminals" class="terminals collapsed">
+        <section id="terminals" class="terminals empty">
           <header class="terminals-head">
             <button id="toggleTerminals" class="ghost small" type="button">
               <span data-i18n="ui.terminals">Терминалы агентов</span>
@@ -108,6 +108,15 @@
             <span id="busyIndicator" class="muted small"></span>
           </div>
         </footer>
+
+        <div id="pinnedHint" class="pinned-hint hidden">
+          <div class="pinned-hint-head">
+            <span class="pinned-hint-icon">📌</span>
+            <span class="pinned-hint-title" data-i18n="ui.pinnedHint">Закреплённая подсказка</span>
+            <button id="pinnedHintClose" class="pinned-hint-close" type="button" aria-label="close">×</button>
+          </div>
+          <div id="pinnedHintBody" class="pinned-hint-body"></div>
+        </div>
       </section>
 
       <aside class="col right">

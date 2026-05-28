@@ -114,6 +114,9 @@ const STRINGS = {
     "ui.termCodex": "Codex",
     "ui.termClaude": "Claude",
     "ui.autopilotStartedHint": "Autopilot работает…",
+    "ui.pinHint": "Закрепить подсказку внизу",
+    "ui.pinnedHint": "Закреплённая подсказка",
+    "tip.stopStatus": "Остановить — прервать текущий процесс. Раунд обрывается кооперативно (агенты в терминалах останавливаются), частичный результат отбрасывается.",
     "tip.autopilot": "Автопилот: Codex и Claude пинг-понгуют по активной подзадаче без участия пользователя.\nЦикл сам останавливается по стоп-условию: оба resolve, два «пустых» раунда подряд (stale×2), block, или достигнут лимит раундов по режиму (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nНажми ещё раз (⏹ Стоп), чтобы прервать — текущий раунд обрывается кооперативно.|||открыта подзадача в режиме STANDARD. Жмёшь «Autopilot ▶» — идут раунды 1,2,3… На 4-м оба агента дают Status: resolve → loop стоп с «debate-complete», coach предлагает «Закрыть».",
     "tip.autoResolve": "Когда включено и автопилот ловит debate-complete (оба resolve) — подзадача закрывается автоматически с кратким резюме из Базы знаний, без лишнего вызова агента.\nКогда выключено (по умолчанию) — автопилот просто останавливается, а закрываешь ты сам (с собственным резюме).|||галка снята: на debate-complete loop стопится, ты пишешь резюме «stop = stale×2 OR token<25%» и жмёшь «Закрыть». Галка стоит: loop сам резолвит и пишет резюме из секции Решения.",
     "tip.terminals": "Live-вывод (stdout+stderr) обоих агентов во время раунда.\nОчищается в начале каждого раунда. Раскрывашка ▾/▴ сворачивает панель; состояние сохраняется между запусками.|||во время autopilot-раунда видишь как Codex стримит рассуждения слева, Claude — справа. Полезно чтобы понять, завис агент или думает.",
@@ -231,6 +234,9 @@ const STRINGS = {
     "ui.termCodex": "Codex",
     "ui.termClaude": "Claude",
     "ui.autopilotStartedHint": "Autopilot running…",
+    "ui.pinHint": "Pin this hint at the bottom",
+    "ui.pinnedHint": "Pinned hint",
+    "tip.stopStatus": "Stop — interrupt the current process. The round is cancelled cooperatively (agents in the terminals stop), the partial result is discarded.",
     "tip.autopilot": "Autopilot: Codex and Claude ping-pong on the active subtask without you.\nThe loop stops on its own when a stop-condition fires: both resolve, two stale rounds in a row (stale×2), block, or the per-mode round budget is hit (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nClick again (⏹ Stop) to interrupt — the current round is cancelled cooperatively.|||a STANDARD-mode subtask is open. You click «Autopilot ▶» — rounds 1,2,3 run. On round 4 both agents return Status: resolve → loop stops with «debate-complete», coach suggests «Resolve».",
     "tip.autoResolve": "When on and autopilot hits debate-complete (both resolve), the subtask is closed automatically with a short summary from the Knowledge Base — no extra agent call.\nWhen off (default) the autopilot just stops and you resolve it yourself (with your own summary).|||unchecked: on debate-complete the loop stops, you type a summary «stop = stale×2 OR token<25%» and click «Resolve». Checked: the loop resolves it itself with a summary built from the Decisions section.",
     "tip.terminals": "Live output (stdout+stderr) of both agents during a round.\nCleared at the start of each round. The ▾/▴ toggle collapses the panel; the state is persisted between sessions.|||during an autopilot round you watch Codex stream its reasoning on the left, Claude on the right. Useful to tell whether an agent is stuck or thinking.",
@@ -284,22 +290,56 @@ function applyLanguage() {
 // ---- Floating tooltip ----------------------------------------------------
 
 let tooltipEl = null;
+let tooltipHideTimer = null;
+let lastTooltipContent = null;
+
+function ttSplit(text) {
+  const [main, example] = String(text || "").split("|||");
+  return { main: main || "", example: (example || "").trim() };
+}
+
 function showTooltip(text, anchor) {
+  if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
   hideTooltip();
   if (!text) return;
   tooltipEl = document.createElement("div");
   tooltipEl.className = `tooltip-floating lang-${UI_LANG}`;
-  const [main, example] = String(text).split("|||");
+  const content = ttSplit(text);
+  lastTooltipContent = content;
+
+  const pinRow = document.createElement("div");
+  pinRow.className = "tt-pin-row";
+  const pin = document.createElement("button");
+  pin.className = "tt-pin";
+  pin.type = "button";
+  pin.textContent = "📌";
+  pin.title = t("ui.pinHint");
+  pin.setAttribute("aria-label", t("ui.pinHint"));
+  pin.addEventListener("click", (event) => {
+    event.stopPropagation();
+    pinHint(content);
+    hideTooltip();
+  });
+  pinRow.appendChild(pin);
+  tooltipEl.appendChild(pinRow);
+
   const textDiv = document.createElement("div");
   textDiv.className = "tt-text";
-  textDiv.textContent = main || "";
+  textDiv.textContent = content.main;
   tooltipEl.appendChild(textDiv);
-  if (example && example.trim()) {
+  if (content.example) {
     const exampleDiv = document.createElement("div");
     exampleDiv.className = "tt-example";
-    exampleDiv.textContent = example.trim();
+    exampleDiv.textContent = content.example;
     tooltipEl.appendChild(exampleDiv);
   }
+
+  // Keep the tooltip alive while the pointer is over it (so the pin is clickable).
+  tooltipEl.addEventListener("mouseenter", () => {
+    if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
+  });
+  tooltipEl.addEventListener("mouseleave", scheduleHideTooltip);
+
   document.body.appendChild(tooltipEl);
   const rect = anchor.getBoundingClientRect();
   const tipRect = tooltipEl.getBoundingClientRect();
@@ -312,11 +352,36 @@ function showTooltip(text, anchor) {
   tooltipEl.style.top = `${top}px`;
   tooltipEl.style.left = `${left}px`;
 }
+
+function scheduleHideTooltip() {
+  if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
+  tooltipHideTimer = setTimeout(hideTooltip, 250);
+}
+
 function hideTooltip() {
+  if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
   if (tooltipEl) {
     tooltipEl.remove();
     tooltipEl = null;
   }
+}
+
+function pinHint(content) {
+  const panel = $("pinnedHint");
+  const body = $("pinnedHintBody");
+  if (!panel || !body) return;
+  body.innerHTML = "";
+  const textDiv = document.createElement("div");
+  textDiv.className = "tt-text";
+  textDiv.textContent = content.main;
+  body.appendChild(textDiv);
+  if (content.example) {
+    const exampleDiv = document.createElement("div");
+    exampleDiv.className = "tt-example";
+    exampleDiv.textContent = content.example;
+    body.appendChild(exampleDiv);
+  }
+  panel.className = `pinned-hint lang-${UI_LANG}`;
 }
 
 function bindTooltipDelegation() {
@@ -326,7 +391,7 @@ function bindTooltipDelegation() {
     showTooltip(target.dataset.tooltipText || "", target);
   });
   document.addEventListener("mouseout", (event) => {
-    if (event.target.closest("[data-tooltip-key]")) hideTooltip();
+    if (event.target.closest("[data-tooltip-key]")) scheduleHideTooltip();
   });
   document.addEventListener("scroll", hideTooltip, true);
   window.addEventListener("blur", hideTooltip);
@@ -356,6 +421,17 @@ function appendTerminal(agent, chunk, reset) {
   }
   el.textContent = termBuffers[agent];
   el.scrollTop = el.scrollHeight;
+  updateTerminalsVisibility();
+}
+
+// Hide the terminals section entirely while there's nothing to show (no buffered
+// output and no round in progress).
+function updateTerminalsVisibility() {
+  const section = $("terminals");
+  if (!section) return;
+  const hasContent = Boolean(termBuffers.codex.trim() || termBuffers.claude.trim());
+  const show = hasContent || Boolean(currentState && currentState.busy);
+  section.classList.toggle("empty", !show);
 }
 
 function connectEvents() {
@@ -395,6 +471,7 @@ function render() {
   renderKnowledge();
   renderSettings();
   renderNextStep();
+  updateTerminalsVisibility();
   $("cliInfo").textContent = currentState.cli
     ? `codex: ${currentState.cli.codex}\nclaude: ${currentState.cli.claude}\nworkdir: ${currentState.workdir}`
     : "";
@@ -663,12 +740,20 @@ function renderRuns() {
 
 function renderStatus() {
   const el = $("status");
+  const busy = Boolean(currentState.busy);
   const idleLabel = currentState.status === "idle" ? t("ui.idle") : currentState.status;
-  el.textContent = currentState.busy ? `${t("ui.busy")} · ${currentState.status}` : idleLabel;
-  el.classList.toggle("busy", Boolean(currentState.busy));
+  el.textContent = busy ? `${t("ui.busy")} · ${currentState.status}` : idleLabel;
+  el.classList.toggle("busy", busy);
+  el.classList.toggle("stoppable", busy);
+  if (busy) {
+    el.dataset.tooltipText = t("tip.stopStatus");
+  } else {
+    delete el.dataset.tooltipText;
+    hideTooltip();
+  }
   $("busyIndicator").textContent = currentState.autopilot?.running
     ? t("ui.autopilotStartedHint")
-    : (currentState.busy ? t("ui.runInProgress") : "");
+    : (busy ? t("ui.runInProgress") : "");
 }
 
 function renderSubtasks() {
@@ -961,13 +1046,22 @@ function bindUi() {
     }
   });
 
+  // Click the busy Status field to interrupt the current round (manual or autopilot).
+  $("status").addEventListener("click", () => {
+    if (!currentState?.busy) return;
+    hideTooltip();
+    api("POST", "/api/autopilot/stop", {});
+  });
+
   const TERMINALS_KEY = "council-room-v2.terminalsCollapsed";
   const applyTerminalsCollapsed = (collapsed) => {
     $("terminals").classList.toggle("collapsed", collapsed);
     const arrow = $("terminals").querySelector(".terminals-arrow");
     if (arrow) arrow.textContent = collapsed ? "▾" : "▴";
   };
-  applyTerminalsCollapsed(localStorage.getItem(TERMINALS_KEY) !== "false");
+  // Default expanded: the panel only appears when there's output, so showing it
+  // expanded by default means the stream is visible the moment a round runs.
+  applyTerminalsCollapsed(localStorage.getItem(TERMINALS_KEY) === "true");
   $("toggleTerminals").addEventListener("click", () => {
     const collapsed = !$("terminals").classList.contains("collapsed");
     applyTerminalsCollapsed(collapsed);
@@ -1024,8 +1118,10 @@ function bindUi() {
     showTooltip(target.dataset.tooltipText, target);
   });
   document.addEventListener("mouseout", (event) => {
-    if (event.target.closest("[data-tooltip-text]:not([data-tooltip-key])")) hideTooltip();
+    if (event.target.closest("[data-tooltip-text]:not([data-tooltip-key])")) scheduleHideTooltip();
   });
+
+  $("pinnedHintClose").addEventListener("click", () => $("pinnedHint").classList.add("hidden"));
 }
 
 bindUi();
