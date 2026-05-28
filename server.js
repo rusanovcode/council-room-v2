@@ -41,6 +41,9 @@ let state = {
   },
 };
 
+// Asset cache-bust id — changes every server start, stamped into served HTML.
+const BUILD_ID = Date.now();
+
 const ROUND_BUDGET = { LIGHT: 3, STANDARD: 6, STRICT: 10, CRITICAL: 12 };
 
 // The FINAL VERIFICATION pass (the gate that closes a subtask) is always run by
@@ -72,6 +75,7 @@ function defaultRun(topic) {
     topic: String(topic || "Untitled").slice(0, 200),
     createdAt: store.now(),
     rounds: 0,
+    archived: false,
     settings: { ...state.settings },
   };
 }
@@ -115,7 +119,7 @@ function publicState() {
       status: state.status,
       run: null,
       autopilot: state.autopilot,
-      runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds })),
+      runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
       settings: state.settings,
       switcher: switcher.detect(),
       workdir: WORKDIR,
@@ -142,7 +146,7 @@ function publicState() {
       messages,
     },
     autopilot: state.autopilot,
-    runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds })),
+    runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
     settings: state.settings,
     switcher: switcher.detect(),
     workdir: WORKDIR,
@@ -605,6 +609,13 @@ function serveStatic(req, res) {
   const types = { ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8" };
   // Local dev tool — never cache, so frontend edits show up on a normal reload.
   res.writeHead(200, { "content-type": types[ext] || "text/plain; charset=utf-8", "cache-control": "no-store" });
+  // For HTML, stamp asset URLs with the server build id so a restart always busts
+  // any stale cached app.js/styles.css (the recurring "old code" trap).
+  if (ext === ".html") {
+    const html = fs.readFileSync(file, "utf8").replace(/__V__/g, String(BUILD_ID));
+    res.end(html);
+    return;
+  }
   fs.createReadStream(file).pipe(res);
 }
 
@@ -652,6 +663,20 @@ async function router(req, res) {
       const dir = runDir(body.runId);
       if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
       if (state.run && state.run.id === body.runId) {
+        state.run = null;
+        state.activeRunId = null;
+      }
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && (pathname === "/api/runs/archive" || pathname === "/api/runs/restore")) {
+      const body = await readBody(req);
+      const run = loadRun(body.runId);
+      run.archived = pathname.endsWith("/archive");
+      saveRun(run);
+      // Archiving the active chat clears the view; restore just flips the flag.
+      if (run.archived && state.run && state.run.id === run.id) {
         state.run = null;
         state.activeRunId = null;
       }
@@ -734,6 +759,27 @@ async function router(req, res) {
         kind: "subtask-delete",
         text: `Подзадача ${body.id} удалена (раундов не было).`,
       });
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && (pathname === "/api/subtasks/trash" || pathname === "/api/subtasks/archive" || pathname === "/api/subtasks/restore")) {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      const dir = runDir(state.run.id);
+      const bin = pathname.endsWith("/trash") ? "trash" : (pathname.endsWith("/archive") ? "archive" : "");
+      const item = subtasks.setBin(dir, body.id, bin);
+      const label = bin === "trash" ? "в корзину" : (bin === "archive" ? "в архив" : "восстановлена в стек");
+      addMessage({ role: "system", name: "Council Room", kind: `subtask-${bin || "restore"}`, text: `Подзадача ${item.id} перемещена ${label}.`, subtaskId: item.id });
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/subtasks/trash/empty") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const dir = runDir(state.run.id);
+      const { removed } = subtasks.emptyTrash(dir);
+      addMessage({ role: "system", name: "Council Room", kind: "subtask-trash", text: `Корзина подзадач очищена (удалено: ${removed}).` });
       broadcast();
       return sendJson(res, 200, publicState());
     }

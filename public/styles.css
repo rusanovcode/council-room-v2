@@ -147,7 +147,7 @@ html, body {
   font-family: var(--mono);
 }
 
-.delete-run {
+.delete-run, .archive-run, .restore-run {
   background: transparent;
   border: none;
   color: var(--muted);
@@ -156,6 +156,56 @@ html, body {
   padding: 0 4px;
 }
 .delete-run:hover { color: var(--red); }
+.archive-run:hover, .restore-run:hover { color: var(--accent); }
+
+/* h2 action button group (archive/trash/+ next to a section title) */
+.block h2 .h2-actions { display: inline-flex; align-items: center; gap: 2px; }
+.block h2 .h2-actions button { padding: 1px 5px; font-size: 11px; }
+
+/* Archive / trash panels */
+.bin-panel { margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 6px; }
+.bin-panel.hidden { display: none; }
+.bin-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.bin-panel-head button { padding: 1px 6px; font-size: 10px; }
+.run-list li.archived-row, .bin-panel .subtask-list li { opacity: 0.85; }
+.bin-panel .subtask-actions { display: inline-flex; }
+.subtask-list li .subtask-archive,
+.subtask-list li .subtask-restore {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.subtask-list li .subtask-archive:hover,
+.subtask-list li .subtask-restore:hover { color: var(--accent); }
+.subtask-list li.previewing { outline: 1px solid var(--accent); }
+
+/* Read-only preview banner in the center column */
+.preview-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(91, 157, 255, 0.1);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
 
 button {
   font: inherit;

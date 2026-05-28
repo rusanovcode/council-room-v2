@@ -123,6 +123,19 @@ const STRINGS = {
     "tip.verifyBadge": "Финальная проверка: открытых вопросов не осталось, все решённые собраны в пакет.\nСледующий раунд — проверочный, его гоняют МАКСИМАЛЬНЫЕ агенты (топ-модель + max reasoning). Если оба подтвердят весь пакет — подзадача готова к закрытию; любой вернёт вопрос в работу — цикл продолжится.|||3 вопроса решены обоими → бейдж VERIFY. Жмёшь раунд (или autopilot): codex gpt-5.5/xhigh и claude opus/max перепроверяют пакет. Оба «Verify: ok» → можно закрывать.",
     "ui.codexAccount": "Codex — аккаунт",
     "ui.claudeAccount": "Claude — аккаунт",
+    "ui.archived": "Архив",
+    "ui.trash": "Корзина",
+    "ui.emptyTrash": "Очистить",
+    "ui.archiveEmpty": "(пусто)",
+    "ui.toArchive": "В архив",
+    "ui.toTrash": "В корзину",
+    "ui.restore": "Восстановить",
+    "ui.previewBanner": "Просмотр (только чтение): {title}",
+    "ui.closePreview": "Закрыть просмотр",
+    "ui.confirmEmptyTrash": "Очистить корзину подзадач? Удалённые безвозвратно исчезнут.",
+    "tip.chatArchive": "Архив чатов. По «×» чат уходит в архив (не удаляется). Тут можно его восстановить обратно в «Чаты».|||закрыл рабочий чат «Phase 1» → он в архиве; через неделю вернулся, нажал ↩ — снова в списке.",
+    "tip.subtaskArchive": "Архив подзадач. Кнопка «в архив» (🗄) на подзадаче убирает её из стека, но сохраняет. Клик по архивной — read-only просмотр в центре; ↩ — вернуть в стек.|||закрытую подзадачу «выбор БД» отправил в архив, чтобы не мешала. Позже кликнул — перечитал решение.",
+    "tip.subtaskTrash": "Корзина подзадач. По «×» подзадача уходит сюда (восстановимо). Клик — read-only просмотр; ↩ — вернуть в стек; «Очистить» — удалить безвозвратно.|||создал лишнюю подзадачу, нажал × → в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть весь мусор.",
     "ui.switcherConnected": "модуль свитч подключён",
     "ui.switcherOffline": "модуль свитч не подключён",
     "tip.switcher": "Модуль свитч (ai-switcher) — мультиаккаунт для агентов. Необязателен: если не подключён, всё работает в стандартном режиме на 1 аккаунте.\nПодключён = в ai-switcher настроен второй аккаунт (auth-папки на месте). Тогда доступен свитч/failover между аккаунтами.|||зелёная точка «подключён» → можно выбрать акк 2 и авто-failover. Серая «не подключён» → только акк 1.",
@@ -255,6 +268,19 @@ const STRINGS = {
     "tip.verifyBadge": "Final verification: no open questions left, all resolved ones are batched.\nThe next round is a verification pass run by the STRONGEST agents (top model + max reasoning). If both confirm the whole batch — the subtask is ready to close; if either reopens a question — the cycle continues.|||3 questions resolved by both → VERIFY badge. Run a round (or autopilot): codex gpt-5.5/xhigh and claude opus/max recheck the batch. Both «Verify: ok» → ready to close.",
     "ui.codexAccount": "Codex — account",
     "ui.claudeAccount": "Claude — account",
+    "ui.archived": "Archive",
+    "ui.trash": "Trash",
+    "ui.emptyTrash": "Empty",
+    "ui.archiveEmpty": "(empty)",
+    "ui.toArchive": "Archive",
+    "ui.toTrash": "To trash",
+    "ui.restore": "Restore",
+    "ui.previewBanner": "Preview (read-only): {title}",
+    "ui.closePreview": "Close preview",
+    "ui.confirmEmptyTrash": "Empty the subtask trash? Deleted items are gone for good.",
+    "tip.chatArchive": "Chat archive. The «×» moves a chat to the archive (not deleted). Restore it back to «Chats» from here.|||closed the «Phase 1» chat → it's archived; a week later you click ↩ and it's back in the list.",
+    "tip.subtaskArchive": "Subtask archive. The «🗄» button moves a subtask out of the stack but keeps it. Click an archived one for a read-only preview; ↩ returns it to the stack.|||archived the resolved «pick DB» subtask to keep it out of the way; later clicked it to re-read the decision.",
+    "tip.subtaskTrash": "Subtask trash. The «×» sends a subtask here (recoverable). Click for a read-only preview; ↩ restores to the stack; «Empty» deletes permanently.|||made an extra subtask, hit × → in trash. Changed your mind — ↩ restored it. Or «Empty» to wipe the junk.",
     "ui.switcherConnected": "switch module connected",
     "ui.switcherOffline": "switch module not connected",
     "tip.switcher": "Switch module (ai-switcher) — multi-account for the agents. Optional: if not connected, everything runs in standard single-account mode.\nConnected = a second account is set up in ai-switcher (auth folders present). Then switching/failover between accounts is available.|||green dot «connected» → you can pick acc 2 and auto-failover. Grey «not connected» → only acc 1.",
@@ -513,6 +539,17 @@ function render() {
 
 let nextStepDismissed = false;
 let coachPinned = false;
+const panelOpen = { chatArchive: false, subtaskArchive: false, subtaskTrash: false };
+let previewSubtaskId = null;
+
+function openPreview(id) {
+  previewSubtaskId = id;
+  render();
+}
+function closePreview() {
+  previewSubtaskId = null;
+  render();
+}
 
 function parseStatusFromAgent(text) {
   if (!text) return "";
@@ -762,20 +799,47 @@ function triggerCoachTarget(target) {
 }
 
 function renderRuns() {
+  const allRuns = currentState.runs || [];
+  const active = allRuns.filter((r) => !r.archived);
+  const archived = allRuns.filter((r) => r.archived);
+
   const list = $("runList");
   list.innerHTML = "";
-  for (const run of currentState.runs || []) {
+  for (const run of active) {
     const li = document.createElement("li");
     if (run.id === currentState.activeRunId) li.classList.add("active");
-    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><button class="delete-run" title="${escapeHtml(t("ui.confirmDelete", { topic: run.topic }))}">×</button>`;
+    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><button class="archive-run" title="${escapeHtml(t("ui.toArchive"))}">🗄</button>`;
     li.addEventListener("click", (event) => {
-      if (event.target.classList.contains("delete-run")) {
-        if (confirm(t("ui.confirmDelete", { topic: run.topic }))) api("POST", "/api/runs/delete", { runId: run.id });
+      if (event.target.classList.contains("archive-run")) {
+        api("POST", "/api/runs/archive", { runId: run.id });
         return;
       }
       api("POST", "/api/runs/switch", { runId: run.id });
     });
     list.appendChild(li);
+  }
+
+  // Chat archive panel
+  $("toggleChatArchive").textContent = `🗄${archived.length ? " " + archived.length : ""}`;
+  $("chatArchive").classList.toggle("hidden", !panelOpen.chatArchive);
+  const aList = $("archivedRunList");
+  aList.innerHTML = "";
+  if (!archived.length) {
+    const empty = document.createElement("li");
+    empty.className = "muted small";
+    empty.style.cursor = "default";
+    empty.textContent = t("ui.archiveEmpty");
+    aList.appendChild(empty);
+  }
+  for (const run of archived) {
+    const li = document.createElement("li");
+    li.classList.add("archived-row");
+    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><button class="restore-run" title="${escapeHtml(t("ui.restore"))}">↩</button>`;
+    li.querySelector(".restore-run").addEventListener("click", (event) => {
+      event.stopPropagation();
+      api("POST", "/api/runs/restore", { runId: run.id });
+    });
+    aList.appendChild(li);
   }
 }
 
@@ -797,73 +861,103 @@ function renderStatus() {
     : (busy ? t("ui.runInProgress") : "");
 }
 
+function makeIconBtn(cls, glyph, title, handler) {
+  const b = document.createElement("button");
+  b.className = cls;
+  b.type = "button";
+  b.textContent = glyph;
+  b.title = title;
+  b.addEventListener("click", (event) => { event.stopPropagation(); handler(); });
+  return b;
+}
+
+function renderSubtaskRow(st, context) {
+  const li = document.createElement("li");
+  li.classList.add(st.status);
+  if (context === "stack" && st.rounds === 0 && st.status !== "resolved") li.classList.add("editable");
+  if (previewSubtaskId === st.id) li.classList.add("previewing");
+
+  const titleSpan = document.createElement("span");
+  titleSpan.className = "subtask-title";
+  titleSpan.textContent = st.title;
+  li.appendChild(titleSpan);
+
+  const right = document.createElement("span");
+  right.className = "subtask-actions";
+  if (context === "stack") {
+    if (st.rounds === 0 && st.status !== "resolved") {
+      right.appendChild(makeIconBtn("subtask-edit", "✎", t("ui.editIcon"), () => openSubtaskModal({ editId: st.id, title: st.title, mode: st.mode })));
+    }
+    right.appendChild(makeIconBtn("subtask-archive", "🗄", t("ui.toArchive"), () => api("POST", "/api/subtasks/archive", { id: st.id })));
+    right.appendChild(makeIconBtn("subtask-delete", "×", t("ui.toTrash"), () => api("POST", "/api/subtasks/trash", { id: st.id })));
+  } else {
+    right.appendChild(makeIconBtn("subtask-restore", "↩", t("ui.restore"), () => api("POST", "/api/subtasks/restore", { id: st.id })));
+  }
+  li.appendChild(right);
+
+  const tag = document.createElement("span");
+  tag.className = "subtask-tag";
+  tag.textContent = `${st.id.slice(-6)} · ${st.mode} · R${st.rounds}`;
+  li.appendChild(tag);
+
+  li.title = `${st.status} — ${st.id}`;
+  if (context === "stack") {
+    if (st.status === "pending" || st.status === "frozen" || st.status === "resolved") {
+      li.style.cursor = "pointer";
+      li.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        if (st.status === "resolved" && !confirm(t("ui.confirmReopen"))) return;
+        api("POST", "/api/subtasks/reopen", { id: st.id });
+      });
+    }
+  } else {
+    // Archived / trashed → click opens a read-only preview in the center.
+    li.style.cursor = "pointer";
+    li.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
+      openPreview(st.id);
+    });
+  }
+  return li;
+}
+
 function renderSubtasks() {
+  const all = currentState.run?.subtasks || [];
+  const stack = all.filter((s) => !s.bin);
+  const archived = all.filter((s) => s.bin === "archive");
+  const trashed = all.filter((s) => s.bin === "trash");
+
   const list = $("subtaskList");
   list.innerHTML = "";
-  const subtasks = currentState.run?.subtasks || [];
-  if (!subtasks.length) {
+  if (!stack.length) {
     const empty = document.createElement("li");
     empty.className = "muted small";
     empty.style.cursor = "default";
     empty.textContent = t("ui.openFirstHint");
     list.appendChild(empty);
-    return;
+  } else {
+    for (const st of stack) list.appendChild(renderSubtaskRow(st, "stack"));
   }
-  for (const st of subtasks) {
-    const li = document.createElement("li");
-    li.classList.add(st.status);
-    const editable = st.rounds === 0 && st.status !== "resolved";
-    if (editable) li.classList.add("editable");
 
-    const titleSpan = document.createElement("span");
-    titleSpan.className = "subtask-title";
-    titleSpan.textContent = st.title;
-    li.appendChild(titleSpan);
+  $("toggleSubtaskArchive").textContent = `🗄${archived.length ? " " + archived.length : ""}`;
+  $("toggleSubtaskTrash").textContent = `🗑${trashed.length ? " " + trashed.length : ""}`;
+  $("subtaskArchive").classList.toggle("hidden", !panelOpen.subtaskArchive);
+  $("subtaskTrash").classList.toggle("hidden", !panelOpen.subtaskTrash);
 
-    const right = document.createElement("span");
-    right.className = "subtask-actions";
-    if (editable) {
-      const edit = document.createElement("button");
-      edit.className = "subtask-edit";
-      edit.type = "button";
-      edit.textContent = "✎";
-      edit.title = t("ui.editIcon");
-      edit.addEventListener("click", (event) => {
-        event.stopPropagation();
-        openSubtaskModal({ editId: st.id, title: st.title, mode: st.mode });
-      });
-      right.appendChild(edit);
-
-      const del = document.createElement("button");
-      del.className = "subtask-delete";
-      del.type = "button";
-      del.textContent = "×";
-      del.title = t("ui.deleteIcon");
-      del.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (!confirm(t("ui.confirmDeleteSubtask", { title: st.title }))) return;
-        api("POST", "/api/subtasks/delete", { id: st.id });
-      });
-      right.appendChild(del);
+  const fillBin = (listEl, items, context) => {
+    listEl.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("li");
+      empty.className = "muted small";
+      empty.style.cursor = "default";
+      empty.textContent = t("ui.archiveEmpty");
+      listEl.appendChild(empty);
+      return;
     }
-    li.appendChild(right);
-
-    const tag = document.createElement("span");
-    tag.className = "subtask-tag";
-    tag.textContent = `${st.id.slice(-6)} · ${st.mode} · R${st.rounds}`;
-    li.appendChild(tag);
-
-    li.title = `${st.status} — ${st.id}`;
-    if (st.status === "pending" || st.status === "frozen" || st.status === "resolved") {
-      li.style.cursor = "pointer";
-      li.addEventListener("click", (event) => {
-        if (event.target.closest(".subtask-edit, .subtask-delete")) return;
-        if (st.status === "resolved" && !confirm(t("ui.confirmReopen"))) return;
-        api("POST", "/api/subtasks/reopen", { id: st.id });
-      });
-    }
-    list.appendChild(li);
-  }
+    for (const st of items) listEl.appendChild(renderSubtaskRow(st, context));
+  };
+  fillBin($("archivedSubtaskList"), archived, "archive");
+  fillBin($("trashedSubtaskList"), trashed, "trash");
 }
 
 function renderActiveSubtask() {
@@ -901,6 +995,28 @@ function renderConversation() {
   trace.innerHTML = "";
   const messages = currentState.run?.messages || [];
   const active = currentState.run?.activeSubtask;
+
+  // Read-only preview of an archived/trashed subtask: show its messages + a banner.
+  const previewSt = previewSubtaskId
+    ? (currentState.run?.subtasks || []).find((s) => s.id === previewSubtaskId)
+    : null;
+  if (previewSt) {
+    const banner = document.createElement("div");
+    banner.className = "preview-banner";
+    banner.innerHTML = `<span>${escapeHtml(t("ui.previewBanner", { title: previewSt.title }))}</span><button class="ghost small" id="closePreviewBtn" type="button">${escapeHtml(t("ui.closePreview"))}</button>`;
+    target.appendChild(banner);
+    banner.querySelector("#closePreviewBtn").addEventListener("click", closePreview);
+    for (const msg of messages.filter((m) => m.subtaskId === previewSt.id)) {
+      if (msg.kind === "process" || msg.kind?.startsWith("subtask-")) continue;
+      const card = document.createElement("div");
+      card.className = `msg ${msg.role}`;
+      const meta = msg.round ? `R${msg.round}` : msg.kind || "";
+      card.innerHTML = `<div class="name"><span>${escapeHtml(msg.name)}</span><span>${escapeHtml(meta)} · ${formatTime(msg.at)}</span></div><div class="text">${escapeHtml(msg.text)}</div>`;
+      target.appendChild(card);
+    }
+    return;
+  }
+
   const filtered = active ? messages.filter((m) => !m.subtaskId || m.subtaskId === active.id) : messages;
   for (const msg of filtered) {
     const isProcess = msg.kind === "process" || msg.kind?.startsWith("subtask-");
@@ -1181,6 +1297,11 @@ function bindUi() {
     }
     openSubtaskModal();
   });
+
+  $("toggleChatArchive").addEventListener("click", () => { panelOpen.chatArchive = !panelOpen.chatArchive; render(); });
+  $("toggleSubtaskArchive").addEventListener("click", () => { panelOpen.subtaskArchive = !panelOpen.subtaskArchive; render(); });
+  $("toggleSubtaskTrash").addEventListener("click", () => { panelOpen.subtaskTrash = !panelOpen.subtaskTrash; render(); });
+  $("emptyTrash").addEventListener("click", () => { if (confirm(t("ui.confirmEmptyTrash"))) api("POST", "/api/subtasks/trash/empty", {}); });
   $("cancelSubtask").addEventListener("click", () => $("openSubtaskModal").classList.add("hidden"));
   $("confirmSubtask").addEventListener("click", async () => {
     const title = $("subtaskTitleInput").value.trim();

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Council Room v2</title>
-    <link rel="stylesheet" href="/styles.css?v=20260528" />
+    <link rel="stylesheet" href="/styles.css?v=__V__" />
   </head>
   <body>
     <main class="shell">
@@ -22,17 +22,39 @@
         <section class="block">
           <h2>
             <span data-i18n="ui.chats">Чаты</span>
+            <span class="h2-actions">
+              <button id="toggleChatArchive" class="ghost small" type="button" data-tooltip-key="t.chatArchive">🗄</button>
+            </span>
           </h2>
           <ul id="runList" class="run-list"></ul>
+          <div id="chatArchive" class="bin-panel hidden">
+            <div class="bin-panel-head"><span data-i18n="ui.archived">Архив</span></div>
+            <ul id="archivedRunList" class="run-list"></ul>
+          </div>
         </section>
 
         <section class="block">
           <h2>
             <span data-i18n="ui.subtaskStack">Стек подзадач</span>
             <span class="help" data-tooltip-key="t.subtaskStack">?</span>
-            <button id="openSubtask" class="ghost small" data-tooltip-key="t.openSubtask">+</button>
+            <span class="h2-actions">
+              <button id="toggleSubtaskArchive" class="ghost small" type="button" data-tooltip-key="t.subtaskArchive">🗄</button>
+              <button id="toggleSubtaskTrash" class="ghost small" type="button" data-tooltip-key="t.subtaskTrash">🗑</button>
+              <button id="openSubtask" class="ghost small" data-tooltip-key="t.openSubtask">+</button>
+            </span>
           </h2>
           <ul id="subtaskList" class="subtask-list"></ul>
+          <div id="subtaskArchive" class="bin-panel hidden">
+            <div class="bin-panel-head"><span data-i18n="ui.archived">Архив</span></div>
+            <ul id="archivedSubtaskList" class="subtask-list"></ul>
+          </div>
+          <div id="subtaskTrash" class="bin-panel hidden">
+            <div class="bin-panel-head">
+              <span data-i18n="ui.trash">Корзина</span>
+              <button id="emptyTrash" class="ghost small" type="button" data-i18n="ui.emptyTrash">Очистить</button>
+            </div>
+            <ul id="trashedSubtaskList" class="subtask-list"></ul>
+          </div>
         </section>
 
         <section class="block status-block">
@@ -266,6 +288,6 @@
       </div>
     </div>
 
-    <script src="/app.js?v=20260528"></script>
+    <script src="/app.js?v=__V__"></script>
   </body>
 </html>
