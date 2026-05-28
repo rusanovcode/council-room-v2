@@ -794,6 +794,15 @@ function selectLastRunOnStartup() {
 selectLastRunOnStartup();
 
 const server = http.createServer(router);
+server.on("error", (err) => {
+  if (err && err.code === "EADDRINUSE") {
+    console.error(`\n[Council Room v2] Порт ${PORT} уже занят — вероятно, запущен старый экземпляр.`);
+    console.error(`Закрой его и перезапусти через "Council Room v2.bat" (он сам освобождает порт), либо: taskkill /F /PID <pid с netstat -ano | findstr :${PORT}>.`);
+  } else {
+    console.error(err);
+  }
+  process.exit(1);
+});
 server.listen(PORT, () => {
   console.log(`Council Room v2 listening on http://localhost:${PORT}`);
   console.log(`Workdir: ${WORKDIR}`);
