@@ -42,6 +42,11 @@
           <div id="status" class="status-line">idle</div>
           <div id="cliInfo" class="cli-info"></div>
         </section>
+
+        <div id="switcherStatus" class="switcher-status" data-tooltip-key="t.switcher">
+          <span class="switcher-dot"></span>
+          <span id="switcherStatusText">—</span>
+        </div>
       </aside>
 
       <section class="col center">
@@ -164,6 +169,18 @@
               <option value="xhigh">xhigh</option>
             </select>
           </label>
+          <div class="account-row">
+            <span class="account-label" data-i18n="ui.codexAccount">Codex — аккаунт</span>
+            <span class="help" data-tooltip-key="t.account">?</span>
+            <select id="codexMode">
+              <option value="auto">auto</option>
+              <option value="manual">manual</option>
+            </select>
+            <select id="codexAccount">
+              <option value="1">акк 1</option>
+              <option value="2">акк 2</option>
+            </select>
+          </div>
           <label>
             <span data-i18n="ui.claudeModel">Модель Claude</span>
             <span class="help" data-tooltip-key="t.model">?</span>
@@ -189,6 +206,18 @@
               <option value="max">max</option>
             </select>
           </label>
+          <div class="account-row">
+            <span class="account-label" data-i18n="ui.claudeAccount">Claude — аккаунт</span>
+            <span class="help" data-tooltip-key="t.account">?</span>
+            <select id="claudeMode">
+              <option value="auto">auto</option>
+              <option value="manual">manual</option>
+            </select>
+            <select id="claudeAccount">
+              <option value="1">акк 1</option>
+              <option value="2">акк 2</option>
+            </select>
+          </div>
         </section>
       </aside>
     </main>

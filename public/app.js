@@ -117,8 +117,16 @@ const STRINGS = {
     "ui.pinHint": "Закрепить подсказку внизу",
     "ui.unfoldHint": "Развернуть обратно в плавающее окно",
     "ui.strictScope": "Строгий scope: всё вне «Файлы в scope» — запрещено",
-    "ui.qCounts": "открыто {open} · решено {resolved} · проверено {verified}",
+    "ui.qCounts": "открыто {open} (crit {crit} / minor {minor}) · решено {resolved} · проверено {verified}",
+    "ui.qPrioToggle": "Приоритет: critical блокирует исполнение, minor можно отложить. Клик — переключить.",
+    "ui.qDeferred": "Критичные решены — готово к исполнению. Отложено второстепенных: {n} (висят здесь). Догнать позже; если станет блокирующим — переключи в critical.",
     "tip.verifyBadge": "Финальная проверка: открытых вопросов не осталось, все решённые собраны в пакет.\nСледующий раунд — проверочный, его гоняют МАКСИМАЛЬНЫЕ агенты (топ-модель + max reasoning). Если оба подтвердят весь пакет — подзадача готова к закрытию; любой вернёт вопрос в работу — цикл продолжится.|||3 вопроса решены обоими → бейдж VERIFY. Жмёшь раунд (или autopilot): codex gpt-5.5/xhigh и claude opus/max перепроверяют пакет. Оба «Verify: ok» → можно закрывать.",
+    "ui.codexAccount": "Codex — аккаунт",
+    "ui.claudeAccount": "Claude — аккаунт",
+    "ui.switcherConnected": "модуль свитч подключён",
+    "ui.switcherOffline": "модуль свитч не подключён",
+    "tip.switcher": "Модуль свитч (ai-switcher) — мультиаккаунт для агентов. Необязателен: если не подключён, всё работает в стандартном режиме на 1 аккаунте.\nПодключён = в ai-switcher настроен второй аккаунт (auth-папки на месте). Тогда доступен свитч/failover между аккаунтами.|||зелёная точка «подключён» → можно выбрать акк 2 и авто-failover. Серая «не подключён» → только акк 1.",
+    "tip.account": "Режим: auto — при лимите/ошибке агент сам переключится на другой аккаунт и повторит раунд; manual — жёстко закреплён выбранный аккаунт, без авто-свитча.\nАккаунт: какой использовать как стартовый (в auto) или закреплённый (в manual). Акк 2 доступен только если модуль свитч подключён.|||Codex auto + акк 1: ловит лимит на акк 1 → сам уходит на акк 2. Claude manual + акк 2: всегда только акк 2.",
     "tip.strictScope": "Спец-режим. Когда включён (☑): всё, что НЕ перечислено в секции «Файлы в scope», автоматически считается вне scope, и агентам СТРОГО запрещено это трогать.\nВ промт добавляется жёсткое правило-дополнение (complement). Удобно, когда проще перечислить разрешённое, чем запрещённое.|||в «Файлы в scope» три файла. Включаешь ☑ — агенты понимают: любой другой файл/папку проекта трогать нельзя, даже если он не указан явно в «Файлы вне scope».",
     "tip.stopStatus": "Остановить — прервать текущий процесс. Раунд обрывается кооперативно (агенты в терминалах останавливаются), частичный результат отбрасывается.",
     "tip.autopilot": "Автопилот: Codex и Claude пинг-понгуют по активной подзадаче без участия пользователя.\nЦикл сам останавливается по стоп-условию: оба resolve, два «пустых» раунда подряд (stale×2), block, или достигнут лимит раундов по режиму (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nНажми ещё раз (⏹ Стоп), чтобы прервать — текущий раунд обрывается кооперативно.|||открыта подзадача в режиме STANDARD. Жмёшь «Autopilot ▶» — идут раунды 1,2,3… На 4-м оба агента дают Status: resolve → loop стоп с «debate-complete», coach предлагает «Закрыть».",
@@ -241,8 +249,16 @@ const STRINGS = {
     "ui.pinHint": "Pin this hint at the bottom",
     "ui.unfoldHint": "Expand back into the floating panel",
     "ui.strictScope": "Strict scope: everything outside «Files in Scope» is forbidden",
-    "ui.qCounts": "open {open} · resolved {resolved} · verified {verified}",
+    "ui.qCounts": "open {open} (crit {crit} / minor {minor}) · resolved {resolved} · verified {verified}",
+    "ui.qPrioToggle": "Priority: critical blocks execution, minor can be deferred. Click to toggle.",
+    "ui.qDeferred": "Critical resolved — ready for execution. Deferred minor questions: {n} (kept here). Catch up later; if one becomes blocking, switch it to critical.",
     "tip.verifyBadge": "Final verification: no open questions left, all resolved ones are batched.\nThe next round is a verification pass run by the STRONGEST agents (top model + max reasoning). If both confirm the whole batch — the subtask is ready to close; if either reopens a question — the cycle continues.|||3 questions resolved by both → VERIFY badge. Run a round (or autopilot): codex gpt-5.5/xhigh and claude opus/max recheck the batch. Both «Verify: ok» → ready to close.",
+    "ui.codexAccount": "Codex — account",
+    "ui.claudeAccount": "Claude — account",
+    "ui.switcherConnected": "switch module connected",
+    "ui.switcherOffline": "switch module not connected",
+    "tip.switcher": "Switch module (ai-switcher) — multi-account for the agents. Optional: if not connected, everything runs in standard single-account mode.\nConnected = a second account is set up in ai-switcher (auth folders present). Then switching/failover between accounts is available.|||green dot «connected» → you can pick acc 2 and auto-failover. Grey «not connected» → only acc 1.",
+    "tip.account": "Mode: auto — on a limit/error the agent switches to the other account and retries the round; manual — the chosen account is pinned, no auto-switch.\nAccount: which to use as the start account (in auto) or the pinned one (in manual). Acc 2 is only available when the switch module is connected.|||Codex auto + acc 1: hits a limit on acc 1 → moves to acc 2 itself. Claude manual + acc 2: always acc 2 only.",
     "tip.strictScope": "Special mode. When on (☑): everything NOT listed in the «Files in Scope» section is automatically considered out of scope, and agents are STRICTLY forbidden to touch it.\nA hard complement rule is injected into the prompt. Handy when it's easier to list what's allowed than what's forbidden.|||«Files in Scope» has three files. Turn on ☑ — agents understand any other project file/folder must not be touched, even if not explicitly listed in «Files Out of Scope».",
     "tip.stopStatus": "Stop — interrupt the current process. The round is cancelled cooperatively (agents in the terminals stop), the partial result is discarded.",
     "tip.autopilot": "Autopilot: Codex and Claude ping-pong on the active subtask without you.\nThe loop stops on its own when a stop-condition fires: both resolve, two stale rounds in a row (stale×2), block, or the per-mode round budget is hit (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nClick again (⏹ Stop) to interrupt — the current round is cancelled cooperatively.|||a STANDARD-mode subtask is open. You click «Autopilot ▶» — rounds 1,2,3 run. On round 4 both agents return Status: resolve → loop stops with «debate-complete», coach suggests «Resolve».",
@@ -486,6 +502,7 @@ function render() {
   renderSettings();
   renderNextStep();
   renderPinnedHint();
+  renderSwitcher();
   updateTerminalsVisibility();
   $("cliInfo").textContent = currentState.cli
     ? `codex: ${currentState.cli.codex}\nclaude: ${currentState.cli.claude}\nworkdir: ${currentState.workdir}`
@@ -993,9 +1010,11 @@ function renderQuestionsBlock(block, tools, help, label) {
   const open = qs.filter((q) => q.status === "open");
   const resolved = qs.filter((q) => q.status === "resolved");
   const verified = qs.filter((q) => q.status === "verified");
+  const criticalOpen = open.filter((q) => q.priority === "critical");
+  const minorOpen = open.filter((q) => q.priority === "minor");
 
-  // VERIFY badge when the subtask is in the final-verification phase.
-  if (!open.length && resolved.length) {
+  // VERIFY badge once no CRITICAL question is open (minor open ones are deferred).
+  if (!criticalOpen.length && resolved.length) {
     const badge = document.createElement("span");
     badge.className = "verify-badge";
     badge.textContent = "VERIFY";
@@ -1005,21 +1024,35 @@ function renderQuestionsBlock(block, tools, help, label) {
 
   const counts = document.createElement("div");
   counts.className = "q-counts muted small";
-  counts.textContent = t("ui.qCounts", { open: open.length, resolved: resolved.length, verified: verified.length });
+  counts.textContent = t("ui.qCounts", { open: open.length, crit: criticalOpen.length, minor: minorOpen.length, resolved: resolved.length, verified: verified.length });
   block.appendChild(counts);
+
+  // Deferred-minors warning: ready for execution, but minor questions still hang here.
+  if (!criticalOpen.length && resolved.length && minorOpen.length) {
+    const warn = document.createElement("div");
+    warn.className = "q-deferred-warn";
+    warn.textContent = t("ui.qDeferred", { n: minorOpen.length });
+    block.appendChild(warn);
+  }
 
   const ul = document.createElement("ul");
   ul.className = "q-list";
   const renderQ = (q) => {
     const li = document.createElement("li");
-    li.className = `q-item q-${q.status}`;
+    li.className = `q-item q-${q.status} qp-${q.priority}`;
     const mark = q.status === "open" ? q.id : (q.status === "resolved" ? `✓ ${q.id}` : `✓✓ ${q.id}`);
     const answer = q.answer ? `<span class="q-answer">→ ${escapeHtml(q.answer)}</span>` : "";
-    li.innerHTML = `<span class="q-text"><b>${escapeHtml(mark)}</b> ${escapeHtml(q.text)}${answer}</span><button class="remove" title="remove">×</button>`;
+    const prio = q.status === "open"
+      ? `<button class="q-prio q-prio-${q.priority}" type="button" title="${escapeHtml(t("ui.qPrioToggle"))}">${q.priority === "critical" ? "crit" : "minor"}</button>`
+      : "";
+    li.innerHTML = `<span class="q-text"><b>${escapeHtml(mark)}</b> ${escapeHtml(q.text)}${answer}</span>${prio}<button class="remove" title="remove">×</button>`;
     li.querySelector(".remove").addEventListener("click", () => api("POST", "/api/questions/remove", { id: q.id }));
+    const prioBtn = li.querySelector(".q-prio");
+    if (prioBtn) prioBtn.addEventListener("click", () => api("POST", "/api/questions/priority", { id: q.id, priority: q.priority === "critical" ? "minor" : "critical" }));
     ul.appendChild(li);
   };
-  open.forEach(renderQ);
+  criticalOpen.forEach(renderQ);
+  minorOpen.forEach(renderQ);
   resolved.forEach(renderQ);
   verified.forEach(renderQ);
   block.appendChild(ul);
@@ -1039,6 +1072,14 @@ function renderQuestionsBlock(block, tools, help, label) {
   block.appendChild(add);
 }
 
+function renderSwitcher() {
+  const el = $("switcherStatus");
+  if (!el) return;
+  const connected = Boolean(currentState.switcher?.connected);
+  el.classList.toggle("connected", connected);
+  $("switcherStatusText").textContent = connected ? t("ui.switcherConnected") : t("ui.switcherOffline");
+}
+
 function renderSettings() {
   if (!currentState.settings) return;
   const s = currentState.settings;
@@ -1051,6 +1092,22 @@ function renderSettings() {
   if (scan) {
     scan.checked = Boolean(s.allowFilesystemScan);
     scan.closest("label.toggle-row")?.classList.toggle("active", Boolean(s.allowFilesystemScan));
+  }
+  // Account / mode controls; acc 2 only selectable when the switch module exposes it.
+  const sw = currentState.switcher || { claude: {}, codex: {} };
+  for (const tool of ["codex", "claude"]) {
+    const modeEl = $(`${tool}Mode`);
+    const accEl = $(`${tool}Account`);
+    if (modeEl) modeEl.value = s[`${tool}Mode`] || "auto";
+    if (accEl) {
+      accEl.value = String(s[`${tool}Account`] || 1);
+      const acc2Available = Boolean(sw[tool]?.acc2);
+      const opt2 = accEl.querySelector('option[value="2"]');
+      if (opt2) opt2.disabled = !acc2Available;
+      const offline = !currentState.switcher?.connected;
+      modeEl.disabled = offline;
+      accEl.disabled = offline;
+    }
   }
 }
 
@@ -1197,7 +1254,7 @@ function bindUi() {
     $("toggleTrace").lastChild.textContent = arrow;
   });
 
-  const settingsHandlers = ["language", "codexModel", "codexEffort", "claudeModel", "claudeEffort"];
+  const settingsHandlers = ["language", "codexModel", "codexEffort", "claudeModel", "claudeEffort", "codexMode", "codexAccount", "claudeMode", "claudeAccount"];
   for (const id of settingsHandlers) {
     const el = $(id);
     const event = el.tagName === "INPUT" ? "blur" : "change";

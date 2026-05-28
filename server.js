@@ -9,6 +9,7 @@ const knowledge = require("./lib/knowledge");
 const questions = require("./lib/questions");
 const prompt = require("./lib/prompt");
 const cli = require("./lib/cli");
+const switcher = require("./lib/switcher");
 
 const ROOT = __dirname;
 const ROOMS_DIR = path.join(ROOT, "rooms");
@@ -33,6 +34,10 @@ let state = {
     moderator: "codex",
     allowFilesystemScan: false,
     strictScope: false,
+    codexMode: "auto",
+    codexAccount: 1,
+    claudeMode: "auto",
+    claudeAccount: 1,
   },
 };
 
@@ -112,6 +117,7 @@ function publicState() {
       autopilot: state.autopilot,
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds })),
       settings: state.settings,
+      switcher: switcher.detect(),
       workdir: WORKDIR,
       port: PORT,
       cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -138,6 +144,7 @@ function publicState() {
     autopilot: state.autopilot,
     runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds })),
     settings: state.settings,
+    switcher: switcher.detect(),
     workdir: WORKDIR,
     port: PORT,
     cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -210,8 +217,12 @@ async function runRound({ guidance = "" } = {}) {
     // remain, this round is the FINAL VERIFICATION pass over the resolved batch.
     ensureQuestionsMigrated(dir, active.id);
     const openQs = questions.openForSubtask(dir, active.id);
+    const criticalOpen = openQs.filter((q) => q.priority === "critical");
+    const minorOpen = openQs.filter((q) => q.priority === "minor");
     const resolvedQs = questions.forSubtask(dir, active.id).filter((q) => q.status === "resolved");
-    const verifyMode = openQs.length === 0 && resolvedQs.length > 0;
+    // Gate on CRITICAL only: verification starts when no critical question is open.
+    // Open minor questions are deferred (don't block) but still surfaced.
+    const verifyMode = criticalOpen.length === 0 && resolvedQs.length > 0;
     const verify = verifyMode
       ? { batch: resolvedQs.map((q) => ({ id: q.id, text: q.text, answer: q.answer })) }
       : null;
@@ -233,8 +244,9 @@ async function runRound({ guidance = "" } = {}) {
       round,
       allowFilesystemScan: allowScan,
       strictScope,
-      openQuestions: openQs.map((q) => ({ id: q.id, text: q.text })),
+      openQuestions: openQs.map((q) => ({ id: q.id, text: q.text, priority: q.priority })),
       verify,
+      deferredMinors: minorOpen.map((q) => ({ id: q.id, text: q.text })),
     };
     const codexPrompt = prompt.buildDebatePrompt({
       ...promptCommon,
@@ -260,35 +272,74 @@ async function runRound({ guidance = "" } = {}) {
     broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
     broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
 
+    // Account selection (multi-account via the optional switch module).
+    const sw = switcher.detect();
+    const codexMode = state.run.settings.codexMode || "auto";
+    const claudeMode = state.run.settings.claudeMode || "auto";
+    const pickAccount = (tool, acc) => (Number(acc) === 2 && switcher.accountAvailable(tool, 2)) ? 2 : 1;
+    let codexAccount = pickAccount("codex", state.run.settings.codexAccount);
+    let claudeAccount = pickAccount("claude", state.run.settings.claudeAccount);
+
     const stamp = `R${round}-${active.id}`;
     activeChildren = new Set();
     const trackChild = (child) => {
       activeChildren.add(child);
       child.on("close", () => activeChildren.delete(child));
     };
-    const [codexResult, claudeResult] = await Promise.all([
-      cli.runCodex(codexPrompt, {
-        workdir: WORKDIR,
-        model: codexModel,
-        effort: codexEffort,
-        outFile: path.join(dir, `${stamp}-codex.txt`),
-        logFile: path.join(dir, `${stamp}-codex.log`),
-        isolated: !allowScan,
-        signal: ac.signal,
-        onStream: (chunk) => broadcastStream("codex", chunk, { subtaskId: active.id, round }),
-        onChild: trackChild,
-      }),
-      cli.runClaude(claudePrompt, {
-        workdir: WORKDIR,
-        model: claudeModel,
-        effort: claudeEffort,
-        logFile: path.join(dir, `${stamp}-claude.log`),
-        isolated: !allowScan,
-        signal: ac.signal,
-        onStream: (chunk) => broadcastStream("claude", chunk, { subtaskId: active.id, round }),
-        onChild: trackChild,
-      }),
-    ]);
+    const runCodexOn = (account) => cli.runCodex(codexPrompt, {
+      workdir: WORKDIR,
+      model: codexModel,
+      effort: codexEffort,
+      outFile: path.join(dir, `${stamp}-codex.txt`),
+      logFile: path.join(dir, `${stamp}-codex.log`),
+      isolated: !allowScan,
+      signal: ac.signal,
+      onStream: (chunk) => broadcastStream("codex", chunk, { subtaskId: active.id, round }),
+      onChild: trackChild,
+      accountEnv: switcher.envForAccount("codex", account),
+    });
+    const runClaudeOn = (account) => cli.runClaude(claudePrompt, {
+      workdir: WORKDIR,
+      model: claudeModel,
+      effort: claudeEffort,
+      logFile: path.join(dir, `${stamp}-claude.log`),
+      isolated: !allowScan,
+      signal: ac.signal,
+      onStream: (chunk) => broadcastStream("claude", chunk, { subtaskId: active.id, round }),
+      onChild: trackChild,
+      accountEnv: switcher.envForAccount("claude", account),
+    });
+
+    addMessage({
+      role: "system",
+      name: "Council Room",
+      kind: "process",
+      text: `Аккаунты раунда: Codex акк${codexAccount} (${codexMode}), Claude акк${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
+      subtaskId: active.id,
+      round,
+    });
+
+    let [codexResult, claudeResult] = await Promise.all([runCodexOn(codexAccount), runClaudeOn(claudeAccount)]);
+
+    // Auto-failover: a failed agent in "auto" mode retries once on the other account.
+    if (!ac.signal.aborted && !codexResult.aborted && !codexResult.ok && codexMode === "auto" && sw.connected) {
+      const other = codexAccount === 1 ? 2 : 1;
+      if (switcher.accountAvailable("codex", other)) {
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Codex: ошибка/лимит на акк${codexAccount} → переключаюсь на акк${other} (auto-failover).`, subtaskId: active.id, round });
+        broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
+        codexResult = await runCodexOn(other);
+        codexAccount = other;
+      }
+    }
+    if (!ac.signal.aborted && !claudeResult.aborted && !claudeResult.ok && claudeMode === "auto" && sw.connected) {
+      const other = claudeAccount === 1 ? 2 : 1;
+      if (switcher.accountAvailable("claude", other)) {
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Claude: ошибка/лимит на акк${claudeAccount} → переключаюсь на акк${other} (auto-failover).`, subtaskId: active.id, round });
+        broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
+        claudeResult = await runClaudeOn(other);
+        claudeAccount = other;
+      }
+    }
 
     if (ac.signal.aborted) {
       addMessage({
@@ -334,6 +385,14 @@ async function runRound({ guidance = "" } = {}) {
       }
       // Record per-agent resolutions of existing questions.
       for (const r of tail.resolved) questions.recordResolve(dir, r.id, agent, r.answer);
+      // Apply priority changes; warn when a deferred question is promoted to critical.
+      for (const pr of tail.priority || []) {
+        const before = questions.forSubtask(dir, active.id).find((x) => x.id === pr.id);
+        questions.setPriority(dir, pr.id, pr.priority);
+        if (before && before.priority === "minor" && pr.priority === "critical" && before.status === "open") {
+          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ ${agent} повысил вопрос ${pr.id} до CRITICAL — теперь он блокирует исполнение.`, subtaskId: active.id, round });
+        }
+      }
     }
 
     // Final-verification pass: reopen anything either agent flagged; if both
@@ -347,16 +406,21 @@ async function runRound({ guidance = "" } = {}) {
       } else if (codexTail.verify?.ok && claudeTail.verify?.ok) {
         questions.markSubtaskVerified(dir, active.id);
         verifyPassed = true;
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Финальная проверка пройдена обоими — все вопросы verified, подзадача готова к закрытию.`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Финальная проверка пройдена обоими — критичные вопросы verified, подзадача готова к закрытию.`, subtaskId: active.id, round });
+        const stillMinor = questions.openForSubtask(dir, active.id).filter((q) => q.priority === "minor");
+        if (stillMinor.length) {
+          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ Отложено ${stillMinor.length} второстепенных вопрос(ов) — догнать позже: ${stillMinor.map((q) => q.id).join(", ")}. Если какой-то станет блокирующим — повысь до critical.`, subtaskId: active.id, round });
+        }
       }
     }
 
     const qStats = questions.forSubtask(dir, active.id);
+    const openNow = qStats.filter((q) => q.status === "open");
     addMessage({
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Вопросы: открыто ${qStats.filter((q) => q.status === "open").length}, решено ${qStats.filter((q) => q.status === "resolved").length}, проверено ${qStats.filter((q) => q.status === "verified").length}.`,
+      text: `Вопросы: открыто ${openNow.length} (critical ${openNow.filter((q) => q.priority === "critical").length} / minor ${openNow.filter((q) => q.priority === "minor").length}), решено ${qStats.filter((q) => q.status === "resolved").length}, проверено ${qStats.filter((q) => q.status === "verified").length}.`,
       subtaskId: active.id,
       round,
     });
@@ -758,6 +822,15 @@ async function router(req, res) {
       const body = await readBody(req);
       const dir = runDir(state.run.id);
       questions.removeById(dir, body.id);
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/questions/priority") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      const dir = runDir(state.run.id);
+      questions.setPriority(dir, body.id, body.priority);
       broadcast();
       return sendJson(res, 200, publicState());
     }

@@ -215,6 +215,43 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   word-break: break-all;
 }
 
+/* Switch-module indicator, pinned to the bottom of the left column */
+.switcher-status {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 10.5px;
+  color: var(--muted);
+  cursor: help;
+  user-select: none;
+}
+.switcher-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.switcher-status.connected { color: var(--green); }
+.switcher-status.connected .switcher-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
+
+/* Per-agent account/mode controls */
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.account-row .account-label { color: var(--text); }
+.account-row select { width: auto; flex: 1; min-width: 70px; font-size: 12px; padding: 4px 6px; }
+.account-row select:disabled { opacity: 0.45; }
+
 .conversation {
   flex: 1;
   overflow-y: auto;
@@ -457,6 +494,31 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .q-answer { display: block; color: var(--muted); margin-top: 2px; }
 .q-item .remove { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0; }
 .q-item .remove:hover { color: var(--red); }
+.q-prio {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.q-prio-critical { color: var(--red); border-color: var(--red); }
+.q-prio-minor { color: var(--muted); }
+.q-item.qp-minor.q-open { border-left-color: var(--muted); opacity: 0.85; }
+.q-deferred-warn {
+  background: rgba(217, 155, 59, 0.12);
+  border: 1px solid rgba(217, 155, 59, 0.4);
+  color: var(--amber);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
 .verify-badge {
   font-size: 9px;
   font-weight: 700;
