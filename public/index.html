@@ -111,8 +111,8 @@
 
         <div id="pinnedHint" class="pinned-hint hidden">
           <div class="pinned-hint-head">
-            <span class="pinned-hint-icon">📌</span>
-            <span class="pinned-hint-title" data-i18n="ui.pinnedHint">Закреплённая подсказка</span>
+            <span class="pinned-hint-title" id="pinnedHintTitle"></span>
+            <button id="pinnedHintPin" class="pinned-hint-pin" type="button" data-i18n-title="ui.unfoldHint" aria-label="unfold">📌</button>
             <button id="pinnedHintClose" class="pinned-hint-close" type="button" aria-label="close">×</button>
           </div>
           <div id="pinnedHintBody" class="pinned-hint-body"></div>
@@ -120,12 +120,10 @@
       </section>
 
       <aside class="col right">
-        <header class="col-head">
-          <h2>
-            <span data-i18n="ui.knowledgeBase">База знаний</span>
-            <span class="help" data-tooltip-key="t.knowledgeBase">?</span>
-          </h2>
+        <header class="col-head kb-head">
+          <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
           <span id="kbUpdated" class="muted small"></span>
+          <span class="help" data-tooltip-key="t.knowledgeBase">?</span>
         </header>
         <div id="kbSections" class="kb-sections"></div>
 
@@ -200,6 +198,7 @@
       <div class="next-step-head">
         <span class="next-step-icon">💡</span>
         <span class="next-step-title" id="nextStepTitle"></span>
+        <button id="nextStepPin" class="next-step-pin" type="button" data-i18n-title="ui.pinHint" aria-label="pin">📌</button>
         <button id="nextStepClose" class="next-step-close" type="button" aria-label="close">×</button>
       </div>
       <div class="next-step-body" id="nextStepBody"></div>

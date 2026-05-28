@@ -31,6 +31,7 @@ let state = {
     claudeEffort: "auto",
     moderator: "codex",
     allowFilesystemScan: false,
+    strictScope: false,
   },
 };
 
@@ -38,6 +39,7 @@ const ROUND_BUDGET = { LIGHT: 3, STANDARD: 6, STRICT: 10, CRITICAL: 12 };
 
 // Shared across manual round and autopilot so the Stop button can cancel either.
 let activeAbort = null;
+let activeChildren = new Set();
 
 const sseClients = new Set();
 
@@ -185,6 +187,7 @@ async function runRound({ guidance = "" } = {}) {
     const language = state.run.settings.language || "ru";
 
     const allowScan = Boolean(state.run.settings?.allowFilesystemScan ?? state.settings.allowFilesystemScan);
+    const strictScope = Boolean(state.run.settings?.strictScope ?? state.settings.strictScope);
     const promptCommon = {
       language,
       subtask: active,
@@ -193,6 +196,7 @@ async function runRound({ guidance = "" } = {}) {
       guidance,
       round,
       allowFilesystemScan: allowScan,
+      strictScope,
     };
     const codexPrompt = prompt.buildDebatePrompt({
       ...promptCommon,
@@ -219,6 +223,11 @@ async function runRound({ guidance = "" } = {}) {
     broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
 
     const stamp = `R${round}-${active.id}`;
+    activeChildren = new Set();
+    const trackChild = (child) => {
+      activeChildren.add(child);
+      child.on("close", () => activeChildren.delete(child));
+    };
     const [codexResult, claudeResult] = await Promise.all([
       cli.runCodex(codexPrompt, {
         workdir: WORKDIR,
@@ -229,6 +238,7 @@ async function runRound({ guidance = "" } = {}) {
         isolated: !allowScan,
         signal: ac.signal,
         onStream: (chunk) => broadcastStream("codex", chunk, { subtaskId: active.id, round }),
+        onChild: trackChild,
       }),
       cli.runClaude(claudePrompt, {
         workdir: WORKDIR,
@@ -238,6 +248,7 @@ async function runRound({ guidance = "" } = {}) {
         isolated: !allowScan,
         signal: ac.signal,
         onStream: (chunk) => broadcastStream("claude", chunk, { subtaskId: active.id, round }),
+        onChild: trackChild,
       }),
     ]);
 
@@ -327,6 +338,7 @@ async function runRound({ guidance = "" } = {}) {
     };
   } finally {
     activeAbort = null;
+    activeChildren.clear();
     state.busy = false;
     state.status = "idle";
     broadcast();
@@ -633,6 +645,9 @@ async function router(req, res) {
         addMessage({ role: "system", name: "Council Room", kind: "process", text: "Autopilot stopped: user-stop.", subtaskId: state.autopilot.subtaskId || "" });
       }
       try { activeAbort?.abort(); } catch {}
+      // Hard-kill the agent process trees — abort/SIGTERM alone leaves the cmd.exe-wrapped codex orphaned on Windows.
+      for (const child of activeChildren) cli.killTree(child);
+      activeChildren.clear();
       broadcast();
       return sendJson(res, 200, publicState());
     }

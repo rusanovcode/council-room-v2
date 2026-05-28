@@ -360,6 +360,8 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 }
 #autopilot.running:hover { background: #c94a4a; }
 
+.kb-head h2 { flex: 1; }
+
 .kb-sections {
   padding: 10px 14px;
   display: flex;
@@ -372,7 +374,25 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   letter-spacing: 0.6px;
   color: var(--muted);
   margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
+.kb-section-label { min-width: 0; }
+.kb-section-tools { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.kb-scope-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 4px;
+  cursor: pointer;
+}
+.kb-scope-toggle:hover { border-color: var(--accent); color: var(--text); }
+.kb-scope-toggle.active { color: var(--green); border-color: var(--green); }
 .kb-section ul {
   list-style: none;
   padding: 0;
@@ -522,25 +542,14 @@ button.square {
   font-size: 12px;
   line-height: 1.5;
   max-width: 420px;
+  overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  pointer-events: auto;
+  pointer-events: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   text-transform: none;
   letter-spacing: normal;
   font-weight: normal;
 }
-.tt-pin-row { display: flex; justify-content: flex-end; margin: -4px -4px 4px 0; }
-.tt-pin {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 4px;
-  opacity: 0.7;
-}
-.tt-pin:hover { opacity: 1; background: rgba(91, 157, 255, 0.15); }
 .tooltip-floating .tt-text,
 .pinned-hint .tt-text { white-space: pre-wrap; }
 .tooltip-floating .tt-example,
@@ -579,9 +588,19 @@ button.square {
   line-height: 1.5;
 }
 .pinned-hint.hidden { display: none; }
-.pinned-hint-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.pinned-hint-icon { font-size: 14px; }
+.pinned-hint-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .pinned-hint-title { flex: 1; font-weight: 600; font-size: 12px; color: var(--text); }
+.pinned-hint-pin {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.75;
+}
+.pinned-hint-pin:hover { opacity: 1; }
 .pinned-hint-close {
   background: transparent;
   border: none;
@@ -636,6 +655,17 @@ button.square {
   color: var(--text);
   font-size: 13px;
 }
+.next-step-pin {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.75;
+}
+.next-step-pin:hover { opacity: 1; }
 .next-step-close {
   background: transparent;
   border: none;

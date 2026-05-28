@@ -115,7 +115,9 @@ const STRINGS = {
     "ui.termClaude": "Claude",
     "ui.autopilotStartedHint": "Autopilot работает…",
     "ui.pinHint": "Закрепить подсказку внизу",
-    "ui.pinnedHint": "Закреплённая подсказка",
+    "ui.unfoldHint": "Развернуть обратно в плавающее окно",
+    "ui.strictScope": "Строгий scope: всё вне «Файлы в scope» — запрещено",
+    "tip.strictScope": "Спец-режим. Когда включён (☑): всё, что НЕ перечислено в секции «Файлы в scope», автоматически считается вне scope, и агентам СТРОГО запрещено это трогать.\nВ промт добавляется жёсткое правило-дополнение (complement). Удобно, когда проще перечислить разрешённое, чем запрещённое.|||в «Файлы в scope» три файла. Включаешь ☑ — агенты понимают: любой другой файл/папку проекта трогать нельзя, даже если он не указан явно в «Файлы вне scope».",
     "tip.stopStatus": "Остановить — прервать текущий процесс. Раунд обрывается кооперативно (агенты в терминалах останавливаются), частичный результат отбрасывается.",
     "tip.autopilot": "Автопилот: Codex и Claude пинг-понгуют по активной подзадаче без участия пользователя.\nЦикл сам останавливается по стоп-условию: оба resolve, два «пустых» раунда подряд (stale×2), block, или достигнут лимит раундов по режиму (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nНажми ещё раз (⏹ Стоп), чтобы прервать — текущий раунд обрывается кооперативно.|||открыта подзадача в режиме STANDARD. Жмёшь «Autopilot ▶» — идут раунды 1,2,3… На 4-м оба агента дают Status: resolve → loop стоп с «debate-complete», coach предлагает «Закрыть».",
     "tip.autoResolve": "Когда включено и автопилот ловит debate-complete (оба resolve) — подзадача закрывается автоматически с кратким резюме из Базы знаний, без лишнего вызова агента.\nКогда выключено (по умолчанию) — автопилот просто останавливается, а закрываешь ты сам (с собственным резюме).|||галка снята: на debate-complete loop стопится, ты пишешь резюме «stop = stale×2 OR token<25%» и жмёшь «Закрыть». Галка стоит: loop сам резолвит и пишет резюме из секции Решения.",
@@ -235,7 +237,9 @@ const STRINGS = {
     "ui.termClaude": "Claude",
     "ui.autopilotStartedHint": "Autopilot running…",
     "ui.pinHint": "Pin this hint at the bottom",
-    "ui.pinnedHint": "Pinned hint",
+    "ui.unfoldHint": "Expand back into the floating panel",
+    "ui.strictScope": "Strict scope: everything outside «Files in Scope» is forbidden",
+    "tip.strictScope": "Special mode. When on (☑): everything NOT listed in the «Files in Scope» section is automatically considered out of scope, and agents are STRICTLY forbidden to touch it.\nA hard complement rule is injected into the prompt. Handy when it's easier to list what's allowed than what's forbidden.|||«Files in Scope» has three files. Turn on ☑ — agents understand any other project file/folder must not be touched, even if not explicitly listed in «Files Out of Scope».",
     "tip.stopStatus": "Stop — interrupt the current process. The round is cancelled cooperatively (agents in the terminals stop), the partial result is discarded.",
     "tip.autopilot": "Autopilot: Codex and Claude ping-pong on the active subtask without you.\nThe loop stops on its own when a stop-condition fires: both resolve, two stale rounds in a row (stale×2), block, or the per-mode round budget is hit (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nClick again (⏹ Stop) to interrupt — the current round is cancelled cooperatively.|||a STANDARD-mode subtask is open. You click «Autopilot ▶» — rounds 1,2,3 run. On round 4 both agents return Status: resolve → loop stops with «debate-complete», coach suggests «Resolve».",
     "tip.autoResolve": "When on and autopilot hits debate-complete (both resolve), the subtask is closed automatically with a short summary from the Knowledge Base — no extra agent call.\nWhen off (default) the autopilot just stops and you resolve it yourself (with your own summary).|||unchecked: on debate-complete the loop stops, you type a summary «stop = stale×2 OR token<25%» and click «Resolve». Checked: the loop resolves it itself with a summary built from the Decisions section.",
@@ -277,6 +281,9 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    el.title = t(el.dataset.i18nTitle);
+  });
   document.querySelectorAll("[data-tooltip-key]").forEach((el) => {
     const key = el.dataset.tooltipKey;
     // Map: data-tooltip-key="t.foo" → look up "tip.foo"
@@ -290,98 +297,83 @@ function applyLanguage() {
 // ---- Floating tooltip ----------------------------------------------------
 
 let tooltipEl = null;
-let tooltipHideTimer = null;
-let lastTooltipContent = null;
-
-function ttSplit(text) {
-  const [main, example] = String(text || "").split("|||");
-  return { main: main || "", example: (example || "").trim() };
-}
-
 function showTooltip(text, anchor) {
-  if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
   hideTooltip();
   if (!text) return;
   tooltipEl = document.createElement("div");
   tooltipEl.className = `tooltip-floating lang-${UI_LANG}`;
-  const content = ttSplit(text);
-  lastTooltipContent = content;
-
-  const pinRow = document.createElement("div");
-  pinRow.className = "tt-pin-row";
-  const pin = document.createElement("button");
-  pin.className = "tt-pin";
-  pin.type = "button";
-  pin.textContent = "📌";
-  pin.title = t("ui.pinHint");
-  pin.setAttribute("aria-label", t("ui.pinHint"));
-  pin.addEventListener("click", (event) => {
-    event.stopPropagation();
-    pinHint(content);
-    hideTooltip();
-  });
-  pinRow.appendChild(pin);
-  tooltipEl.appendChild(pinRow);
-
+  const [main, example] = String(text).split("|||");
   const textDiv = document.createElement("div");
   textDiv.className = "tt-text";
-  textDiv.textContent = content.main;
+  textDiv.textContent = main || "";
   tooltipEl.appendChild(textDiv);
-  if (content.example) {
+  if (example && example.trim()) {
     const exampleDiv = document.createElement("div");
     exampleDiv.className = "tt-example";
-    exampleDiv.textContent = content.example;
+    exampleDiv.textContent = example.trim();
     tooltipEl.appendChild(exampleDiv);
   }
-
-  // Keep the tooltip alive while the pointer is over it (so the pin is clickable).
-  tooltipEl.addEventListener("mouseenter", () => {
-    if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
-  });
-  tooltipEl.addEventListener("mouseleave", scheduleHideTooltip);
-
   document.body.appendChild(tooltipEl);
   const rect = anchor.getBoundingClientRect();
+  const margin = 8;
+  const gap = 6;
+  const spaceBelow = window.innerHeight - rect.bottom - margin - gap;
+  const spaceAbove = rect.top - margin - gap;
+  const fullH = tooltipEl.offsetHeight;
+  // Prefer below; flip above if it doesn't fit; if neither fits, use the larger side.
+  let placeAbove;
+  if (fullH <= spaceBelow) placeAbove = false;
+  else if (fullH <= spaceAbove) placeAbove = true;
+  else placeAbove = spaceAbove > spaceBelow;
+  const avail = placeAbove ? spaceAbove : spaceBelow;
+  // Cap height to the chosen side so the tooltip never overlaps the anchor button.
+  if (fullH > avail) tooltipEl.style.maxHeight = `${Math.max(60, avail)}px`;
   const tipRect = tooltipEl.getBoundingClientRect();
-  let top = rect.bottom + 6;
+  let top = placeAbove ? rect.top - tipRect.height - gap : rect.bottom + gap;
   let left = rect.left;
-  if (top + tipRect.height > window.innerHeight - 10) top = rect.top - tipRect.height - 6;
-  if (top < 6) top = 6;
   if (left + tipRect.width > window.innerWidth - 10) left = window.innerWidth - tipRect.width - 10;
   if (left < 6) left = 6;
   tooltipEl.style.top = `${top}px`;
   tooltipEl.style.left = `${left}px`;
 }
-
-function scheduleHideTooltip() {
-  if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
-  tooltipHideTimer = setTimeout(hideTooltip, 250);
-}
-
 function hideTooltip() {
-  if (tooltipHideTimer) { clearTimeout(tooltipHideTimer); tooltipHideTimer = null; }
   if (tooltipEl) {
     tooltipEl.remove();
     tooltipEl = null;
   }
 }
 
-function pinHint(content) {
+// Pin the current next-step coach (lightbulb) guidance into the docked bottom panel.
+function pinCoach() {
+  const step = computeNextStep();
   const panel = $("pinnedHint");
   const body = $("pinnedHintBody");
-  if (!panel || !body) return;
+  if (!step || !panel || !body) return;
+  $("pinnedHintTitle").textContent = step.title;
   body.innerHTML = "";
   const textDiv = document.createElement("div");
   textDiv.className = "tt-text";
-  textDiv.textContent = content.main;
+  textDiv.textContent = step.body;
   body.appendChild(textDiv);
-  if (content.example) {
-    const exampleDiv = document.createElement("div");
-    exampleDiv.className = "tt-example";
-    exampleDiv.textContent = content.example;
-    body.appendChild(exampleDiv);
-  }
-  panel.className = `pinned-hint lang-${UI_LANG}`;
+  panel.classList.remove("hidden");
+  coachPinned = true;
+  renderNextStep();
+}
+
+// Pin button on the docked panel → restore the floating coach (unfold).
+function unpinCoach() {
+  $("pinnedHint").classList.add("hidden");
+  coachPinned = false;
+  nextStepDismissed = false;
+  renderNextStep();
+}
+
+// Close (×) on the docked panel → fully close; floating stays dismissed (💡 reopen remains).
+function closeCoachPinned() {
+  $("pinnedHint").classList.add("hidden");
+  coachPinned = false;
+  nextStepDismissed = true;
+  renderNextStep();
 }
 
 function bindTooltipDelegation() {
@@ -391,7 +383,7 @@ function bindTooltipDelegation() {
     showTooltip(target.dataset.tooltipText || "", target);
   });
   document.addEventListener("mouseout", (event) => {
-    if (event.target.closest("[data-tooltip-key]")) scheduleHideTooltip();
+    if (event.target.closest("[data-tooltip-key]")) hideTooltip();
   });
   document.addEventListener("scroll", hideTooltip, true);
   window.addEventListener("blur", hideTooltip);
@@ -480,6 +472,7 @@ function render() {
 // ---- Next-step coach -----------------------------------------------------
 
 let nextStepDismissed = false;
+let coachPinned = false;
 
 function parseStatusFromAgent(text) {
   if (!text) return "";
@@ -585,6 +578,12 @@ function renderNextStep() {
   const step = computeNextStep();
   const panel = $("nextStep");
   const reopen = $("nextStepReopen");
+  if (coachPinned) {
+    // Guidance is docked at the bottom — hide the floating panel to avoid duplication.
+    panel.classList.add("hidden");
+    reopen.classList.add("hidden");
+    return;
+  }
   if (!step) {
     panel.classList.add("hidden");
     reopen.classList.add("hidden");
@@ -905,7 +904,32 @@ function renderKnowledge() {
     const items = kb.sections[key] || [];
     const block = document.createElement("div");
     block.className = "kb-section";
-    block.innerHTML = `<h3>${escapeHtml(label)} <span class="help" data-tooltip-key="t.kb.${key}" data-tooltip-text="${escapeHtml(t(`tip.kb.${key}`))}">?</span></h3>`;
+    const h3 = document.createElement("h3");
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "kb-section-label";
+    labelSpan.textContent = label;
+    h3.appendChild(labelSpan);
+    const tools = document.createElement("span");
+    tools.className = "kb-section-tools";
+    if (key === "files_out_of_scope") {
+      const on = Boolean(currentState.settings?.strictScope);
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "kb-scope-toggle" + (on ? " active" : "");
+      toggle.textContent = on ? "☑" : "☐";
+      toggle.title = t("ui.strictScope");
+      toggle.dataset.tooltipText = t("tip.strictScope");
+      toggle.addEventListener("click", () => api("POST", "/api/settings", { strictScope: !on }));
+      tools.appendChild(toggle);
+    }
+    const help = document.createElement("span");
+    help.className = "help";
+    help.dataset.tooltipKey = `t.kb.${key}`;
+    help.dataset.tooltipText = t(`tip.kb.${key}`);
+    help.textContent = "?";
+    tools.appendChild(help);
+    h3.appendChild(tools);
+    block.appendChild(h3);
     const ul = document.createElement("ul");
     for (const item of items) {
       const li = document.createElement("li");
@@ -1118,10 +1142,18 @@ function bindUi() {
     showTooltip(target.dataset.tooltipText, target);
   });
   document.addEventListener("mouseout", (event) => {
-    if (event.target.closest("[data-tooltip-text]:not([data-tooltip-key])")) scheduleHideTooltip();
+    if (event.target.closest("[data-tooltip-text]:not([data-tooltip-key])")) hideTooltip();
   });
 
-  $("pinnedHintClose").addEventListener("click", () => $("pinnedHint").classList.add("hidden"));
+  $("nextStepPin").addEventListener("click", (event) => {
+    event.stopPropagation();
+    pinCoach();
+  });
+  $("pinnedHintPin").addEventListener("click", (event) => {
+    event.stopPropagation();
+    unpinCoach();
+  });
+  $("pinnedHintClose").addEventListener("click", closeCoachPinned);
 }
 
 bindUi();
