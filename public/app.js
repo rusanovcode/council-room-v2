@@ -117,6 +117,8 @@ const STRINGS = {
     "ui.pinHint": "Закрепить подсказку внизу",
     "ui.unfoldHint": "Развернуть обратно в плавающее окно",
     "ui.strictScope": "Строгий scope: всё вне «Файлы в scope» — запрещено",
+    "ui.qCounts": "открыто {open} · решено {resolved} · проверено {verified}",
+    "tip.verifyBadge": "Финальная проверка: открытых вопросов не осталось, все решённые собраны в пакет.\nСледующий раунд — проверочный, его гоняют МАКСИМАЛЬНЫЕ агенты (топ-модель + max reasoning). Если оба подтвердят весь пакет — подзадача готова к закрытию; любой вернёт вопрос в работу — цикл продолжится.|||3 вопроса решены обоими → бейдж VERIFY. Жмёшь раунд (или autopilot): codex gpt-5.5/xhigh и claude opus/max перепроверяют пакет. Оба «Verify: ok» → можно закрывать.",
     "tip.strictScope": "Спец-режим. Когда включён (☑): всё, что НЕ перечислено в секции «Файлы в scope», автоматически считается вне scope, и агентам СТРОГО запрещено это трогать.\nВ промт добавляется жёсткое правило-дополнение (complement). Удобно, когда проще перечислить разрешённое, чем запрещённое.|||в «Файлы в scope» три файла. Включаешь ☑ — агенты понимают: любой другой файл/папку проекта трогать нельзя, даже если он не указан явно в «Файлы вне scope».",
     "tip.stopStatus": "Остановить — прервать текущий процесс. Раунд обрывается кооперативно (агенты в терминалах останавливаются), частичный результат отбрасывается.",
     "tip.autopilot": "Автопилот: Codex и Claude пинг-понгуют по активной подзадаче без участия пользователя.\nЦикл сам останавливается по стоп-условию: оба resolve, два «пустых» раунда подряд (stale×2), block, или достигнут лимит раундов по режиму (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nНажми ещё раз (⏹ Стоп), чтобы прервать — текущий раунд обрывается кооперативно.|||открыта подзадача в режиме STANDARD. Жмёшь «Autopilot ▶» — идут раунды 1,2,3… На 4-м оба агента дают Status: resolve → loop стоп с «debate-complete», coach предлагает «Закрыть».",
@@ -239,6 +241,8 @@ const STRINGS = {
     "ui.pinHint": "Pin this hint at the bottom",
     "ui.unfoldHint": "Expand back into the floating panel",
     "ui.strictScope": "Strict scope: everything outside «Files in Scope» is forbidden",
+    "ui.qCounts": "open {open} · resolved {resolved} · verified {verified}",
+    "tip.verifyBadge": "Final verification: no open questions left, all resolved ones are batched.\nThe next round is a verification pass run by the STRONGEST agents (top model + max reasoning). If both confirm the whole batch — the subtask is ready to close; if either reopens a question — the cycle continues.|||3 questions resolved by both → VERIFY badge. Run a round (or autopilot): codex gpt-5.5/xhigh and claude opus/max recheck the batch. Both «Verify: ok» → ready to close.",
     "tip.strictScope": "Special mode. When on (☑): everything NOT listed in the «Files in Scope» section is automatically considered out of scope, and agents are STRICTLY forbidden to touch it.\nA hard complement rule is injected into the prompt. Handy when it's easier to list what's allowed than what's forbidden.|||«Files in Scope» has three files. Turn on ☑ — agents understand any other project file/folder must not be touched, even if not explicitly listed in «Files Out of Scope».",
     "tip.stopStatus": "Stop — interrupt the current process. The round is cancelled cooperatively (agents in the terminals stop), the partial result is discarded.",
     "tip.autopilot": "Autopilot: Codex and Claude ping-pong on the active subtask without you.\nThe loop stops on its own when a stop-condition fires: both resolve, two stale rounds in a row (stale×2), block, or the per-mode round budget is hit (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nClick again (⏹ Stop) to interrupt — the current round is cancelled cooperatively.|||a STANDARD-mode subtask is open. You click «Autopilot ▶» — rounds 1,2,3 run. On round 4 both agents return Status: resolve → loop stops with «debate-complete», coach suggests «Resolve».",
@@ -314,27 +318,33 @@ function showTooltip(text, anchor) {
     tooltipEl.appendChild(exampleDiv);
   }
   document.body.appendChild(tooltipEl);
-  const rect = anchor.getBoundingClientRect();
+  // The UI uses body `zoom` for font scaling; getBoundingClientRect/innerHeight are
+  // in visual px, but a fixed element's style offsets get multiplied by zoom — so
+  // we compute everything in visual px and divide the final offsets by zoom.
+  const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
   const margin = 8;
   const gap = 6;
-  const spaceBelow = window.innerHeight - rect.bottom - margin - gap;
-  const spaceAbove = rect.top - margin - gap;
-  const fullH = tooltipEl.offsetHeight;
+  const a = anchor.getBoundingClientRect();
+  let tr = tooltipEl.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - a.bottom - margin - gap;
+  const spaceAbove = a.top - margin - gap;
   // Prefer below; flip above if it doesn't fit; if neither fits, use the larger side.
   let placeAbove;
-  if (fullH <= spaceBelow) placeAbove = false;
-  else if (fullH <= spaceAbove) placeAbove = true;
+  if (tr.height <= spaceBelow) placeAbove = false;
+  else if (tr.height <= spaceAbove) placeAbove = true;
   else placeAbove = spaceAbove > spaceBelow;
   const avail = placeAbove ? spaceAbove : spaceBelow;
   // Cap height to the chosen side so the tooltip never overlaps the anchor button.
-  if (fullH > avail) tooltipEl.style.maxHeight = `${Math.max(60, avail)}px`;
-  const tipRect = tooltipEl.getBoundingClientRect();
-  let top = placeAbove ? rect.top - tipRect.height - gap : rect.bottom + gap;
-  let left = rect.left;
-  if (left + tipRect.width > window.innerWidth - 10) left = window.innerWidth - tipRect.width - 10;
+  if (tr.height > avail) {
+    tooltipEl.style.maxHeight = `${Math.max(60, avail) / zoom}px`;
+    tr = tooltipEl.getBoundingClientRect();
+  }
+  let top = placeAbove ? a.top - tr.height - gap : a.bottom + gap;
+  let left = a.left;
+  if (left + tr.width > window.innerWidth - 10) left = window.innerWidth - tr.width - 10;
   if (left < 6) left = 6;
-  tooltipEl.style.top = `${top}px`;
-  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.top = `${top / zoom}px`;
+  tooltipEl.style.left = `${left / zoom}px`;
 }
 function hideTooltip() {
   if (tooltipEl) {
@@ -945,6 +955,13 @@ function renderKnowledge() {
     tools.appendChild(help);
     h3.appendChild(tools);
     block.appendChild(h3);
+
+    if (key === "open_questions") {
+      renderQuestionsBlock(block, tools, help, label);
+      target.appendChild(block);
+      continue;
+    }
+
     const ul = document.createElement("ul");
     for (const item of items) {
       const li = document.createElement("li");
@@ -969,6 +986,57 @@ function renderKnowledge() {
     block.appendChild(add);
     target.appendChild(block);
   }
+}
+
+function renderQuestionsBlock(block, tools, help, label) {
+  const qs = currentState.run?.questions || [];
+  const open = qs.filter((q) => q.status === "open");
+  const resolved = qs.filter((q) => q.status === "resolved");
+  const verified = qs.filter((q) => q.status === "verified");
+
+  // VERIFY badge when the subtask is in the final-verification phase.
+  if (!open.length && resolved.length) {
+    const badge = document.createElement("span");
+    badge.className = "verify-badge";
+    badge.textContent = "VERIFY";
+    badge.dataset.tooltipText = t("tip.verifyBadge");
+    tools.insertBefore(badge, help);
+  }
+
+  const counts = document.createElement("div");
+  counts.className = "q-counts muted small";
+  counts.textContent = t("ui.qCounts", { open: open.length, resolved: resolved.length, verified: verified.length });
+  block.appendChild(counts);
+
+  const ul = document.createElement("ul");
+  ul.className = "q-list";
+  const renderQ = (q) => {
+    const li = document.createElement("li");
+    li.className = `q-item q-${q.status}`;
+    const mark = q.status === "open" ? q.id : (q.status === "resolved" ? `✓ ${q.id}` : `✓✓ ${q.id}`);
+    const answer = q.answer ? `<span class="q-answer">→ ${escapeHtml(q.answer)}</span>` : "";
+    li.innerHTML = `<span class="q-text"><b>${escapeHtml(mark)}</b> ${escapeHtml(q.text)}${answer}</span><button class="remove" title="remove">×</button>`;
+    li.querySelector(".remove").addEventListener("click", () => api("POST", "/api/questions/remove", { id: q.id }));
+    ul.appendChild(li);
+  };
+  open.forEach(renderQ);
+  resolved.forEach(renderQ);
+  verified.forEach(renderQ);
+  block.appendChild(ul);
+
+  const add = document.createElement("div");
+  add.className = "kb-add";
+  add.innerHTML = `<input placeholder="${escapeHtml(t("ui.addPlaceholder", { label }))}" /><button class="ghost">${t("ui.add")}</button>`;
+  const input = add.querySelector("input");
+  const button = add.querySelector("button");
+  const submit = () => {
+    if (!input.value.trim()) return;
+    api("POST", "/api/questions/add", { text: input.value.trim() });
+    input.value = "";
+  };
+  button.addEventListener("click", submit);
+  input.addEventListener("keydown", (event) => { if (event.key === "Enter") submit(); });
+  block.appendChild(add);
 }
 
 function renderSettings() {

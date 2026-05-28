@@ -6,6 +6,7 @@ const url = require("node:url");
 const store = require("./lib/store");
 const subtasks = require("./lib/subtasks");
 const knowledge = require("./lib/knowledge");
+const questions = require("./lib/questions");
 const prompt = require("./lib/prompt");
 const cli = require("./lib/cli");
 
@@ -36,6 +37,11 @@ let state = {
 };
 
 const ROUND_BUDGET = { LIGHT: 3, STANDARD: 6, STRICT: 10, CRITICAL: 12 };
+
+// The FINAL VERIFICATION pass (the gate that closes a subtask) is always run by
+// the strongest available agents at max reasoning, regardless of the cheaper
+// models used for regular debate rounds.
+const VERIFY_AGENTS = { codexModel: "gpt-5.5", codexEffort: "xhigh", claudeModel: "opus", claudeEffort: "max" };
 
 // Shared across manual round and autopilot so the Stop button can cancel either.
 let activeAbort = null;
@@ -85,6 +91,17 @@ function listRuns() {
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
+// One-time, idempotent: move legacy free-text open_questions from knowledge.md
+// into the per-subtask questions store (deduped), then clear the KB section.
+function ensureQuestionsMigrated(dir, subtaskId) {
+  if (!subtaskId) return;
+  const kb = knowledge.load(dir);
+  const legacy = kb.sections.open_questions || [];
+  if (!legacy.length) return;
+  questions.migrateStrings(dir, subtaskId, legacy, 0);
+  knowledge.replaceSection(dir, "open_questions", []);
+}
+
 function publicState() {
   if (!state.run) {
     return {
@@ -103,7 +120,9 @@ function publicState() {
   const dir = runDir(state.run.id);
   const allSubtasks = subtasks.loadAll(dir);
   const active = allSubtasks.find((item) => item.status === "open") || null;
+  if (active) ensureQuestionsMigrated(dir, active.id);
   const messages = store.readJsonl(transcriptPath(state.run.id));
+  const activeQuestions = active ? questions.forSubtask(dir, active.id) : [];
   return {
     activeRunId: state.run.id,
     busy: state.busy,
@@ -113,6 +132,7 @@ function publicState() {
       activeSubtask: active,
       subtasks: allSubtasks,
       knowledge: knowledge.load(dir),
+      questions: activeQuestions,
       messages,
     },
     autopilot: state.autopilot,
@@ -186,6 +206,22 @@ async function runRound({ guidance = "" } = {}) {
     const kbSnapshot = knowledge.snapshotForPrompt(dir);
     const language = state.run.settings.language || "ru";
 
+    // Question lifecycle: feed only OPEN questions; if none open but some resolved
+    // remain, this round is the FINAL VERIFICATION pass over the resolved batch.
+    ensureQuestionsMigrated(dir, active.id);
+    const openQs = questions.openForSubtask(dir, active.id);
+    const resolvedQs = questions.forSubtask(dir, active.id).filter((q) => q.status === "resolved");
+    const verifyMode = openQs.length === 0 && resolvedQs.length > 0;
+    const verify = verifyMode
+      ? { batch: resolvedQs.map((q) => ({ id: q.id, text: q.text, answer: q.answer })) }
+      : null;
+
+    // Final verification → strongest agents at max reasoning; otherwise per-chat settings.
+    const codexModel = verifyMode ? VERIFY_AGENTS.codexModel : state.run.settings.codexModel;
+    const codexEffort = verifyMode ? VERIFY_AGENTS.codexEffort : state.run.settings.codexEffort;
+    const claudeModel = verifyMode ? VERIFY_AGENTS.claudeModel : state.run.settings.claudeModel;
+    const claudeEffort = verifyMode ? VERIFY_AGENTS.claudeEffort : state.run.settings.claudeEffort;
+
     const allowScan = Boolean(state.run.settings?.allowFilesystemScan ?? state.settings.allowFilesystemScan);
     const strictScope = Boolean(state.run.settings?.strictScope ?? state.settings.strictScope);
     const promptCommon = {
@@ -197,6 +233,8 @@ async function runRound({ guidance = "" } = {}) {
       round,
       allowFilesystemScan: allowScan,
       strictScope,
+      openQuestions: openQs.map((q) => ({ id: q.id, text: q.text })),
+      verify,
     };
     const codexPrompt = prompt.buildDebatePrompt({
       ...promptCommon,
@@ -213,7 +251,7 @@ async function runRound({ guidance = "" } = {}) {
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Раунд ${round} (subtask ${active.id}): запуск Codex и Claude параллельно. Codex prompt ${codexPrompt.length} chars, Claude prompt ${claudePrompt.length} chars.`,
+      text: `Раунд ${round} (subtask ${active.id})${verifyMode ? " — ФИНАЛЬНАЯ ПРОВЕРКА (максимальные агенты: codex " + codexModel + "/" + codexEffort + ", claude " + claudeModel + "/" + claudeEffort + ")" : ""}: запуск Codex и Claude параллельно. Codex prompt ${codexPrompt.length} chars, Claude prompt ${claudePrompt.length} chars.`,
       subtaskId: active.id,
       round,
     });
@@ -231,8 +269,8 @@ async function runRound({ guidance = "" } = {}) {
     const [codexResult, claudeResult] = await Promise.all([
       cli.runCodex(codexPrompt, {
         workdir: WORKDIR,
-        model: state.run.settings.codexModel,
-        effort: state.run.settings.codexEffort,
+        model: codexModel,
+        effort: codexEffort,
         outFile: path.join(dir, `${stamp}-codex.txt`),
         logFile: path.join(dir, `${stamp}-codex.log`),
         isolated: !allowScan,
@@ -242,8 +280,8 @@ async function runRound({ guidance = "" } = {}) {
       }),
       cli.runClaude(claudePrompt, {
         workdir: WORKDIR,
-        model: state.run.settings.claudeModel,
-        effort: state.run.settings.claudeEffort,
+        model: claudeModel,
+        effort: claudeEffort,
         logFile: path.join(dir, `${stamp}-claude.log`),
         isolated: !allowScan,
         signal: ac.signal,
@@ -284,11 +322,44 @@ async function runRound({ guidance = "" } = {}) {
       round,
     });
 
-    for (const patch of [...codexTail.kbPatches, ...claudeTail.kbPatches]) {
-      try {
-        knowledge.addItem(dir, patch.section, patch.item);
-      } catch {}
+    // Route KB-patches: open_questions go to the per-subtask questions store
+    // (deduped), everything else into the durable Knowledge Base.
+    for (const [agent, tail] of [["codex", codexTail], ["claude", claudeTail]]) {
+      for (const patch of tail.kbPatches) {
+        if (patch.section === "open_questions") {
+          questions.addQuestion(dir, active.id, patch.item, round);
+        } else {
+          try { knowledge.addItem(dir, patch.section, patch.item); } catch {}
+        }
+      }
+      // Record per-agent resolutions of existing questions.
+      for (const r of tail.resolved) questions.recordResolve(dir, r.id, agent, r.answer);
     }
+
+    // Final-verification pass: reopen anything either agent flagged; if both
+    // confirm with no reopens, mark the whole batch verified → debate complete.
+    let verifyPassed = false;
+    if (verifyMode) {
+      const reopen = new Set([...(codexTail.verify?.reopen || []), ...(claudeTail.verify?.reopen || [])]);
+      for (const id of reopen) questions.reopen(dir, id);
+      if (reopen.size) {
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Финальная проверка: возвращены в работу — ${[...reopen].join(", ")}.`, subtaskId: active.id, round });
+      } else if (codexTail.verify?.ok && claudeTail.verify?.ok) {
+        questions.markSubtaskVerified(dir, active.id);
+        verifyPassed = true;
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Финальная проверка пройдена обоими — все вопросы verified, подзадача готова к закрытию.`, subtaskId: active.id, round });
+      }
+    }
+
+    const qStats = questions.forSubtask(dir, active.id);
+    addMessage({
+      role: "system",
+      name: "Council Room",
+      kind: "process",
+      text: `Вопросы: открыто ${qStats.filter((q) => q.status === "open").length}, решено ${qStats.filter((q) => q.status === "resolved").length}, проверено ${qStats.filter((q) => q.status === "verified").length}.`,
+      subtaskId: active.id,
+      round,
+    });
 
     subtasks.incrementRounds(dir, active.id);
 
@@ -314,6 +385,7 @@ async function runRound({ guidance = "" } = {}) {
         round,
       });
     }
+    const debateComplete = (codexTail.status === "resolve" && claudeTail.status === "resolve") || verifyPassed;
     if (codexTail.status === "block" || claudeTail.status === "block") {
       addMessage({
         role: "system",
@@ -333,7 +405,7 @@ async function runRound({ guidance = "" } = {}) {
       round,
       subtaskId: active.id,
       stale: codexStale && claudeStale,
-      resolve: codexTail.status === "resolve" && claudeTail.status === "resolve",
+      resolve: debateComplete,
       block: codexTail.status === "block" || claudeTail.status === "block",
     };
   } finally {
@@ -670,6 +742,26 @@ async function router(req, res) {
       return sendJson(res, 200, publicState());
     }
 
+    if (method === "POST" && pathname === "/api/questions/add") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      const dir = runDir(state.run.id);
+      const active = subtasks.activeSubtask(dir);
+      if (!active) return sendJson(res, 400, { error: "No active subtask" });
+      questions.addQuestion(dir, active.id, body.text || "", state.run.rounds || 0);
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/questions/remove") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      const dir = runDir(state.run.id);
+      questions.removeById(dir, body.id);
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
     if (method === "POST" && pathname === "/api/settings") {
       const body = await readBody(req);
       state.settings = { ...state.settings, ...body };
@@ -689,10 +781,23 @@ async function router(req, res) {
   }
 }
 
+// Auto-select the most recently created chat on startup so a server restart
+// doesn't land the user on an empty screen ("куда делись чаты?").
+function selectLastRunOnStartup() {
+  const runs = listRuns(); // sorted ascending by createdAt
+  if (!runs.length) return;
+  const last = runs[runs.length - 1];
+  state.run = last;
+  state.activeRunId = last.id;
+}
+
+selectLastRunOnStartup();
+
 const server = http.createServer(router);
 server.listen(PORT, () => {
   console.log(`Council Room v2 listening on http://localhost:${PORT}`);
   console.log(`Workdir: ${WORKDIR}`);
   console.log(`Codex: ${cli.describeCodex()}`);
   console.log(`Claude: ${cli.describeClaude()}`);
+  console.log(`Active chat: ${state.activeRunId || "(none)"}`);
 });

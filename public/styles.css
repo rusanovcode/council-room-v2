@@ -433,6 +433,41 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .kb-add input { flex: 1; font-size: 12px; padding: 4px 6px; }
 .kb-add button { padding: 4px 8px; font-size: 11px; }
 
+/* Open-questions lifecycle */
+.q-counts { margin: 0 0 6px; font-family: var(--mono); }
+.q-list { list-style: none; padding: 0; margin: 0 0 6px; display: flex; flex-direction: column; gap: 4px; }
+.q-item {
+  background: var(--panel-2);
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: var(--mono);
+  word-break: break-word;
+  border-left: 3px solid var(--amber);
+}
+.q-item .q-text { flex: 1; }
+.q-item .q-text b { color: var(--amber); }
+.q-item.q-resolved { border-left-color: var(--green); opacity: 0.9; }
+.q-item.q-resolved .q-text b { color: var(--green); }
+.q-item.q-verified { border-left-color: var(--green); opacity: 0.6; }
+.q-item.q-verified .q-text b { color: var(--green); }
+.q-answer { display: block; color: var(--muted); margin-top: 2px; }
+.q-item .remove { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0; }
+.q-item .remove:hover { color: var(--red); }
+.verify-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--green);
+  border: 1px solid var(--green);
+  border-radius: 3px;
+  padding: 1px 5px;
+  cursor: help;
+}
+
 label {
   display: grid;
   grid-template-columns: 1fr auto;
