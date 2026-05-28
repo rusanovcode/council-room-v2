@@ -264,6 +264,55 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 }
 .trace-list .trace-row { padding: 2px 0; border-top: 1px dotted var(--border); }
 
+/* Pinned agent terminals */
+.terminals {
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+.terminals-head {
+  padding: 4px 14px;
+}
+.terminals-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.terminals-arrow { font-size: 10px; }
+.terminals-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 14px 10px;
+}
+.terminals.collapsed .terminals-body { display: none; }
+.terminal-pane { display: flex; flex-direction: column; min-width: 0; }
+.terminal-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.terminal {
+  margin: 0;
+  background: #0a0c10;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: #b9c8e6;
+  height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .composer {
   border-top: 1px solid var(--border);
   padding: 10px 14px;
@@ -276,7 +325,25 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
+.autoresolve-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.autoresolve-row > input { width: auto; margin: 0; }
+.autoresolve-row > span { color: var(--text); }
+#autopilot.running {
+  background: var(--red);
+  border-color: var(--red);
+  color: white;
+  animation: coachPulse 1.6s ease-in-out infinite;
+}
+#autopilot.running:hover { background: #c94a4a; }
 
 .kb-sections {
   padding: 10px 14px;

@@ -67,6 +67,26 @@
 
         <div id="conversation" class="conversation"></div>
 
+        <section id="terminals" class="terminals collapsed">
+          <header class="terminals-head">
+            <button id="toggleTerminals" class="ghost small" type="button">
+              <span data-i18n="ui.terminals">Терминалы агентов</span>
+              <span class="help" data-tooltip-key="t.terminals">?</span>
+              <span class="terminals-arrow">▾</span>
+            </button>
+          </header>
+          <div class="terminals-body">
+            <div class="terminal-pane">
+              <div class="terminal-label" data-i18n="ui.termCodex">Codex</div>
+              <pre id="termCodex" class="terminal"></pre>
+            </div>
+            <div class="terminal-pane">
+              <div class="terminal-label" data-i18n="ui.termClaude">Claude</div>
+              <pre id="termClaude" class="terminal"></pre>
+            </div>
+          </div>
+        </section>
+
         <details id="trace" class="trace">
           <summary data-i18n="ui.traceSummary">Служебные события</summary>
           <div id="traceList" class="trace-list"></div>
@@ -78,6 +98,13 @@
           <div class="composer-actions">
             <button id="runRound" class="primary" disabled
               data-i18n="ui.runRound" data-tooltip-key="t.runRound">▶ Запустить раунд</button>
+            <button id="autopilot" class="ghost" disabled
+              data-i18n="ui.autopilotStart" data-tooltip-key="t.autopilot">Autopilot ▶</button>
+            <label class="autoresolve-row">
+              <input id="autoResolve" type="checkbox" />
+              <span data-i18n="ui.autoResolve">Авто-закрытие</span>
+              <span class="help" data-tooltip-key="t.autoResolve">?</span>
+            </label>
             <span id="busyIndicator" class="muted small"></span>
           </div>
         </footer>

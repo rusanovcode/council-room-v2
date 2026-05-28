@@ -107,6 +107,19 @@ const STRINGS = {
     "coach.runRound.title": "Готов к следующему раунду",
     "coach.runRound.body": "Можешь запустить ещё раунд или закрыть подзадачу, если решение собрано. В Knowledge Base уже добавлено: {kbCount} пункт(а).",
     "coach.runRound.action": "Запустить раунд",
+    "ui.autopilotStart": "Autopilot ▶",
+    "ui.autopilotStop": "⏹ Стоп",
+    "ui.autoResolve": "Авто-закрытие",
+    "ui.terminals": "Терминалы агентов",
+    "ui.termCodex": "Codex",
+    "ui.termClaude": "Claude",
+    "ui.autopilotStartedHint": "Autopilot работает…",
+    "tip.autopilot": "Автопилот: Codex и Claude пинг-понгуют по активной подзадаче без участия пользователя.\nЦикл сам останавливается по стоп-условию: оба resolve, два «пустых» раунда подряд (stale×2), block, или достигнут лимит раундов по режиму (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nНажми ещё раз (⏹ Стоп), чтобы прервать — текущий раунд обрывается кооперативно.|||открыта подзадача в режиме STANDARD. Жмёшь «Autopilot ▶» — идут раунды 1,2,3… На 4-м оба агента дают Status: resolve → loop стоп с «debate-complete», coach предлагает «Закрыть».",
+    "tip.autoResolve": "Когда включено и автопилот ловит debate-complete (оба resolve) — подзадача закрывается автоматически с кратким резюме из Базы знаний, без лишнего вызова агента.\nКогда выключено (по умолчанию) — автопилот просто останавливается, а закрываешь ты сам (с собственным резюме).|||галка снята: на debate-complete loop стопится, ты пишешь резюме «stop = stale×2 OR token<25%» и жмёшь «Закрыть». Галка стоит: loop сам резолвит и пишет резюме из секции Решения.",
+    "tip.terminals": "Live-вывод (stdout+stderr) обоих агентов во время раунда.\nОчищается в начале каждого раунда. Раскрывашка ▾/▴ сворачивает панель; состояние сохраняется между запусками.|||во время autopilot-раунда видишь как Codex стримит рассуждения слева, Claude — справа. Полезно чтобы понять, завис агент или думает.",
+    "coach.autopilot.title": "Autopilot работает",
+    "coach.autopilot.body": "Codex и Claude идут раунд за раундом по активной подзадаче. Остановится сам по стоп-условию (оба resolve / stale×2 / block / лимит раундов). Можешь прервать в любой момент.",
+    "coach.autopilot.action": "⏹ Остановить autopilot",
   },
   en: {
     "ui.newChat": "+ New chat",
@@ -211,6 +224,19 @@ const STRINGS = {
     "coach.runRound.title": "Ready for next round",
     "coach.runRound.body": "You can run another round or resolve the subtask if the decision is collected. Knowledge Base already has {kbCount} item(s).",
     "coach.runRound.action": "Run round",
+    "ui.autopilotStart": "Autopilot ▶",
+    "ui.autopilotStop": "⏹ Stop",
+    "ui.autoResolve": "Auto-resolve",
+    "ui.terminals": "Agent terminals",
+    "ui.termCodex": "Codex",
+    "ui.termClaude": "Claude",
+    "ui.autopilotStartedHint": "Autopilot running…",
+    "tip.autopilot": "Autopilot: Codex and Claude ping-pong on the active subtask without you.\nThe loop stops on its own when a stop-condition fires: both resolve, two stale rounds in a row (stale×2), block, or the per-mode round budget is hit (LIGHT 3 / STANDARD 6 / STRICT 10 / CRITICAL 12).\nClick again (⏹ Stop) to interrupt — the current round is cancelled cooperatively.|||a STANDARD-mode subtask is open. You click «Autopilot ▶» — rounds 1,2,3 run. On round 4 both agents return Status: resolve → loop stops with «debate-complete», coach suggests «Resolve».",
+    "tip.autoResolve": "When on and autopilot hits debate-complete (both resolve), the subtask is closed automatically with a short summary from the Knowledge Base — no extra agent call.\nWhen off (default) the autopilot just stops and you resolve it yourself (with your own summary).|||unchecked: on debate-complete the loop stops, you type a summary «stop = stale×2 OR token<25%» and click «Resolve». Checked: the loop resolves it itself with a summary built from the Decisions section.",
+    "tip.terminals": "Live output (stdout+stderr) of both agents during a round.\nCleared at the start of each round. The ▾/▴ toggle collapses the panel; the state is persisted between sessions.|||during an autopilot round you watch Codex stream its reasoning on the left, Claude on the right. Useful to tell whether an agent is stuck or thinking.",
+    "coach.autopilot.title": "Autopilot running",
+    "coach.autopilot.body": "Codex and Claude are going round after round on the active subtask. It stops on its own at a stop-condition (both resolve / stale×2 / block / round budget). You can interrupt anytime.",
+    "coach.autopilot.action": "⏹ Stop autopilot",
   },
 };
 
@@ -317,6 +343,21 @@ async function api(method, path, body) {
   return null;
 }
 
+const TERM_CAP = 40000; // chars per pinned terminal
+const termBuffers = { codex: "", claude: "" };
+
+function appendTerminal(agent, chunk, reset) {
+  const el = agent === "codex" ? $("termCodex") : $("termClaude");
+  if (!el) return;
+  if (reset) {
+    termBuffers[agent] = "";
+  } else {
+    termBuffers[agent] = (termBuffers[agent] + chunk).slice(-TERM_CAP);
+  }
+  el.textContent = termBuffers[agent];
+  el.scrollTop = el.scrollHeight;
+}
+
 function connectEvents() {
   const source = new EventSource("/api/events");
   source.onmessage = (event) => {
@@ -327,6 +368,15 @@ function connectEvents() {
       console.error("SSE parse failed", error);
     }
   };
+  source.addEventListener("stream", (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.agent !== "codex" && data.agent !== "claude") return;
+      appendTerminal(data.agent, data.chunk || "", Boolean(data.reset));
+    } catch (error) {
+      console.error("SSE stream parse failed", error);
+    }
+  });
   source.onerror = () => {
     setTimeout(connectEvents, 2000);
     source.close();
@@ -382,6 +432,13 @@ function computeNextStep() {
   }
   const active = s.run?.activeSubtask;
   const subtasks = s.run?.subtasks || [];
+  if (s.autopilot?.running) {
+    return {
+      title: t("coach.autopilot.title"),
+      body: t("coach.autopilot.body"),
+      action: { label: t("coach.autopilot.action"), target: "autopilot" },
+    };
+  }
   if (!active && !subtasks.length) {
     return {
       title: t("coach.step2.title"),
@@ -609,7 +666,9 @@ function renderStatus() {
   const idleLabel = currentState.status === "idle" ? t("ui.idle") : currentState.status;
   el.textContent = currentState.busy ? `${t("ui.busy")} · ${currentState.status}` : idleLabel;
   el.classList.toggle("busy", Boolean(currentState.busy));
-  $("busyIndicator").textContent = currentState.busy ? t("ui.runInProgress") : "";
+  $("busyIndicator").textContent = currentState.autopilot?.running
+    ? t("ui.autopilotStartedHint")
+    : (currentState.busy ? t("ui.runInProgress") : "");
 }
 
 function renderSubtasks() {
@@ -683,13 +742,30 @@ function renderSubtasks() {
 
 function renderActiveSubtask() {
   const active = currentState.run?.activeSubtask;
+  const autopilotRunning = Boolean(currentState.autopilot?.running);
   $("activeSubtaskTitle").textContent = active ? active.title : t("ui.noActiveSubtask");
   $("activeSubtaskMeta").textContent = active
     ? t("ui.subtaskMeta", { id: active.id, mode: active.mode, rounds: active.rounds })
     : t("ui.noActiveSubtaskHint");
-  $("runRound").disabled = !active || currentState.busy;
-  $("resolveSubtask").disabled = !active;
-  $("freezeSubtask").disabled = !active;
+  $("runRound").disabled = !active || currentState.busy || autopilotRunning;
+  $("resolveSubtask").disabled = !active || autopilotRunning;
+  $("freezeSubtask").disabled = !active || autopilotRunning;
+  renderAutopilot();
+}
+
+function renderAutopilot() {
+  const btn = $("autopilot");
+  if (!btn) return;
+  const active = currentState.run?.activeSubtask;
+  const running = Boolean(currentState.autopilot?.running);
+  btn.textContent = running ? t("ui.autopilotStop") : t("ui.autopilotStart");
+  btn.classList.toggle("running", running);
+  btn.classList.toggle("primary", running);
+  btn.classList.toggle("ghost", !running);
+  // While running, Stop must stay clickable; otherwise needs an active subtask.
+  btn.disabled = running ? false : (!active || currentState.busy);
+  const autoResolve = $("autoResolve");
+  if (autoResolve) autoResolve.disabled = running;
 }
 
 function renderConversation() {
@@ -874,6 +950,28 @@ function bindUi() {
     const guidance = $("guidance").value.trim();
     $("guidance").value = "";
     await api("POST", "/api/round", { guidance });
+  });
+
+  $("autopilot").addEventListener("click", async () => {
+    if (currentState.autopilot?.running) {
+      await api("POST", "/api/autopilot/stop", {});
+    } else {
+      const autoResolve = $("autoResolve").checked;
+      await api("POST", "/api/autopilot/start", { autoResolve });
+    }
+  });
+
+  const TERMINALS_KEY = "council-room-v2.terminalsCollapsed";
+  const applyTerminalsCollapsed = (collapsed) => {
+    $("terminals").classList.toggle("collapsed", collapsed);
+    const arrow = $("terminals").querySelector(".terminals-arrow");
+    if (arrow) arrow.textContent = collapsed ? "▾" : "▴";
+  };
+  applyTerminalsCollapsed(localStorage.getItem(TERMINALS_KEY) !== "false");
+  $("toggleTerminals").addEventListener("click", () => {
+    const collapsed = !$("terminals").classList.contains("collapsed");
+    applyTerminalsCollapsed(collapsed);
+    try { localStorage.setItem(TERMINALS_KEY, String(collapsed)); } catch {}
   });
 
   $("resolveSubtask").addEventListener("click", async () => {
