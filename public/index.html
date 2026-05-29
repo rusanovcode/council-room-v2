@@ -187,15 +187,9 @@
             </div>
           </div>
         </details>
-        <header class="col-head kb-head">
-          <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
-          <span id="kbUpdated" class="muted small"></span>
-          <span class="help" data-tooltip-key="t.knowledgeBase">?</span>
-        </header>
-        <div id="kbSections" class="kb-sections"></div>
 
         <section class="block">
-          <h2 data-i18n="ui.settings">Настройки</h2>
+          <h2><span data-i18n="ui.settings">Настройки</span> <span class="help" data-tooltip-key="t.agentSettings">?</span></h2>
           <label class="toggle-row danger-toggle">
             <input id="allowFilesystemScan" type="checkbox" />
             <span data-i18n="ui.allowScan">Разрешить агентам сканировать файлы</span>
@@ -283,6 +277,13 @@
           </div>
           </div><!-- /#legacyAgents -->
         </section>
+
+        <header class="col-head kb-head">
+          <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
+          <span id="kbUpdated" class="muted small"></span>
+          <span class="help" data-tooltip-key="t.knowledgeBase">?</span>
+        </header>
+        <div id="kbSections" class="kb-sections"></div>
       </aside>
     </main>
 
