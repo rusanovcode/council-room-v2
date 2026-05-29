@@ -202,8 +202,21 @@ function recentTurnsForSubtask(runId, subtaskId, limit = 2) {
   if (!subtaskId) return [];
   const messages = store.readJsonl(transcriptPath(runId));
   return messages
-    .filter((m) => m.subtaskId === subtaskId && (m.role === "agent" || m.role === "user"))
+    .filter((m) => m.subtaskId === subtaskId && (m.role === "agent" || m.role === "user") && !m.trashed)
     .slice(-limit * 2);
+}
+
+// Move an agent response to the trash (or restore it). Trashed messages are kept
+// in the transcript but hidden from the conversation and excluded from the
+// context fed to the next round.
+function setMessageTrashed(runId, id, trashed) {
+  const file = transcriptPath(runId);
+  const messages = store.readJsonl(file);
+  const target = messages.find((m) => m.id === id);
+  if (!target) throw new Error("Message not found");
+  target.trashed = Boolean(trashed);
+  store.rewriteJsonl(file, messages);
+  return target;
 }
 
 async function runRound({ guidance = "" } = {}) {
@@ -523,7 +536,7 @@ function buildLocalSummary(dir, subtask) {
   return lines.join("\n");
 }
 
-async function runAutopilot({ autoResolve = false } = {}) {
+async function runAutopilot({ autoResolve = false, guidance = "" } = {}) {
   if (!state.run) throw new Error("No active run");
   if (state.busy) throw new Error("Busy");
   if (state.autopilot.running) throw new Error("Autopilot already running");
@@ -542,6 +555,7 @@ async function runAutopilot({ autoResolve = false } = {}) {
   broadcast();
 
   let staleStreak = 0;
+  let pendingGuidance = guidance; // forwarded to the first round only, then cleared
   try {
     while (state.autopilot.running) {
       const cur = subtasks.activeSubtask(dir);
@@ -551,7 +565,8 @@ async function runAutopilot({ autoResolve = false } = {}) {
 
       let r;
       try {
-        r = await runRound({});
+        r = await runRound({ guidance: pendingGuidance });
+        pendingGuidance = "";
       } catch (error) {
         stopAutopilot(`error: ${error.message}`);
         break;
@@ -791,6 +806,19 @@ async function router(req, res) {
       return sendJson(res, 200, publicState());
     }
 
+    if (method === "POST" && (pathname === "/api/messages/trash" || pathname === "/api/messages/restore")) {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      const trashed = pathname.endsWith("/trash");
+      try {
+        setMessageTrashed(state.run.id, body.id, trashed);
+      } catch (error) {
+        return sendJson(res, 404, { error: error.message });
+      }
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
     if (method === "POST" && pathname === "/api/subtasks/trash/empty") {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const dir = runDir(state.run.id);
@@ -828,7 +856,7 @@ async function router(req, res) {
     if (method === "POST" && pathname === "/api/autopilot/start") {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
-      runAutopilot({ autoResolve: Boolean(body.autoResolve) }).catch((error) => {
+      runAutopilot({ autoResolve: Boolean(body.autoResolve), guidance: body.guidance || "" }).catch((error) => {
         stopAutopilot(`error: ${error.message}`);
         broadcast();
       });
@@ -959,6 +987,9 @@ async function router(req, res) {
 
     if (method === "POST" && pathname === "/api/settings") {
       const body = await readBody(req);
+      // Allowing filesystem scan lifts strict scope (the two express opposite
+      // intents). One-way only: toggling strict scope leaves scan untouched.
+      if (body.allowFilesystemScan === true) body.strictScope = false;
       state.settings = { ...state.settings, ...body };
       if (state.run) {
         state.run.settings = { ...state.run.settings, ...body };
@@ -976,9 +1007,15 @@ async function router(req, res) {
   }
 }
 
+// Rehydrate the in-memory state.settings (what the UI reads) from the run's
+// persisted settings (what rounds read) whenever a run is activated. Without
+// this the two diverge after a restart: state.settings falls back to code
+// defaults (e.g. mode "auto") while run.settings keeps the on-disk value
+// (e.g. "manual") — the UI then shows auto but rounds use manual.
 function applyRunSettings(run) {
-  if (run?.settings?.subscriptions) {
-    state.settings.subscriptions = { ...run.settings.subscriptions };
+  if (!run?.settings) return;
+  for (const [key, value] of Object.entries(run.settings)) {
+    if (value !== undefined) state.settings[key] = value;
   }
 }
 

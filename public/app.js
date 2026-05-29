@@ -13,6 +13,10 @@ const STRINGS = {
     "ui.resolve": "Закрыть",
     "ui.freeze": "Заморозить",
     "ui.trace": "Лог",
+    "ui.msgTrash": "Корзина ответов",
+    "ui.trashResponse": "В корзину",
+    "ui.restoreResponse": "Восстановить",
+    "ui.trashedEmpty": "Корзина ответов пуста.",
     "ui.traceSummary": "Служебные события",
     "ui.runRound": "▶ Запустить раунд",
     "ui.guidancePlaceholder": "Направление на следующий раунд (опц.)",
@@ -68,6 +72,7 @@ const STRINGS = {
     "tip.freeze": "Заморозить подзадачу с причиной. Не закрыта, но временно не дебатируется.|||подзадача «выбор UI-библиотеки» — ждёт пока пользователь сравнит варианты. Причина: «жду решения пользователя по vanilla vs preact».",
     "tip.runRound": "Один синхронный раунд: Codex и Claude отвечают параллельно ПО АКТИВНОЙ подзадаче.\nРеализацию не запускает, файлы не меняет (read-only debate).|||жмёшь «▶ Запустить раунд». Через 30-90 секунд в ленте два новых сообщения: Codex и Claude, каждое заканчивается хвостом «New facts / risks / alternatives / Status / KB-patch».",
     "tip.trace": "Служебные сообщения (запуск CLI, KB-патчи и т.п.).\nСкрыты из обычной ленты, чтобы не засорять её.|||«Раунд 3 (subtask st_5a625327): запуск Codex и Claude параллельно. Codex prompt 1842 chars, Claude prompt 1842 chars.» — техническая запись, не для чтения.",
+    "tip.msgTrash": "Показать/скрыть удалённые ответы агентов.\nОтвет в корзине скрыт из ленты и не передаётся агентам в контекст следующего раунда — но не удаляется, его можно восстановить.|||ошибочный или шумный ответ убираешь в корзину кнопкой 🗑 на карточке; передумал — открываешь корзину и жмёшь «Восстановить».",
     "tip.mode": "LIGHT — хотфикс ≤3 файлов, без дебатов.\nSTANDARD — обычная фича, 2–4 раунда.\nSTRICT — критичные системы, 4–8 раундов.\nCRITICAL — прод/финансы, 6–10 раундов + независимый аудит.|||смена цвета кнопки → LIGHT. Новый эндпоинт API → STANDARD. Переезд auth-логики → STRICT. Миграция платёжной БД → CRITICAL.",
     "tip.langToggle": "Переключить язык интерфейса (RU ⇄ EN). Также влияет на язык ответов агентов.|||клик на «RU» → весь UI становится английским, агенты в следующем раунде ответят по-английски.",
     "tip.fontUp": "Увеличить размер интерфейса (текст + контролы). Масштаб сохраняется между запусками.|||при работе на 4K-мониторе или с расстояния — нажми A+ 2-3 раза.",
@@ -188,6 +193,10 @@ const STRINGS = {
     "ui.resolve": "Resolve",
     "ui.freeze": "Freeze",
     "ui.trace": "Trace",
+    "ui.msgTrash": "Response bin",
+    "ui.trashResponse": "Trash",
+    "ui.restoreResponse": "Restore",
+    "ui.trashedEmpty": "Response bin is empty.",
     "ui.traceSummary": "Process trace (system events)",
     "ui.runRound": "▶ Run round",
     "ui.guidancePlaceholder": "Steer the next round (optional)",
@@ -243,6 +252,7 @@ const STRINGS = {
     "tip.freeze": "Freeze the subtask with a reason. Not closed, but paused from debate.|||subtask “pick UI library” — waiting for the user to compare options. Reason: “awaiting user decision on vanilla vs preact”.",
     "tip.runRound": "One synchronous round: Codex and Claude answer in parallel ON THE ACTIVE subtask.\nDoes not run implementation, does not modify files (read-only debate).|||click ▶ Run round. After 30-90 seconds, two new messages appear: Codex and Claude, each ending with “New facts / risks / alternatives / Status / KB-patch”.",
     "tip.trace": "System messages (CLI launch, KB patches, etc.).\nHidden from the main feed to keep it clean.|||“Round 3 (subtask st_5a625327): Codex and Claude launched in parallel. Codex prompt 1842 chars, Claude prompt 1842 chars.” — a technical record, not for reading.",
+    "tip.msgTrash": "Show/hide trashed agent responses.\nA trashed response is hidden from the feed and excluded from the context sent to the agents next round — but not deleted, it can be restored.|||trash a wrong or noisy answer with the 🗑 button on its card; changed your mind — open the bin and hit «Restore».",
     "tip.mode": "LIGHT — hotfix ≤3 files, no debate.\nSTANDARD — normal feature, 2–4 rounds.\nSTRICT — critical systems, 4–8 rounds.\nCRITICAL — production/finance, 6–10 rounds + independent audit.|||recoloring a button → LIGHT. New API endpoint → STANDARD. Moving auth logic → STRICT. Migrating the payments DB → CRITICAL.",
     "tip.langToggle": "Toggle interface language (RU ⇄ EN). Also drives agent answer language.|||click EN → the whole UI becomes Russian, agents will answer in Russian on the next round.",
     "tip.fontUp": "Increase interface size (text + controls). Scale is persisted between sessions.|||working on a 4K display or from a distance — hit A+ 2-3 times.",
@@ -480,6 +490,7 @@ function renderPinnedHint() {
 function pinCoach() {
   if (!computeNextStep()) return;
   coachPinned = true;
+  saveCoachPinned();
   renderPinnedHint();
   renderNextStep();
 }
@@ -487,6 +498,7 @@ function pinCoach() {
 // Pin button on the docked panel → restore the floating coach (unfold).
 function unpinCoach() {
   coachPinned = false;
+  saveCoachPinned();
   nextStepDismissed = false;
   $("pinnedHint").classList.add("hidden");
   renderNextStep();
@@ -495,6 +507,7 @@ function unpinCoach() {
 // Close (×) on the docked panel → fully close; floating stays dismissed (💡 reopen remains).
 function closeCoachPinned() {
   coachPinned = false;
+  saveCoachPinned();
   nextStepDismissed = true;
   $("pinnedHint").classList.add("hidden");
   renderNextStep();
@@ -595,8 +608,17 @@ function render() {
 // ---- Next-step coach -----------------------------------------------------
 
 let nextStepDismissed = false;
-let coachPinned = false;
-const panelOpen = { chatArchive: false, subtaskArchive: false, subtaskTrash: false, switcherStats: false };
+// UI-chrome prefs below are global (per-browser) and persisted in localStorage so
+// they survive reload / PC reboot — same store as font scale and language.
+let coachPinned = localStorage.getItem("council-room-v2.coachPinned") === "true";
+const PANELS_KEY = "council-room-v2.panels";
+const panelOpen = (() => {
+  const def = { chatArchive: false, subtaskArchive: false, subtaskTrash: false, switcherStats: false };
+  try { return { ...def, ...JSON.parse(localStorage.getItem(PANELS_KEY) || "{}") }; } catch { return def; }
+})();
+function savePanelOpen() { try { localStorage.setItem(PANELS_KEY, JSON.stringify(panelOpen)); } catch {} }
+function saveCoachPinned() { try { localStorage.setItem("council-room-v2.coachPinned", String(coachPinned)); } catch {} }
+let showTrashedMsgs = false; // header toggle: reveal the response bin
 let previewSubtaskId = null;
 
 function openPreview(id) {
@@ -1084,14 +1106,48 @@ function renderConversation() {
       trace.appendChild(row);
       continue;
     }
+    if (msg.trashed) continue; // hidden from the main feed; shown in the response bin
     const card = document.createElement("div");
     card.className = `msg ${msg.role}`;
     const meta = msg.round ? `R${msg.round}` : msg.kind || "";
+    // Agent responses can be trashed (excluded from the feed and the next round's context).
+    const trashBtn = msg.role === "agent"
+      ? `<button class="msg-trash" type="button" data-id="${escapeHtml(msg.id)}" title="${escapeHtml(t("ui.trashResponse"))}">🗑</button>`
+      : "";
     card.innerHTML = `
-      <div class="name"><span>${escapeHtml(msg.name)}</span><span>${escapeHtml(meta)} · ${formatTime(msg.at)}</span></div>
+      <div class="name"><span>${escapeHtml(msg.name)}</span><span class="name-right">${escapeHtml(meta)} · ${formatTime(msg.at)}${trashBtn}</span></div>
       <div class="text">${escapeHtml(msg.text)}</div>
     `;
     target.appendChild(card);
+  }
+
+  // Response bin: trashed agent responses with a Restore button (toggled in the header).
+  if (showTrashedMsgs) {
+    const trashed = filtered.filter((m) => m.trashed && m.role === "agent");
+    const bin = document.createElement("div");
+    bin.className = "msg-bin";
+    const head = document.createElement("div");
+    head.className = "msg-bin-head";
+    head.textContent = t("ui.msgTrash");
+    bin.appendChild(head);
+    if (!trashed.length) {
+      const empty = document.createElement("div");
+      empty.className = "msg-bin-empty muted small";
+      empty.textContent = t("ui.trashedEmpty");
+      bin.appendChild(empty);
+    } else {
+      for (const msg of trashed) {
+        const card = document.createElement("div");
+        card.className = `msg ${msg.role} trashed`;
+        const meta = msg.round ? `R${msg.round}` : msg.kind || "";
+        card.innerHTML = `
+          <div class="name"><span>${escapeHtml(msg.name)}</span><span class="name-right">${escapeHtml(meta)} · ${formatTime(msg.at)}<button class="msg-restore" type="button" data-id="${escapeHtml(msg.id)}">↩ ${escapeHtml(t("ui.restoreResponse"))}</button></span></div>
+          <div class="text">${escapeHtml(msg.text)}</div>
+        `;
+        bin.appendChild(card);
+      }
+    }
+    target.appendChild(bin);
   }
   target.scrollTop = target.scrollHeight;
 }
@@ -1286,7 +1342,7 @@ function openLoginModal(tool, account, authorized, isApi) {
 // ---- Switcher detailed-stats panel (tabbed, CodeBurn-style) ----------------
 let statsData = null;
 let statsPeriod = "today";
-let statsTab = "limits";
+let statsTab = localStorage.getItem("council-room-v2.statsTab") || "limits";
 
 async function loadStats() {
   try {
@@ -1368,8 +1424,8 @@ function renderStatsPanel() {
     ? `<div class="stats-cli">${escapeHtml("codex: " + currentState.cli.codex)}<br>${escapeHtml("claude: " + currentState.cli.claude)}<br>${escapeHtml("workdir: " + currentState.workdir)}</div>`
     : "";
   panel.innerHTML = `<div class="stats-tabs">${tabBar}<button class="stats-close" type="button">×</button></div><div class="stats-body">${body}</div>${cliBlock}`;
-  panel.querySelectorAll(".stats-tab").forEach((b) => b.addEventListener("click", () => { statsTab = b.dataset.tab; renderStatsPanel(); }));
-  panel.querySelector(".stats-close")?.addEventListener("click", () => { panelOpen.switcherStats = false; renderSwitcher(); });
+  panel.querySelectorAll(".stats-tab").forEach((b) => b.addEventListener("click", () => { statsTab = b.dataset.tab; try { localStorage.setItem("council-room-v2.statsTab", statsTab); } catch {} renderStatsPanel(); }));
+  panel.querySelector(".stats-close")?.addEventListener("click", () => { panelOpen.switcherStats = false; savePanelOpen(); renderSwitcher(); });
   panel.querySelectorAll(".stats-period").forEach((b) => b.addEventListener("click", () => { statsPeriod = b.dataset.period; loadStats(); }));
   panel.querySelectorAll("input[data-subkey]").forEach((inp) => inp.addEventListener("change", () => {
     const key = inp.dataset.subkey;
@@ -1542,12 +1598,13 @@ function bindUi() {
     openSubtaskModal();
   });
 
-  $("toggleChatArchive").addEventListener("click", () => { panelOpen.chatArchive = !panelOpen.chatArchive; render(); });
-  $("toggleSubtaskArchive").addEventListener("click", () => { panelOpen.subtaskArchive = !panelOpen.subtaskArchive; render(); });
-  $("toggleSubtaskTrash").addEventListener("click", () => { panelOpen.subtaskTrash = !panelOpen.subtaskTrash; render(); });
+  $("toggleChatArchive").addEventListener("click", () => { panelOpen.chatArchive = !panelOpen.chatArchive; savePanelOpen(); render(); });
+  $("toggleSubtaskArchive").addEventListener("click", () => { panelOpen.subtaskArchive = !panelOpen.subtaskArchive; savePanelOpen(); render(); });
+  $("toggleSubtaskTrash").addEventListener("click", () => { panelOpen.subtaskTrash = !panelOpen.subtaskTrash; savePanelOpen(); render(); });
   $("emptyTrash").addEventListener("click", () => { if (confirm(t("ui.confirmEmptyTrash"))) api("POST", "/api/subtasks/trash/empty", {}); });
   $("toggleSwitcherStats").addEventListener("click", () => {
     panelOpen.switcherStats = !panelOpen.switcherStats;
+    savePanelOpen();
     render();
     if (panelOpen.switcherStats) loadStats();
   });
@@ -1579,12 +1636,24 @@ function bindUi() {
     await api("POST", "/api/round", { guidance });
   });
 
+  // Auto-resolve checkbox is a global UI pref (persisted in localStorage).
+  const AUTORESOLVE_KEY = "council-room-v2.autoResolve";
+  const autoResolveEl = $("autoResolve");
+  if (autoResolveEl) {
+    autoResolveEl.checked = localStorage.getItem(AUTORESOLVE_KEY) === "true";
+    autoResolveEl.addEventListener("change", () => {
+      try { localStorage.setItem(AUTORESOLVE_KEY, String(autoResolveEl.checked)); } catch {}
+    });
+  }
+
   $("autopilot").addEventListener("click", async () => {
     if (currentState.autopilot?.running) {
       await api("POST", "/api/autopilot/stop", {});
     } else {
       const autoResolve = $("autoResolve").checked;
-      await api("POST", "/api/autopilot/start", { autoResolve });
+      const guidance = $("guidance").value.trim();
+      $("guidance").value = "";
+      await api("POST", "/api/autopilot/start", { autoResolve, guidance });
     }
   });
 
@@ -1630,6 +1699,21 @@ function bindUi() {
     const traceLabelEl = $("toggleTrace").querySelector("[data-i18n='ui.trace']");
     const arrow = trace.open ? " ▴" : " ▾";
     $("toggleTrace").lastChild.textContent = arrow;
+  });
+
+  $("toggleMsgTrash").addEventListener("click", () => {
+    showTrashedMsgs = !showTrashedMsgs;
+    $("toggleMsgTrash").classList.toggle("active", showTrashedMsgs);
+    $("toggleMsgTrash").lastChild.textContent = showTrashedMsgs ? " ▴" : " ▾";
+    renderConversation();
+  });
+
+  // Trash / restore agent responses (delegated — cards are rebuilt each render).
+  $("conversation").addEventListener("click", (event) => {
+    const trashBtn = event.target.closest(".msg-trash");
+    if (trashBtn) { api("POST", "/api/messages/trash", { id: trashBtn.dataset.id }); return; }
+    const restoreBtn = event.target.closest(".msg-restore");
+    if (restoreBtn) { api("POST", "/api/messages/restore", { id: restoreBtn.dataset.id }); return; }
   });
 
   const settingsHandlers = ["language", "codexModel", "codexEffort", "claudeModel", "claudeEffort", "codexMode", "codexAccount", "claudeMode", "claudeAccount"];
