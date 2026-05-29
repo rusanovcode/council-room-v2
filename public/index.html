@@ -69,7 +69,6 @@
       <section class="col center">
         <header class="col-head">
           <div>
-            <h2 id="activeSubtaskTitle" data-i18n="ui.noActiveSubtask">Нет активной подзадачи</h2>
             <div id="activeSubtaskMeta" class="muted small"></div>
           </div>
           <div class="head-actions">
@@ -89,6 +88,12 @@
             <button id="langToggle" class="ghost square" type="button" data-tooltip-key="t.langToggle">RU</button>
           </div>
         </header>
+
+        <div id="subtaskStatement" class="subtask-statement">
+          <div id="subtaskStatementText" class="subtask-statement-text clamped"></div>
+          <button id="toggleSubtaskStatement" class="subtask-statement-toggle hidden" type="button"
+            data-i18n-title="ui.toggleStatement" aria-expanded="false">▾</button>
+        </div>
 
         <div id="conversation" class="conversation"></div>
 
@@ -111,6 +116,15 @@
             </div>
           </div>
         </section>
+
+        <div id="pinnedHint" class="pinned-hint hidden">
+          <div class="pinned-hint-head">
+            <span class="pinned-hint-title" id="pinnedHintTitle"></span>
+            <button id="pinnedHintPin" class="pinned-hint-pin" type="button" data-i18n-title="ui.unfoldHint" aria-label="unfold">📌</button>
+            <button id="pinnedHintClose" class="pinned-hint-close" type="button" aria-label="close">×</button>
+          </div>
+          <div id="pinnedHintBody" class="pinned-hint-body"></div>
+        </div>
 
         <details id="trace" class="trace">
           <summary data-i18n="ui.traceSummary">Служебные события</summary>
@@ -143,15 +157,6 @@
             </div>
           </div>
         </footer>
-
-        <div id="pinnedHint" class="pinned-hint hidden">
-          <div class="pinned-hint-head">
-            <span class="pinned-hint-title" id="pinnedHintTitle"></span>
-            <button id="pinnedHintPin" class="pinned-hint-pin" type="button" data-i18n-title="ui.unfoldHint" aria-label="unfold">📌</button>
-            <button id="pinnedHintClose" class="pinned-hint-close" type="button" aria-label="close">×</button>
-          </div>
-          <div id="pinnedHintBody" class="pinned-hint-body"></div>
-        </div>
       </section>
 
       <aside class="col right">

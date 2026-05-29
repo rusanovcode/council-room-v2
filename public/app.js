@@ -143,9 +143,10 @@ const STRINGS = {
     "tip.subtaskTrash": "Корзина подзадач. По «×» подзадача уходит сюда (восстановимо). Клик — read-only просмотр; ↩ — вернуть в стек; «Очистить» — удалить безвозвратно.|||создал лишнюю подзадачу, нажал × → в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть весь мусор.",
     "ui.switcherConnected": "модуль свитч подключён",
     "ui.switcherOffline": "модуль свитч не подключён",
+    "ui.toggleStatement": "Развернуть / свернуть текст постановки подзадачи",
     "ui.switcherStats": "Подробная статистика",
-    "ui.refreshTokens": "Обновить остаток токенов (мини-запрос к Claude-аккаунтам)",
-    "ui.confirmRefresh": "Обновить остаток токенов?\n\nБудет отправлен крошечный запрос («What is 1+3?») к каждому Claude-аккаунту, чтобы обновить кэш использования. Тратит немного подписки.",
+    "ui.refreshTokens": "Обновить остаток токенов (мини-запрос самой дешёвой моделью к каждому аккаунту)",
+    "ui.confirmRefresh": "Обновить остаток токенов?\n\nК каждому авторизованному аккаунту (Codex и Claude) будет отправлен крошечный запрос («What is 1+3?») самой дешёвой моделью (Codex gpt-5.4-mini / Claude haiku), чтобы обновить данные по использованию. Виден в логе «Служебные события». Тратит немного подписки.",
     "ui.apiTitle": "{tool}: API-ключ",
     "ui.apiSteps": "Это профиль с API-ключом, а не OAuth-аккаунт.|Ключ задаётся в ai-switcher (profiles / api-keys), не через это окно.|Вход через терминал тут не нужен.",
     "ui.tabLimits": "Лимиты",
@@ -324,9 +325,10 @@ const STRINGS = {
     "tip.subtaskTrash": "Subtask trash. The «×» sends a subtask here (recoverable). Click for a read-only preview; ↩ restores to the stack; «Empty» deletes permanently.|||made an extra subtask, hit × → in trash. Changed your mind — ↩ restored it. Or «Empty» to wipe the junk.",
     "ui.switcherConnected": "switch module connected",
     "ui.switcherOffline": "switch module not connected",
+    "ui.toggleStatement": "Expand / collapse the subtask statement",
     "ui.switcherStats": "Detailed stats",
-    "ui.refreshTokens": "Refresh remaining tokens (tiny request to Claude accounts)",
-    "ui.confirmRefresh": "Refresh remaining tokens?\n\nA tiny request («What is 1+3?») is sent to each Claude account to update the usage cache. Spends a little subscription.",
+    "ui.refreshTokens": "Refresh remaining tokens (tiny request on the cheapest model to each account)",
+    "ui.confirmRefresh": "Refresh remaining tokens?\n\nA tiny request («What is 1+3?») is sent to every authorized account (Codex and Claude) on the cheapest model (Codex gpt-5.4-mini / Claude haiku) to update usage data. Shown in the Process trace. Spends a little subscription.",
     "ui.apiTitle": "{tool}: API key",
     "ui.apiSteps": "This is an API-key profile, not an OAuth account.|The key is configured in ai-switcher (profiles / api-keys), not here.|No terminal login is needed.",
     "ui.tabLimits": "Limits",
@@ -610,6 +612,7 @@ function render() {
 // ---- Next-step coach -----------------------------------------------------
 
 let nextStepDismissed = false;
+let subtaskStatementExpanded = false; // subtask-statement field: collapsed (2 lines) ↔ full
 // UI-chrome prefs below are global (per-browser) and persisted in localStorage so
 // they survive reload / PC reboot — same store as font scale and language.
 let coachPinned = localStorage.getItem("council-room-v2.coachPinned") === "true";
@@ -1044,7 +1047,20 @@ function renderSubtasks() {
 function renderActiveSubtask() {
   const active = currentState.run?.activeSubtask;
   const autopilotRunning = Boolean(currentState.autopilot?.running);
-  $("activeSubtaskTitle").textContent = active ? active.title : t("ui.noActiveSubtask");
+  // Subtask statement — its own field below the buttons, above the chat. Shown
+  // clamped to 2 lines; the ▾ toggle (only when it actually overflows) opens it.
+  const stEl = $("subtaskStatementText");
+  const stToggle = $("toggleSubtaskStatement");
+  if (stEl && stToggle) {
+    stEl.textContent = active ? active.title : t("ui.noActiveSubtask");
+    stEl.classList.add("clamped"); // measure overflow against the 2-line clamp
+    const overflowing = stEl.scrollHeight - stEl.clientHeight > 2;
+    if (!overflowing) subtaskStatementExpanded = false;
+    stToggle.classList.toggle("hidden", !overflowing);
+    stEl.classList.toggle("clamped", !subtaskStatementExpanded);
+    stToggle.textContent = subtaskStatementExpanded ? "▴" : "▾";
+    stToggle.setAttribute("aria-expanded", String(subtaskStatementExpanded));
+  }
   $("activeSubtaskMeta").textContent = active
     ? t("ui.subtaskMeta", { id: active.id, mode: active.mode, rounds: active.rounds })
     : t("ui.noActiveSubtaskHint");
@@ -1353,6 +1369,7 @@ let statsData = null;
 let statsPeriod = "today";
 let statsTab = localStorage.getItem("council-room-v2.statsTab") || "limits";
 let statsLoading = false;
+let lastStatsVersion = null; // server statsVersion last applied (re-fetch on bump)
 
 async function loadStats() {
   statsLoading = true;
@@ -1386,9 +1403,8 @@ function renderStatsPanel() {
   let body = "";
   // Registered accounts per service (acc1 always + authorized acc2/api).
   const accs = [];
-  const acc = currentState?.switcher?.accounts || {};
   for (const tool of ["codex", "claude"]) {
-    for (const p of (acc[tool] || []).filter((x) => x.id === "acc1" || x.authorized)) {
+    for (const p of visibleAccounts(tool)) {
       const isApi = p.id === "apikey" || p.mode === "api";
       const num = p.id === "acc1" ? 1 : p.id === "acc2" ? 2 : null;
       const tn = tool === "codex" ? "Codex" : "Claude";
@@ -1457,6 +1473,18 @@ function tokenClass(pct) {
   return "tok-empty"; // < 1% left → grey
 }
 
+// Which account profiles to surface for a service. acc1 is always shown; acc2
+// and an API profile only when the switch module is connected AND the profile
+// is authorized. Without the switcher there are no second accounts to display.
+function visibleAccounts(tool) {
+  const sw = currentState?.switcher || {};
+  const connected = Boolean(sw.connected);
+  return (sw.accounts?.[tool] || []).filter((p) => {
+    if (p.id === "acc1" || p.account === 1) return true;
+    return connected && Boolean(p.authorized);
+  });
+}
+
 function renderSwitcher() {
   const el = $("switcherStatus");
   if (!el) return;
@@ -1474,8 +1502,8 @@ function renderSwitcher() {
   // API profile is present. Hide an API profile until its key is actually set.
   const toolName = { codex: "Codex", claude: "Claude" };
   for (const tool of ["codex", "claude"]) {
-    // Show acc1 always; the 2nd account / API only when registered (authorized).
-    const profs = (accounts[tool] || []).filter((p) => p.id === "acc1" || p.authorized);
+    // Show acc1 always; the 2nd account / API only when the switcher is connected.
+    const profs = visibleAccounts(tool);
     if (!profs.length) continue;
     const row = document.createElement("div");
     row.className = "acct-row";
@@ -1499,8 +1527,15 @@ function renderSwitcher() {
   $("toggleSwitcherStats").textContent = panelOpen.switcherStats ? "▴" : "▾";
   // Panel persisted open across a reload → fetch stats once (the toggle handler
   // only fires on click). Guarded so SSE re-renders don't refetch or rebuild the
-  // panel mid-interaction (e.g. typing a subscription date).
-  if (panelOpen.switcherStats && statsData === null && !statsLoading) loadStats();
+  // panel mid-interaction (e.g. typing a subscription date). When the server's
+  // statsVersion bumps (the ↻ refresh finished), re-fetch so the Limits/Spend
+  // tabs show the fresh numbers, not the stale cached ones.
+  const ver = sw.statsVersion;
+  if (panelOpen.switcherStats && !statsLoading) {
+    if (statsData === null) loadStats();
+    else if (lastStatsVersion !== null && ver !== undefined && ver !== lastStatsVersion) loadStats();
+  }
+  if (ver !== undefined) lastStatsVersion = ver;
 }
 
 function renderSettings() {
@@ -1526,8 +1561,8 @@ function renderSettings() {
     const accEl = $(`${tool}Account`);
     if (modeEl) modeEl.value = s[`${tool}Mode`] || "auto";
     if (accEl) {
-      const profs = (sw.accounts?.[tool] || []).filter((p) => p.id === "acc1" || p.authorized);
-      const list = profs.length ? profs : [{ id: "acc1" }, { id: "acc2" }];
+      const profs = visibleAccounts(tool);
+      const list = profs.length ? profs : [{ id: "acc1" }];
       const cur = norm(s[`${tool}Account`]);
       accEl.innerHTML = list.map((p) => {
         const isApi = p.id === "apikey" || p.mode === "api";
@@ -1589,6 +1624,11 @@ function bindUi() {
   $("nextStepReopen").addEventListener("click", () => {
     nextStepDismissed = false;
     renderNextStep();
+  });
+
+  $("toggleSubtaskStatement").addEventListener("click", () => {
+    subtaskStatementExpanded = !subtaskStatementExpanded;
+    renderActiveSubtask();
   });
 
   $("langToggle").addEventListener("click", () => {

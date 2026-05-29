@@ -76,7 +76,7 @@ Council Room v2/
 
 `configDir` (claude): acc1 = `%USERPROFILE%\.claude`, acc2 = `…\auth\claude-acc2` (`switcher.claudePaths()`).
 `codexHome`: acc1 = `%USERPROFILE%\.codex`, acc2 = `…\auth\codex-acc2` (`switcher.codexPaths()`).
-Раскрывашка тянет `GET /api/switcher/stats?period=today|week|all` (кэш 60с) → `{claude:{acc1,acc2}, codex:{acc1,acc2}}`, каждый `{windows, spending}`. Кнопка ↻ refresh шлёт мини-запрос по Claude-аккаунтам → наполняет `.usage-cache.json`.
+Раскрывашка тянет `GET /api/switcher/stats?period=today|week|all` (кэш 60с) → `{claude:{acc1,acc2}, codex:{acc1,acc2}}`, каждый `{windows, spending}`. Кнопка ↻ refresh (`POST /api/switcher/refresh`) шлёт мини-запрос («What is 1+3?») **по всем авторизованным аккаунтам** самой дешёвой моделью сервиса (Codex `gpt-5.4-mini` — с `--ephemeral`=off, чтобы записался rollout с `rate_limits`; Claude `haiku` — наполняет `.usage-cache.json`), затем форсит перечитку токен-источников (`switcher.refreshUsage()`: сброс throttle Claude-OAuth + сброс 30с-кэша Codex). Каждый пинг пишется в лог «Служебные события» (`kind:"process"`).
 
 ---
 

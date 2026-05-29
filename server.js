@@ -61,6 +61,9 @@ let activeChildren = new Set();
 // on a timer + after switcher actions; falls back to file detection if gateway down.
 let switcherStatus = switcher.detect();
 let statsCache = {};
+// Bumped whenever the token-usage sources are force-refreshed (the ↻ button), so
+// the client knows to re-fetch the stats panel (Limits tab) once it lands.
+let statsVersion = 0;
 async function refreshSwitcher() {
   try { switcherStatus = await switcher.status(); } catch { switcherStatus = switcher.detect(); }
 }
@@ -131,7 +134,7 @@ function publicState() {
       autopilot: state.autopilot,
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
       settings: state.settings,
-      switcher: switcherStatus,
+      switcher: { ...switcherStatus, statsVersion },
       workdir: WORKDIR,
       port: PORT,
       cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -158,7 +161,7 @@ function publicState() {
     autopilot: state.autopilot,
     runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
     settings: state.settings,
-    switcher: switcherStatus,
+    switcher: { ...switcherStatus, statsVersion },
     workdir: WORKDIR,
     port: PORT,
     cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -975,18 +978,84 @@ async function router(req, res) {
     }
 
     if (method === "POST" && pathname === "/api/switcher/refresh") {
-      // Fire a tiny prompt per Claude account so its .usage-cache.json repopulates,
-      // then re-poll the gateway. Codex has no usage source, so we skip it.
+      // Token monitor: fire a tiny prompt at the CHEAPEST model of every
+      // authorized account so its usage source repopulates (Codex → a persisted
+      // rollout with fresh rate_limits; Claude → its usage cache), then re-poll.
+      // Each ping is logged to the Process trace so the spend is visible.
+      const CHEAP_MODEL = { codex: "gpt-5.4-mini", claude: "haiku" };
+      const sw = switcherStatus.accounts || {};
+      const connected = Boolean(switcherStatus.connected);
+      const targets = [];
+      for (const tool of ["codex", "claude"]) {
+        for (const p of sw[tool] || []) {
+          const isApi = p.id === "apikey" || p.mode === "api";
+          const isAcc1 = p.id === "acc1" || p.account === 1;
+          // acc1 always; acc2 only when the switcher is connected. Skip API + unauthorized.
+          if (isApi || !p.authorized || (!isAcc1 && !connected)) continue;
+          const num = p.account || (p.id === "acc1" ? 1 : p.id === "acc2" ? 2 : null);
+          if (num) targets.push({ tool, num });
+        }
+      }
+      const sid = state.run ? (subtasks.activeSubtask(runDir(state.run.id))?.id || "") : "";
+      // Remaining-token % for a given account in a switcher-status snapshot.
+      const pctOf = (st, tool, num) => {
+        const p = ((st.accounts || {})[tool] || []).find((x) =>
+          (x.account || (x.id === "acc1" ? 1 : x.id === "acc2" ? 2 : null)) === num);
+        return p && p.tokensPct != null ? p.tokensPct : null;
+      };
+      const fmtPct = (v) => (v == null ? "—" : `${v}%`);
       (async () => {
-        await Promise.all([1, 2].map((acc) =>
-          cli.runClaude("What is 1+3? Reply with just the number.", {
+        if (!targets.length) {
+          addMessage({ role: "system", name: "Council Room", kind: "process", subtaskId: sid,
+            text: "Мониторинг токенов: нет авторизованных аккаунтов для опроса." });
+          return;
+        }
+        const before = {}; // tool:num → remaining % before the ping
+        const list = targets.map(({ tool, num }) => {
+          before[`${tool}${num}`] = pctOf(switcherStatus, tool, num);
+          return `${tool} акк ${num} (${CHEAP_MODEL[tool]})`;
+        }).join(", ");
+        addMessage({
+          role: "system", name: "Council Room", kind: "process", subtaskId: sid,
+          text: `Мониторинг токенов: мини-запрос («What is 1+3?») к ${targets.length} аккаунт(ам) самой дешёвой моделью — ${list}.`,
+        });
+        await Promise.all(targets.map(async ({ tool, num }) => {
+          const model = CHEAP_MODEL[tool];
+          const runner = tool === "codex" ? cli.runCodex : cli.runClaude;
+          const r = await runner("What is 1+3? Reply with just the number.", {
             workdir: WORKDIR,
             isolated: true,
-            accountEnv: switcher.envForAccount("claude", acc),
-          }).catch(() => {})
-        ));
+            model,
+            accountEnv: switcher.envForAccount(tool, num),
+            ...(tool === "codex" ? { ephemeral: false } : {}), // persist rollout → fresh rate_limits
+          }).catch((e) => ({ ok: false, text: e?.message || "error" }));
+          const secs = r?.result?.durationMs ? `, ${(r.result.durationMs / 1000).toFixed(1)}с` : "";
+          const reply = r?.ok ? `ответ «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `ошибка/лимит (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
+          addMessage({
+            role: "system", name: "Council Room", kind: "process", subtaskId: sid,
+            text: `Мониторинг токенов: ${tool} акк ${num} (${model})${secs} → ${reply}.`,
+          });
+        }));
+        await switcher.refreshUsage(); // force the displayed % to actually move
         statsCache = {}; // force recompute after fresh requests
         await refreshSwitcher();
+        statsVersion++; // signal the client to re-fetch the stats panel (Limits tab)
+        // Per-account summary: overall remaining (before → after) + the two
+        // rolling windows (5h / weekly). utilization = % USED, so remaining = 100 − it.
+        const winRem = (w) => (w && typeof w.utilization === "number")
+          ? `${Math.max(0, Math.min(100, Math.round(100 - w.utilization)))}%` : "—";
+        for (const { tool, num } of targets) {
+          const b = before[`${tool}${num}`];
+          const a = pctOf(switcherStatus, tool, num);
+          const win = tool === "claude"
+            ? stats.usageWindows(switcher.claudePaths()[`acc${num}`])
+            : switcher.codexUsageWindows(switcher.codexPaths()[`acc${num}`]);
+          const winStr = win ? ` [окна: 5ч ${winRem(win.fiveHour)} · нед ${winRem(win.sevenDay)}]` : " [окна: нет данных]";
+          addMessage({
+            role: "system", name: "Council Room", kind: "process", subtaskId: sid,
+            text: `Мониторинг токенов: ${tool} акк ${num} — остаток ${fmtPct(b)} → ${fmtPct(a)}${winStr}.`,
+          });
+        }
         broadcast();
       })();
       return sendJson(res, 202, { accepted: true });

@@ -23,12 +23,26 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   height: 100%;
+  /* The whole page never scrolls — only inner areas (chat, side columns) do.
+     Without this the body itself scrolls and every "pinned" panel rides along
+     with it, especially under the body `zoom` used for font scaling. */
+  overflow: hidden;
 }
 
 .shell {
   display: grid;
   grid-template-columns: 280px 1fr 320px;
-  height: 100vh;
+  /* Pin the single row to exactly the viewport height. Without an explicit row
+     track, the auto row grows to the tallest column's content (> 100vh), which
+     stretches every column past the viewport and pushes the center column's
+     pinned footer below the fold. minmax(0,1fr) keeps it at 100vh and lets the
+     columns' inner scroll areas do the scrolling. */
+  grid-template-rows: minmax(0, 1fr);
+  /* % (not 100vh): under body `zoom` the shell must fill the zoomed page box,
+     and percentage heights scale with zoom while vh is measured against the
+     un-zoomed viewport (which left the shell taller than the screen → page
+     scroll → panels drifting). */
+  height: 100%;
   overflow: hidden;
 }
 
@@ -38,9 +52,24 @@ html, body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* allow the column (and its inner scrollers) to shrink below content */
 }
 .col.right { border-right: none; }
 .col.center { background: var(--bg); }
+
+/* Center column: only the chat scrolls. The header (Закрыть/Заморозить/Лог…) and
+   the subtask-statement field stay pinned at the top; the terminals, trace
+   («Служебные события») and composer stay pinned at the bottom. #conversation is
+   the sole scroll area between them. (The detailed-stats panel is position:fixed,
+   so it's already pinned independently.) */
+.col.center { overflow: hidden; }
+.col.center > .col-head,
+.col.center > #subtaskStatement,
+.col.center > #terminals,
+.col.center > #trace,
+.col.center > .composer,
+.col.center > #pinnedHint { flex-shrink: 0; }
+.col.center > #conversation { min-height: 0; }
 
 .col-head {
   position: sticky;
@@ -234,6 +263,14 @@ input[type="text"], textarea, select {
 }
 textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-size: 13px; }
 
+/* Header + value on one row: "СТАТУС  [ ожидание ]" */
+.status-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.status-block h2 { margin: 0; flex-shrink: 0; }
+.status-block .status-line { flex: 1; min-width: 0; }
 .status-line {
   font-family: var(--mono);
   font-size: 12px;
@@ -297,6 +334,22 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   line-height: 1;
 }
 .switcher-expand:hover { color: var(--accent); }
+/* Detailed-stats toggle (▾) — RGB pulse to draw the eye, with a soft same-hue
+   halo diffusing behind it. The animation owns the colour, so it overrides the
+   :hover rule above while running. */
+#toggleSwitcherStats {
+  font-size: 15px;
+  padding: 0 4px;
+  border-radius: 4px;
+  animation: rgbPulse 4s linear infinite;
+}
+@keyframes rgbPulse {
+  0%   { color: #ff3b3b; box-shadow: 0 0 8px 2px rgba(255, 59, 59, 0.5); }
+  25%  { color: #46e85a; box-shadow: 0 0 8px 2px rgba(70, 232, 90, 0.5); }
+  50%  { color: #3b8bff; box-shadow: 0 0 8px 2px rgba(59, 139, 255, 0.5); }
+  75%  { color: #d65bff; box-shadow: 0 0 8px 2px rgba(214, 91, 255, 0.5); }
+  100% { color: #ff3b3b; box-shadow: 0 0 8px 2px rgba(255, 59, 59, 0.5); }
+}
 /* Account buttons — one row per service (Codex / Claude); API adds a 3rd in the row */
 .switcher-accounts {
   display: flex;
@@ -758,7 +811,43 @@ label.toggle-row.danger-toggle > input:checked + span::after {
    title yields space instead. */
 .head-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; flex-shrink: 0; }
 .col.center .col-head > div:first-child { min-width: 0; }
-#activeSubtaskTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Subtask statement — own field under the header buttons, above the chat.
+   Collapsed to 2 lines by default; the ▾ toggle expands it downward. */
+.subtask-statement {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.subtask-statement-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.subtask-statement-text.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.subtask-statement-toggle {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 0 4px;
+}
+.subtask-statement-toggle:hover { color: var(--accent); }
 .head-divider {
   width: 1px;
   height: 18px;
@@ -892,6 +981,9 @@ button.square {
   line-height: 1.5;
 }
 .pinned-hint.hidden { display: none; }
+/* Cap the hint body so a long hint scrolls inside itself instead of crowding
+   out the chat; the head (title + pin/close) stays visible above it. */
+.pinned-hint-body { max-height: 22vh; overflow-y: auto; }
 .pinned-hint-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .pinned-hint-title { flex: 1; font-weight: 600; font-size: 12px; color: var(--text); }
 .pinned-hint-pin {
