@@ -40,6 +40,8 @@ node server.js          # or: npm start
 
 Opens at **http://localhost:8788**.
 
+First time? See **[SETUP.md](SETUP.md)** — install the agent CLIs and sign in with your own ChatGPT/Anthropic account (OAuth).
+
 Launchers (free the port from an old instance and open the browser):
 
 | OS | File |
@@ -84,6 +86,7 @@ Round data is stored locally in `rooms/<id>/` and never committed.
 
 ### Docs
 
+- [`SETUP.md`](SETUP.md) — install the CLIs and sign in (OAuth), per user.
 - [`HANDOFF.md`](HANDOFF.md) — what's done/verified, phase status.
 - [`ROADMAP.md`](ROADMAP.md) — Phase 2/3/4 plan.
 - [`DATA_SOURCES.md`](DATA_SOURCES.md) — where tokens/stats come from, endpoints, switch module.
@@ -130,6 +133,8 @@ node server.js          # или: npm start
 
 Откроется на **http://localhost:8788**.
 
+Первый запуск? Смотри **[SETUP.md](SETUP.md)** — установка CLI-агентов и вход в свой аккаунт ChatGPT/Anthropic (OAuth).
+
 Лаунчеры (освобождают порт от старого экземпляра и открывают браузер):
 
 | ОС | Файл |
@@ -174,6 +179,7 @@ rooms/                 данные чатов (в .gitignore)
 
 ### Документация
 
+- [`SETUP.md`](SETUP.md) — установка CLI и вход (OAuth), для каждого пользователя.
 - [`HANDOFF.md`](HANDOFF.md) — что сделано/проверено, состояние по фазам.
 - [`ROADMAP.md`](ROADMAP.md) — план Phase 2/3/4.
 - [`DATA_SOURCES.md`](DATA_SOURCES.md) — откуда берутся токены/статистика, эндпоинты, switch-модуль.
