@@ -286,11 +286,15 @@ async function runRound({ guidance = "" } = {}) {
     broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
     broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
 
-    // Account selection (multi-account via the optional switch module).
+    // Account selection (multi-account via the optional switch module). Account
+    // refs are profile ids: "acc1" | "acc2" (number 1/2 also accepted for compat).
     const sw = switcher.detect();
     const codexMode = state.run.settings.codexMode || "auto";
     const claudeMode = state.run.settings.claudeMode || "auto";
-    const pickAccount = (tool, acc) => (Number(acc) === 2 && switcher.accountAvailable(tool, 2)) ? 2 : 1;
+    const pickAccount = (tool, acc) => {
+      const wantAcc2 = acc === "acc2" || Number(acc) === 2;
+      return wantAcc2 && switcher.accountAvailable(tool, "acc2") ? "acc2" : "acc1";
+    };
     let codexAccount = pickAccount("codex", state.run.settings.codexAccount);
     let claudeAccount = pickAccount("claude", state.run.settings.claudeAccount);
 
@@ -328,7 +332,7 @@ async function runRound({ guidance = "" } = {}) {
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Аккаунты раунда: Codex акк${codexAccount} (${codexMode}), Claude акк${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
+      text: `Аккаунты раунда: Codex ${codexAccount} (${codexMode}), Claude ${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
       subtaskId: active.id,
       round,
     });
@@ -337,18 +341,18 @@ async function runRound({ guidance = "" } = {}) {
 
     // Auto-failover: a failed agent in "auto" mode retries once on the other account.
     if (!ac.signal.aborted && !codexResult.aborted && !codexResult.ok && codexMode === "auto" && sw.connected) {
-      const other = codexAccount === 1 ? 2 : 1;
+      const other = codexAccount === "acc1" ? "acc2" : "acc1";
       if (switcher.accountAvailable("codex", other)) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Codex: ошибка/лимит на акк${codexAccount} → переключаюсь на акк${other} (auto-failover).`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Codex: ошибка/лимит на ${codexAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
         broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
         codexResult = await runCodexOn(other);
         codexAccount = other;
       }
     }
     if (!ac.signal.aborted && !claudeResult.aborted && !claudeResult.ok && claudeMode === "auto" && sw.connected) {
-      const other = claudeAccount === 1 ? 2 : 1;
+      const other = claudeAccount === "acc1" ? "acc2" : "acc1";
       if (switcher.accountAvailable("claude", other)) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Claude: ошибка/лимит на акк${claudeAccount} → переключаюсь на акк${other} (auto-failover).`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Claude: ошибка/лимит на ${claudeAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
         broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
         claudeResult = await runClaudeOn(other);
         claudeAccount = other;

@@ -152,6 +152,7 @@ const STRINGS = {
     "ui.used": "использовано",
     "ui.now": "сейчас",
     "ui.noData": "нет данных",
+    "ui.codexNoData": "нет данных (Codex — через OAuth API, отложено)",
     "ui.periodToday": "сегодня",
     "ui.periodWeek": "неделя",
     "ui.periodAll": "всё",
@@ -326,6 +327,7 @@ const STRINGS = {
     "ui.used": "used",
     "ui.now": "now",
     "ui.noData": "no data",
+    "ui.codexNoData": "no data (Codex — via OAuth API, deferred)",
     "ui.periodToday": "today",
     "ui.periodWeek": "week",
     "ui.periodAll": "all",
@@ -1317,14 +1319,26 @@ function renderStatsPanel() {
   const tabs = [["limits", t("ui.tabLimits")], ["spend", t("ui.tabSpend")], ["sub", t("ui.tabSub")]];
   const tabBar = tabs.map(([id, label]) => `<button class="stats-tab${statsTab === id ? " active" : ""}" data-tab="${id}">${escapeHtml(label)}</button>`).join("");
   let body = "";
-  const accs = [["acc1", "Cl1"], ["acc2", "Cl2"]];
+  // Registered accounts per service (acc1 always + authorized acc2/api).
+  const accs = [];
+  const acc = currentState?.switcher?.accounts || {};
+  for (const tool of ["codex", "claude"]) {
+    for (const p of (acc[tool] || []).filter((x) => x.id === "acc1" || x.authorized)) {
+      const isApi = p.id === "apikey" || p.mode === "api";
+      const num = p.id === "acc1" ? 1 : p.id === "acc2" ? 2 : null;
+      const tn = tool === "codex" ? "Codex" : "Claude";
+      accs.push({ tool, id: p.id, label: isApi ? `${tn} API` : `${tn} ${num}` });
+    }
+  }
+  const claudeData = (a) => (a.tool === "claude" ? statsData?.claude?.[a.id] : null);
+  const noDataNote = (a) => a.tool === "codex" ? escapeHtml(t("ui.codexNoData")) : escapeHtml(t("ui.noData"));
 
   if (statsTab === "limits") {
-    body = accs.map(([id, label]) => {
-      const w = statsData?.claude?.[id]?.windows;
-      if (!w) return `<div class="stats-acc"><b>${label}</b> <span class="muted">${escapeHtml(t("ui.noData"))}</span></div>`;
+    body = accs.map((a) => {
+      const w = claudeData(a)?.windows;
+      if (!w) return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b> <span class="muted small">${noDataNote(a)}</span></div>`;
       const fh = w.fiveHour, sd = w.sevenDay;
-      return `<div class="stats-acc"><b>${label}</b>
+      return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
         <div>${escapeHtml(t("ui.hourlyReset"))}: <b>${fh ? fmtCountdown(fh.resetsAt) : "—"}</b> ${fh ? `(${escapeHtml(t("ui.used"))} ${fh.utilization}%)` : ""}</div>
         <div>${escapeHtml(t("ui.weeklyReset"))}: <b>${sd ? fmtDateTime(sd.resetsAt) : "—"}</b> ${sd ? `(${escapeHtml(t("ui.used"))} ${sd.utilization}%)` : ""}</div>
         <div class="muted small">${escapeHtml(t("ui.windowStart"))}: ${fh ? fmtDateTime(fh.startsAt) : "—"}</div></div>`;
@@ -1332,20 +1346,20 @@ function renderStatsPanel() {
   } else if (statsTab === "spend") {
     const periods = [["today", t("ui.periodToday")], ["week", t("ui.periodWeek")], ["all", t("ui.periodAll")]];
     body = `<div class="stats-periods">${periods.map(([p, l]) => `<button class="stats-period${statsPeriod === p ? " active" : ""}" data-period="${p}">${escapeHtml(l)}</button>`).join("")}</div>`;
-    body += accs.map(([id, label]) => {
-      const s = statsData?.claude?.[id]?.spending;
-      if (!s) return `<div class="stats-acc"><b>${label}</b> <span class="muted">${escapeHtml(t("ui.noData"))}</span></div>`;
-      return `<div class="stats-acc"><b>${label}</b>
+    body += accs.map((a) => {
+      const s = claudeData(a)?.spending;
+      if (!s) return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b> <span class="muted small">${noDataNote(a)}</span></div>`;
+      return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
         <div>${escapeHtml(t("ui.spendIn"))}: ${s.inputK}K · ${escapeHtml(t("ui.spendOut"))}: ${s.outputK}K</div>
         <div class="muted small">cache R ${s.cacheReadK}K / W ${s.cacheWriteK}K · ${escapeHtml(t("ui.sessions"))}: ${s.sessions}</div></div>`;
     }).join("");
   } else if (statsTab === "sub") {
     const subs = currentState?.settings?.subscriptions || {};
-    body = accs.map(([id, label]) => {
-      const key = `claude:${id}`;
+    body = accs.map((a) => {
+      const key = `${a.tool}:${a.id}`;
       const sub = subs[key] || {};
       const dl = sub.end ? Math.ceil((new Date(sub.end).getTime() - Date.now()) / 86400000) : null;
-      return `<div class="stats-acc"><b>${label}</b>
+      return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
         <label class="sub-row">${escapeHtml(t("ui.subStart"))} <input type="date" data-subkey="${key}" data-field="start" value="${escapeHtml(sub.start || "")}"></label>
         <label class="sub-row">${escapeHtml(t("ui.subEnd"))} <input type="date" data-subkey="${key}" data-field="end" value="${escapeHtml(sub.end || "")}"></label>
         <div class="${dl !== null && dl <= 7 ? "stats-warn" : ""}">${dl === null ? "" : escapeHtml(t("ui.daysLeft", { n: dl }))}</div></div>`;
@@ -1387,31 +1401,31 @@ function renderSwitcher() {
   const accounts = sw.accounts || {};
   // One row per service (Codex / Claude) → 2 buttons per row normally, 3 when an
   // API profile is present. Hide an API profile until its key is actually set.
+  const toolName = { codex: "Codex", claude: "Claude" };
   for (const tool of ["codex", "claude"]) {
-    const profs = (accounts[tool] || []).filter((p) => {
-      const isApi = p.id === "apikey" || p.mode === "api";
-      return isApi ? p.authorized : true;
-    });
+    // Show acc1 always; the 2nd account / API only when registered (authorized).
+    const profs = (accounts[tool] || []).filter((p) => p.id === "acc1" || p.authorized);
     if (!profs.length) continue;
     const row = document.createElement("div");
     row.className = "acct-row";
     for (const a of profs) {
       const isApi = a.id === "apikey" || a.mode === "api";
       const accountNum = a.account || (a.id === "acc1" ? 1 : a.id === "acc2" ? 2 : null);
+      const label = isApi ? `${toolName[tool]} API` : `${toolName[tool]} ${accountNum}`;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = `acct-btn ${tokenClass(a.tokensPct)}${a.authorized ? "" : " unauthorized"}${a.active ? " active" : ""}`;
-      btn.textContent = isApi ? "API" : `${tool === "codex" ? "Cx" : "Cl"}${accountNum || ""}`;
+      btn.textContent = label;
       btn.dataset.tooltipText = t("tip.acctBtn", { tool, account: isApi ? "API" : accountNum, pct: a.tokensPct == null ? "—" : `${a.tokensPct}%` });
-      btn.addEventListener("click", () => openLoginModal(tool, isApi ? "apikey" : accountNum, a.authorized, isApi));
+      btn.addEventListener("click", () => openLoginModal(tool, isApi ? "apikey" : `acc${accountNum}`, a.authorized, isApi));
       row.appendChild(btn);
     }
     box.appendChild(row);
   }
 
-  // Detailed-stats expander (content added later).
+  // Detailed-stats expander — sits below the bar and opens downward.
   $("switcherStats").classList.toggle("hidden", !panelOpen.switcherStats);
-  $("toggleSwitcherStats").textContent = panelOpen.switcherStats ? "▾" : "▴";
+  $("toggleSwitcherStats").textContent = panelOpen.switcherStats ? "▴" : "▾";
 }
 
 function renderSettings() {
@@ -1427,17 +1441,27 @@ function renderSettings() {
     scan.checked = Boolean(s.allowFilesystemScan);
     scan.closest("label.toggle-row")?.classList.toggle("active", Boolean(s.allowFilesystemScan));
   }
-  // Account / mode controls; acc 2 only selectable when the switch module exposes it.
-  const sw = currentState.switcher || { claude: {}, codex: {} };
+  // Account / mode controls. The account dropdown is built from the switch
+  // module's profiles (acc1 + registered acc2/api), so it auto-includes new
+  // accounts. Values are profile ids ("acc1"/"acc2"/"apikey").
+  const sw = currentState.switcher || {};
+  const norm = (v) => (v === "acc2" || Number(v) === 2) ? "acc2" : (v === "apikey" ? "apikey" : "acc1");
   for (const tool of ["codex", "claude"]) {
     const modeEl = $(`${tool}Mode`);
     const accEl = $(`${tool}Account`);
     if (modeEl) modeEl.value = s[`${tool}Mode`] || "auto";
     if (accEl) {
-      accEl.value = String(s[`${tool}Account`] || 1);
-      const acc2Available = Boolean(sw[tool]?.acc2);
-      const opt2 = accEl.querySelector('option[value="2"]');
-      if (opt2) opt2.disabled = !acc2Available;
+      const profs = (sw.accounts?.[tool] || []).filter((p) => p.id === "acc1" || p.authorized);
+      const list = profs.length ? profs : [{ id: "acc1" }, { id: "acc2" }];
+      const cur = norm(s[`${tool}Account`]);
+      accEl.innerHTML = list.map((p) => {
+        const isApi = p.id === "apikey" || p.mode === "api";
+        const num = p.id === "acc1" ? 1 : p.id === "acc2" ? 2 : null;
+        const label = isApi ? "API" : `акк ${num}`;
+        // apikey isn't run-routable from here yet (gateway-only) → shown but disabled.
+        return `<option value="${p.id}"${isApi ? " disabled" : ""}${p.id === cur ? " selected" : ""}>${label}</option>`;
+      }).join("");
+      accEl.value = cur;
       const offline = !currentState.switcher?.connected;
       modeEl.disabled = offline;
       accEl.disabled = offline;

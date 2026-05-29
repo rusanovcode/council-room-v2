@@ -261,7 +261,7 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   font-family: var(--mono);
   font-size: 11px;
   color: var(--muted);
-  margin-top: 8px;
+  padding: 6px 14px 10px;
   word-break: break-all;
 }
 
@@ -357,7 +357,8 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .stats-period { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 2px 7px; border-radius: 3px; cursor: pointer; }
 .stats-period.active { color: var(--text); border-color: var(--accent); }
 .sub-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 3px 0; font-size: 11px; color: var(--muted); }
-.sub-row input { width: auto; flex: 0 0 auto; font-size: 11px; padding: 2px 4px; }
+.sub-row input { width: auto; flex: 0 0 auto; font-size: 11px; padding: 2px 4px; background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.sub-row input::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 .stats-warn { color: var(--amber); font-weight: 600; }
 
 /* Per-agent account/mode controls */
