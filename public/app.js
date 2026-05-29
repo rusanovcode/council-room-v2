@@ -226,6 +226,11 @@ const STRINGS = {
     "ui.keyKeepPlaceholder": "ключ задан — оставь пустым, чтобы не менять",
     "ui.providersKeySaved": "Ключ(и) сохранены в .env ✓",
     "ui.keyNeedsRef": "Введён ключ, но не задано имя Env-переменной у профиля «{p}». Заполни поле «Env-переменная ключа».",
+    "ui.keyTesting": "Проверяю ключ мини-запросом…",
+    "ui.keyWorks": "Ключ рабочий ✓ (ответ: «{reply}») — сохранён в .env",
+    "ui.keyFailed": "Ключ не прошёл проверку: {e}",
+    "ui.keyTestNeedsModel": "Для проверки ключа сначала укажи модель в этом профиле.",
+    "ui.chainEmpty": "Профилей нет. Добавь профиль выше (+ Профиль) — он появится здесь галочкой для включения в цепочку.",
     "ui.remove": "Удалить",
     "ui.roleMode": "Режим",
     "ui.roleChain": "Бэкенды (failover по порядку)",
@@ -461,6 +466,11 @@ const STRINGS = {
     "ui.keyKeepPlaceholder": "key set — leave empty to keep it",
     "ui.providersKeySaved": "Key(s) saved to .env ✓",
     "ui.keyNeedsRef": "A key was entered but profile «{p}» has no env var name. Fill the «API key env var» field.",
+    "ui.keyTesting": "Testing key with a tiny request…",
+    "ui.keyWorks": "Key works ✓ (reply: «{reply}») — saved to .env",
+    "ui.keyFailed": "Key failed the test: {e}",
+    "ui.keyTestNeedsModel": "Set a model in this profile first to test the key.",
+    "ui.chainEmpty": "No profiles yet. Add one above (+ Profile) — it will appear here as a checkbox to include in the chain.",
     "ui.remove": "Remove",
     "ui.roleMode": "Mode",
     "ui.roleChain": "Backends (failover in order)",
@@ -1861,6 +1871,7 @@ function renderProfileRow(p) {
   const cli = isCliProviderId(p.provider);
   const preset = presetById(p.provider);
   const creds = (currentState.providers && currentState.providers.credentials) || {};
+  const validated = (currentState.providers && currentState.providers.validated) || {};
   const needsKey = !cli && p.provider !== "ollama" && (preset ? preset.needsKey : true);
   const keyBadge = needsKey
     ? `<span class="key-badge ${creds[p.id] ? "ok" : "miss"}">${creds[p.id] ? t("ui.keySet") : t("ui.keyMissing")}</span>`
@@ -1875,10 +1886,13 @@ function renderProfileRow(p) {
     fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
     if (p.provider !== "ollama") {
       fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
-      const keyOk = Boolean(creds[p.id]);
+      // Green ✓ only when the key passed a live test (validated), not merely
+      // present. Placeholder still reflects presence ("key set — leave empty").
+      const keyPresent = Boolean(creds[p.id]);
+      const keyOk = Boolean(validated[p.id]);
       fields += `<label class="p-field"><span>${t("ui.profileApiKey")} ${helpIcon("profileApiKey")}</span>
         <span class="p-key-wrap">
-          <input type="password" class="p-apikey${keyOk ? " has-key" : ""}" value="" autocomplete="off" placeholder="${keyOk ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}">
+          <input type="password" class="p-apikey${keyOk ? " has-key" : ""}" value="" autocomplete="off" placeholder="${keyPresent ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}">
           ${keyOk ? `<span class="key-ok" title="${escapeHtml(t("ui.keySet"))}">✓</span>` : ""}
         </span></label>`;
     }
@@ -1901,7 +1915,7 @@ function renderRoleEditor(slot) {
   const checks = providersDraft.profiles.map((p) => {
     const checked = (r.profileIds || []).includes(p.id);
     return `<label class="chain-item"><input type="checkbox" class="role-chain" data-id="${escapeHtml(p.id)}"${checked ? " checked" : ""}> ${escapeHtml(p.label || p.id)}</label>`;
-  }).join("") || `<span class="muted small">—</span>`;
+  }).join("") || `<span class="muted small">${escapeHtml(t("ui.chainEmpty"))}</span>`;
   return `<div class="role-card" data-slot="${slot}">
     <div class="role-title">${title}</div>
     <label class="p-field"><span>${t("ui.profileLabel")} ${helpIcon("profileLabel")}</span><input class="role-label" value="${escapeHtml(r.label || "")}"></label>
@@ -1967,6 +1981,32 @@ function removeProfileDraft(id) {
     r.profileIds = (r.profileIds || []).filter((x) => x !== id);
   }
   renderProviders();
+}
+
+// Live-test a freshly entered API key: persist it to .env and fire a tiny
+// request. Green ✓ appears only when the request actually returns an answer.
+async function testProfileKey(p, apiKey) {
+  if (!p) return;
+  const ref = (p.credentialRef || "").trim();
+  if (!ref) { showProvidersMsg(t("ui.keyNeedsRef", { p: p.label || p.id }), true); return; }
+  if (!(p.model || "").trim()) { showProvidersMsg(t("ui.keyTestNeedsModel"), true); return; }
+  showProvidersMsg(t("ui.keyTesting"), false);
+  try {
+    const r = await fetch("/api/providers/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: p.provider, baseUrl: p.baseUrl, credentialRef: ref, model: p.model, apiKey }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (currentState.providers) {
+      if (j.credentials) currentState.providers.credentials = j.credentials;
+      if (j.validated) currentState.providers.validated = j.validated;
+    }
+    if (j.ok) showProvidersMsg(t("ui.keyWorks", { reply: j.reply || "" }), false);
+    else showProvidersMsg(t("ui.keyFailed", { e: j.error || `error ${r.status}` }), true);
+    renderProviders(); // refresh the ✓ / placeholder and chips
+  } catch (e) {
+    showProvidersMsg(e.message, true);
+  }
 }
 
 function showProvidersMsg(text, isError) {
@@ -2290,6 +2330,14 @@ function bindUi() {
     // Any other field change (label/model/...) just syncs the draft and
     // refreshes the connected-agent chips (no re-render, so focus is kept).
     if (event.target.classList.contains("p-provider")) { syncProvidersFromDOM(); renderProviders(); }
+    else if (event.target.classList.contains("p-apikey")) {
+      // A key was just entered/changed → test it live; green ✓ only on success.
+      syncProvidersFromDOM();
+      const id = event.target.closest(".profile-row")?.dataset.id;
+      const p = providersDraft.profiles.find((x) => x.id === id);
+      const key = event.target.value.trim();
+      if (p && key) testProfileKey(p, key);
+    }
     else { syncProvidersFromDOM(); renderConnectedAgents(); }
   });
 

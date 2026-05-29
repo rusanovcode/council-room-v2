@@ -71,6 +71,9 @@ let activeChildren = new Set();
 // on a timer + after switcher actions; falls back to file detection if gateway down.
 let switcherStatus = switcher.detect();
 let statsCache = {};
+// credentialRefs whose key passed a live test request this session. Drives the
+// green "verified" check on the API-key field — presence alone isn't enough.
+const validatedRefs = new Set();
 // Bumped whenever the token-usage sources are force-refreshed (the ↻ button), so
 // the client knows to re-fetch the stats panel (Limits tab) once it lands.
 let statsVersion = 0;
@@ -150,10 +153,17 @@ function ensureQuestionsMigrated(dir, subtaskId) {
 function providersInfo() {
   const cfg = (state.run && state.run.settings && state.run.settings.profiles) || state.settings.profiles || [];
   const credentials = {};
-  for (const p of cfg) if (p && p.id) credentials[p.id] = providers.credentialPresent(p);
+  const validated = {};
+  for (const p of cfg) if (p && p.id) {
+    credentials[p.id] = providers.credentialPresent(p);
+    // "validated" = the key passed a live test request this session. Keyless
+    // providers (Ollama) need no key, so they count as validated when present.
+    const ref = p.credentialRef || (providers.resolveProfile(p).credentialRef);
+    validated[p.id] = ref ? validatedRefs.has(ref) : Boolean(credentials[p.id]);
+  }
   // Per-profile cumulative token spend (API keys have no remaining %, only spend)
   // so the connected-agent chips can show how much each backend has used.
-  return { mode: providers.mode(), presets: providers.presets(), types: providers.providerTypes(), credentials, usage: usage.summary(ROOMS_DIR) };
+  return { mode: providers.mode(), presets: providers.presets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR) };
 }
 
 function publicState() {
@@ -1028,9 +1038,40 @@ async function router(req, res) {
       } catch (e) {
         return sendJson(res, 400, { error: e.message });
       }
+      validatedRefs.delete(ref); // new key is unproven until a live test passes
       broadcast();
       // Echo back which profiles now have their key present (no key values).
       return sendJson(res, 200, { ok: true, credentials: publicState().providers.credentials });
+    }
+
+    if (method === "POST" && pathname === "/api/providers/test") {
+      // Validate an API key with a tiny live request. Optionally persists the
+      // typed key to .env first (so the user gets the green check the moment a
+      // working key is entered). Only network providers; CLI is out of scope.
+      const body = await readBody(req);
+      const provider = String((body && body.provider) || "");
+      const credentialRef = String((body && body.credentialRef) || "").trim();
+      const model = String((body && body.model) || "").trim();
+      const apiKey = String((body && body.apiKey) || "");
+      if (profiles.isCliProvider(provider)) return sendJson(res, 400, { error: "CLI providers can't be key-tested" });
+      if (!credentialRef && provider !== "ollama") return sendJson(res, 400, { error: "credentialRef required" });
+      if (!model) return sendJson(res, 400, { error: "set a model first" });
+      if (apiKey && credentialRef) {
+        try { env.setEnvVar(ROOT, credentialRef, apiKey); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+      }
+      const profile = { provider, baseUrl: body.baseUrl, credentialRef, model };
+      const r = await providers.runProfile(profile, "What is 1+3? Reply with just the number.", { timeoutMs: 25000 })
+        .catch((e) => ({ ok: false, text: e && e.message ? e.message : "error" }));
+      if (credentialRef) { if (r.ok) validatedRefs.add(credentialRef); else validatedRefs.delete(credentialRef); }
+      broadcast();
+      const info = publicState().providers;
+      return sendJson(res, 200, {
+        ok: Boolean(r.ok),
+        error: r.ok ? "" : String(r.text || "").split("\n")[0].slice(0, 200),
+        reply: r.ok ? String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40) : "",
+        credentials: info.credentials,
+        validated: info.validated,
+      });
     }
 
     if (method === "POST" && pathname === "/api/providers/usage/reset") {
