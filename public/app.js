@@ -230,6 +230,8 @@ const STRINGS = {
     "ui.keyWorks": "Ключ рабочий ✓ (ответ: «{reply}») — сохранён в .env",
     "ui.keyFailed": "Ключ не прошёл проверку: {e}",
     "ui.keyTestNeedsModel": "Для проверки ключа сначала укажи модель в этом профиле.",
+    "ui.keyVerified": "Ключ проверен живым запросом — рабочий (зелёная галочка).",
+    "ui.keyUnverified": "Ключ задан, но не проверен (жёлтая галочка). Введи/перевведи ключ в поле — он протестируется автоматически.",
     "ui.chainEmpty": "Профилей нет. Добавь профиль выше (+ Профиль) — он появится здесь галочкой для включения в цепочку.",
     "ui.remove": "Удалить",
     "ui.roleMode": "Режим",
@@ -470,6 +472,8 @@ const STRINGS = {
     "ui.keyWorks": "Key works ✓ (reply: «{reply}») — saved to .env",
     "ui.keyFailed": "Key failed the test: {e}",
     "ui.keyTestNeedsModel": "Set a model in this profile first to test the key.",
+    "ui.keyVerified": "Key verified with a live request — working (green check).",
+    "ui.keyUnverified": "Key is set but unverified (amber check). Enter/re-enter the key in the field — it will be tested automatically.",
     "ui.chainEmpty": "No profiles yet. Add one above (+ Profile) — it will appear here as a checkbox to include in the chain.",
     "ui.remove": "Remove",
     "ui.roleMode": "Mode",
@@ -1886,14 +1890,19 @@ function renderProfileRow(p) {
     fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
     if (p.provider !== "ollama") {
       fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
-      // Green ✓ only when the key passed a live test (validated), not merely
-      // present. Placeholder still reflects presence ("key set — leave empty").
+      // Three states for the ✓: green = key passed a live test (verified);
+      // amber = key present but not yet verified; none = no key. Placeholder
+      // reflects presence ("key set — leave empty").
       const keyPresent = Boolean(creds[p.id]);
       const keyOk = Boolean(validated[p.id]);
+      const mark = keyOk
+        ? `<span class="key-ok" title="${escapeHtml(t("ui.keyVerified"))}">✓</span>`
+        : (keyPresent ? `<span class="key-pending" title="${escapeHtml(t("ui.keyUnverified"))}">✓</span>` : "");
+      const inputCls = keyOk ? " has-key" : (keyPresent ? " has-key-pending" : "");
       fields += `<label class="p-field"><span>${t("ui.profileApiKey")} ${helpIcon("profileApiKey")}</span>
         <span class="p-key-wrap">
-          <input type="password" class="p-apikey${keyOk ? " has-key" : ""}" value="" autocomplete="off" placeholder="${keyPresent ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}">
-          ${keyOk ? `<span class="key-ok" title="${escapeHtml(t("ui.keySet"))}">✓</span>` : ""}
+          <input type="password" class="p-apikey${inputCls}" value="" autocomplete="off" placeholder="${keyPresent ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}">
+          ${mark}
         </span></label>`;
     }
   }

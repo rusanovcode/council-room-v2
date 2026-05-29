@@ -1255,18 +1255,20 @@ button.square {
   min-width: 0; /* let fields shrink below their content so they never overflow the row */
 }
 .p-field input, .p-field select { width: 100%; }
-/* API-key field: green ✓ overlay when a key is already saved. */
+/* API-key field: ✓ overlay — green when the key passed a live test (verified),
+   amber when present but unverified. */
 .p-key-wrap { position: relative; display: block; width: 100%; }
-.p-apikey.has-key { padding-right: 22px; }
-.p-key-wrap .key-ok {
+.p-apikey.has-key, .p-apikey.has-key-pending { padding-right: 22px; }
+.p-key-wrap .key-ok, .p-key-wrap .key-pending {
   position: absolute;
   right: 7px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--green);
   font-weight: 700;
   pointer-events: none;
 }
+.p-key-wrap .key-ok { color: var(--green); }
+.p-key-wrap .key-pending { color: var(--amber); }
 .key-badge {
   font-size: 10px;
   padding: 1px 6px;
