@@ -179,6 +179,12 @@ const STRINGS = {
     "ui.spendIn": "вход",
     "ui.spendOut": "выход",
     "ui.sessions": "запросов",
+    "ui.spendTotal": "всего",
+    "ui.requests": "запросов",
+    "ui.apiBadge": "API-ключ",
+    "ui.apiNoLimit": "у API-ключа нет окон-лимитов — смотри расход",
+    "ui.resetSpend": "Сбросить расход",
+    "ui.confirmResetSpend": "Сбросить накопленный расход по всем API-профилям?\n\nЭто только локальные счётчики токенов (rooms/.provider-usage.json), на сам биллинг провайдера не влияет.",
     "ui.subStart": "начало",
     "ui.subEnd": "конец",
     "ui.daysLeft": "осталось дней: {n}",
@@ -395,6 +401,12 @@ const STRINGS = {
     "ui.spendIn": "in",
     "ui.spendOut": "out",
     "ui.sessions": "requests",
+    "ui.spendTotal": "total",
+    "ui.requests": "requests",
+    "ui.apiBadge": "API key",
+    "ui.apiNoLimit": "API keys have no limit windows — see spending",
+    "ui.resetSpend": "Reset spending",
+    "ui.confirmResetSpend": "Reset accumulated spending for all API profiles?\n\nThis only clears local token counters (rooms/.provider-usage.json); it does not affect the provider's actual billing.",
     "ui.subStart": "start",
     "ui.subEnd": "end",
     "ui.daysLeft": "days left: {n}",
@@ -1469,6 +1481,7 @@ function fmtDateTime(iso) {
   if (!iso) return "—";
   try { return new Date(iso).toLocaleString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch { return iso; }
 }
+function fmtTokK(n) { return `${(Number(n || 0) / 1000).toFixed(1)}K`; }
 
 function renderStatsPanel() {
   const panel = $("switcherStats");
@@ -1499,6 +1512,11 @@ function renderStatsPanel() {
         <div>${escapeHtml(t("ui.weeklyReset"))}: <b>${sd ? fmtDateTime(sd.resetsAt) : "—"}</b> ${sd ? `(${escapeHtml(t("ui.used"))} ${sd.utilization}%)` : ""}</div>
         <div class="muted small">${escapeHtml(t("ui.windowStart"))}: ${fh ? fmtDateTime(fh.startsAt) : "—"}</div></div>`;
     }).join("");
+    // API-key profiles have no rolling-window limits — note them so the user
+    // knows where to look (Spending tab) instead of seeing nothing.
+    const prov = statsData?.providers || {};
+    body += Object.keys(prov).map((id) =>
+      `<div class="stats-acc"><b>${escapeHtml(prov[id].label || id)}</b> <span class="muted small">${escapeHtml(t("ui.apiNoLimit"))}</span></div>`).join("");
   } else if (statsTab === "spend") {
     const periods = [["today", t("ui.periodToday")], ["week", t("ui.periodWeek")], ["all", t("ui.periodAll")]];
     body = `<div class="stats-periods">${periods.map(([p, l]) => `<button class="stats-period${statsPeriod === p ? " active" : ""}" data-period="${p}">${escapeHtml(l)}</button>`).join("")}</div>`;
@@ -1509,6 +1527,19 @@ function renderStatsPanel() {
         <div>${escapeHtml(t("ui.spendIn"))}: ${s.inputK}K · ${escapeHtml(t("ui.spendOut"))}: ${s.outputK}K</div>
         <div class="muted small">cache R ${s.cacheReadK}K / W ${s.cacheWriteK}K · ${escapeHtml(t("ui.sessions"))}: ${s.sessions}</div></div>`;
     }).join("");
+    // API-key profiles: cumulative token spend (no per-period source) from the
+    // provider usage block. Shown after the windowed Claude/Codex accounts.
+    const prov = statsData?.providers || {};
+    const provIds = Object.keys(prov);
+    if (provIds.length) {
+      body += provIds.map((id) => {
+        const e = prov[id];
+        return `<div class="stats-acc"><b>${escapeHtml(e.label || id)}</b> <span class="muted small">${escapeHtml(t("ui.apiBadge"))}</span>
+          <div>${escapeHtml(t("ui.spendIn"))}: ${fmtTokK(e.inputTokens)} · ${escapeHtml(t("ui.spendOut"))}: ${fmtTokK(e.outputTokens)}</div>
+          <div class="muted small">${escapeHtml(t("ui.spendTotal"))}: ${fmtTokK(e.totalTokens)} · ${escapeHtml(t("ui.requests"))}: ${e.requests}</div></div>`;
+      }).join("");
+      body += `<button class="stats-reset" type="button">${escapeHtml(t("ui.resetSpend"))}</button>`;
+    }
   } else if (statsTab === "sub") {
     const subs = currentState?.settings?.subscriptions || {};
     body = accs.map((a) => {
@@ -1530,6 +1561,11 @@ function renderStatsPanel() {
   panel.querySelectorAll(".stats-tab").forEach((b) => b.addEventListener("click", () => { statsTab = b.dataset.tab; try { localStorage.setItem("council-room-v2.statsTab", statsTab); } catch {} renderStatsPanel(); }));
   panel.querySelector(".stats-close")?.addEventListener("click", () => { panelOpen.switcherStats = false; savePanelOpen(); renderSwitcher(); });
   panel.querySelectorAll(".stats-period").forEach((b) => b.addEventListener("click", () => { statsPeriod = b.dataset.period; loadStats(); }));
+  panel.querySelector(".stats-reset")?.addEventListener("click", async () => {
+    if (!confirm(t("ui.confirmResetSpend"))) return;
+    try { await api("POST", "/api/providers/usage/reset", {}); } catch {}
+    loadStats();
+  });
   panel.querySelectorAll("input[data-subkey]").forEach((inp) => inp.addEventListener("change", () => {
     const key = inp.dataset.subkey;
     const cur = (currentState?.settings?.subscriptions || {})[key] || {};

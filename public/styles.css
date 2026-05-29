@@ -416,6 +416,8 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .stats-periods { display: flex; gap: 3px; margin-bottom: 4px; }
 .stats-period { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 2px 7px; border-radius: 3px; cursor: pointer; }
 .stats-period.active { color: var(--text); border-color: var(--accent); }
+.stats-reset { margin-top: 6px; background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; }
+.stats-reset:hover { color: var(--text); border-color: var(--accent); }
 .sub-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 3px 0; font-size: 11px; color: var(--muted); }
 .sub-row input { width: auto; flex: 0 0 auto; font-size: 11px; padding: 2px 4px; background: var(--bg); color: var(--text); border: 1px solid var(--border); color-scheme: dark; }
 .sub-row input::-webkit-calendar-picker-indicator { filter: invert(0.7); }

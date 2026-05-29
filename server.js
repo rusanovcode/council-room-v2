@@ -18,6 +18,7 @@ const stats = require("./lib/stats");
 const profiles = require("./lib/profiles");
 const roles = require("./lib/roles");
 const providers = require("./lib/providers");
+const usage = require("./lib/usage");
 
 const ROOT = __dirname;
 const ROOMS_DIR = path.join(ROOT, "rooms");
@@ -405,6 +406,16 @@ async function runRound({ guidance = "" } = {}) {
       });
       return { aborted: true };
     }
+
+    // Accumulate API-profile token spend (subscription/CLI backends report no
+    // usage, so only network providers contribute). The winning profile of each
+    // slot is on the role result; bump the stats panel when anything was recorded.
+    let usageRecorded = false;
+    for (const r of [codexResult, claudeResult]) {
+      const u = r && r.result && r.result.usage;
+      if (u && r.profile) { usage.record(ROOMS_DIR, r.profile, u); usageRecorded = true; }
+    }
+    if (usageRecorded) { statsCache = {}; statsVersion++; }
 
     const codexTail = prompt.parseAgentTail(codexResult.text);
     const claudeTail = prompt.parseAgentTail(claudeResult.text);
@@ -995,7 +1006,18 @@ async function router(req, res) {
           },
         };
       }
-      return sendJson(res, 200, statsCache[key].data);
+      // Provider spend is cumulative (no per-period source), so attach it fresh
+      // rather than caching it with the windowed Claude/Codex stats.
+      return sendJson(res, 200, { ...statsCache[key].data, providers: usage.summary(ROOMS_DIR) });
+    }
+
+    if (method === "POST" && pathname === "/api/providers/usage/reset") {
+      const body = await readBody(req);
+      usage.reset(ROOMS_DIR, body && body.profileId ? String(body.profileId) : null);
+      statsCache = {};
+      statsVersion++;
+      broadcast();
+      return sendJson(res, 200, { ok: true, providers: usage.summary(ROOMS_DIR) });
     }
 
     if (method === "POST" && pathname === "/api/switcher/subscription") {

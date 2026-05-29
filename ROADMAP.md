@@ -223,16 +223,26 @@ Gate-экран: чек-лист зелёных галок («все critarian m
   - **Проверено:** `test/round.integration.test.js` — реальный `runRound` в `PROVIDERS_MODE=api`
     гоняет оба слота через мок-бэкенд по HTTP (без подписок/CLI); `test/roles.test.js` — деривация/
     failover/verify/CRUD; boot-смоук full-режима (панель отдаётся, `/api/state.providers` корректен).
-  - **Ещё НЕ сделано:** CLI-as-provider живьём не прогонялся (только мок); переосмысление панели
-    токенов для API-ключей (spend vs остаток %); живой прогон реального API-провайдера/Ollama —
-    за пользователем.
+  - **Ещё НЕ сделано:** CLI-as-provider живьём не прогонялся (только мок); живой прогон реального
+    API-провайдера/Ollama — за пользователем.
+- **[DONE 2026-05-30] Панель токенов под API-ключи (step 3).** У API-ключей нет «остатка %» →
+  показываем фактический расход. `lib/providers` перестал выбрасывать `usage` из ответа
+  (`prompt_tokens`/`completion_tokens`; стрим — `stream_options.include_usage`), `normalizeUsage`
+  → `result.usage`. `lib/usage.js` — кумулятивный per-profile store в `rooms/.provider-usage.json`
+  (gitignored): `record`/`summary`/`reset`. `runRound` пишет расход по сетевым профилям (CLI/OAuth
+  usage не шлют → не считаются), бампит `statsVersion`. `/api/switcher/stats` отдаёт `providers`
+  (свежим, вне кэша); `POST /api/providers/usage/reset`. UI: во вкладке «Расход» строки API-профилей
+  (вход/выход/всего/запросов + кнопка «Сбросить расход»), во «Лимитах» — пометка «у API-ключа нет
+  окон-лимитов». Bilingual + стиль. Тест: usage-парсинг (нестрим+стрим) и round-trip store в
+  `test/providers.test.js` — зелёные; boot-смоук `PROVIDERS_MODE=api` (stats.providers, reset) OK.
 
 ### Задачи
 - ~~Интерфейс провайдера + реализации `openai-compatible` и `ollama`.~~ **DONE** (см. Прогресс).
 - ~~Профили (CRUD в настройках) + роли A/B со списком failover → заменить хардкод Codex/Claude.~~ **DONE**.
 - ~~Хранение ключей — env / настройки, НЕ в репозитории.~~ **DONE** (`credentialRef`+`.env`).
-- **Мониторинг токенов**: «остаток %» — это про подписку/OAuth (usage-cache/rollout). Для
-  API-ключей остатка нет → показывать расход (spend) или прятать; панель статистики переосмыслить.
+- ~~**Мониторинг токенов**: «остаток %» — это про подписку/OAuth (usage-cache/rollout). Для
+  API-ключей остатка нет → показывать расход (spend) или прятать; панель статистики переосмыслить.~~
+  **DONE** (step 3): расход токенов из `usage` ответа → `lib/usage.js` → вкладки «Расход»/«Лимиты».
 - **Публичная сборка без OAuth/switcher**: убрать из репозитория OAuth/подписочный путь
   (код `cli.js` spawnLogin + `codex`/`claude` вызовы, `switcher.js` oauth/usage) и все доки о нём;
   оставить только API-адаптер + Ollama. Подписочный путь — только в локальной/приватной версии.

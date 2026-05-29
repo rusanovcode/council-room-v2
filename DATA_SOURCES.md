@@ -78,11 +78,12 @@ Council Room v2/
 | **Расход** (input/output/cache/запросы) | `<configDir>/projects/**/*.jsonl`, поле `message.usage`; период по `timestamp` (`stats.spending`) | **только Claude** (Codex-расхода в этих логах нет) |
 | **Стоимость $** | в сыром JSONL **нет** — показываем 0/опускаем | — |
 | **Даты подписки** | источника нет → ручной ввод в `settings.subscriptions["claude:acc1"]={start,end}` (UI вкладка «Подписки») | ручками |
-| **API-ключ профили** | rollout/usage-cache у них нет → серый | — |
+| **API-ключ профили — кнопка** | rollout/usage-cache у них нет (нет «остатка %») → кнопка серая | — |
+| **API-ключ профили — расход** | `usage` из ответа провайдера (`prompt_tokens`/`completion_tokens`; стрим — `stream_options.include_usage`) → `lib/providers.normalizeUsage` → кумулятивно `lib/usage.js` в `rooms/.provider-usage.json` (gitignored). Записывается в `runRound`, показывается во вкладках «Расход»/«Лимиты» (пометка «нет окон-лимитов»), сброс — `POST /api/providers/usage/reset` | [Phase 5] любые сетевые профили (openai-compatible; Ollama usage обычно не шлёт → не считается) |
 
 `configDir` (claude): acc1 = `%USERPROFILE%\.claude`, acc2 = `…\auth\claude-acc2` (`switcher.claudePaths()`).
 `codexHome`: acc1 = `%USERPROFILE%\.codex`, acc2 = `…\auth\codex-acc2` (`switcher.codexPaths()`).
-Раскрывашка тянет `GET /api/switcher/stats?period=today|week|all` (кэш 60с) → `{claude:{acc1,acc2}, codex:{acc1,acc2}}`, каждый `{windows, spending}`. Кнопка ↻ refresh (`POST /api/switcher/refresh`) шлёт мини-запрос («What is 1+3?») **по всем авторизованным аккаунтам** самой дешёвой моделью сервиса (Codex `gpt-5.4-mini` — с `--ephemeral`=off, чтобы записался rollout с `rate_limits`; Claude `haiku` — наполняет `.usage-cache.json`), затем форсит перечитку токен-источников (`switcher.refreshUsage()`: сброс throttle Claude-OAuth + сброс 30с-кэша Codex). Каждый пинг пишется в лог «Служебные события» (`kind:"process"`).
+Раскрывашка тянет `GET /api/switcher/stats?period=today|week|all` (кэш 60с) → `{claude:{acc1,acc2}, codex:{acc1,acc2}, providers:{profileId→{label,inputTokens,outputTokens,totalTokens,requests,lastAt}}}`, claude/codex — `{windows, spending}`; `providers` отдаётся свежим (вне кэша, расход кумулятивный). Кнопка ↻ refresh (`POST /api/switcher/refresh`) шлёт мини-запрос («What is 1+3?») **по всем авторизованным аккаунтам** самой дешёвой моделью сервиса (Codex `gpt-5.4-mini` — с `--ephemeral`=off, чтобы записался rollout с `rate_limits`; Claude `haiku` — наполняет `.usage-cache.json`), затем форсит перечитку токен-источников (`switcher.refreshUsage()`: сброс throttle Claude-OAuth + сброс 30с-кэша Codex). Каждый пинг пишется в лог «Служебные события» (`kind:"process"`).
 
 ---
 
@@ -95,6 +96,7 @@ Council Room v2/
 - kb: `/api/kb/add|remove`
 - round/autopilot: `/api/round`, `/api/autopilot/start|stop`
 - switcher: `/api/switcher/login|refresh|stats|subscription`
+- providers: `/api/providers/usage/reset` ([Phase 5] сброс кумулятивного расхода по API-профилям; `{profileId}` или пусто = все)
 - `/api/settings`
 - Статика: `?v=__V__` → подставляется `BUILD_ID` (время старта сервера) → кэш всегда свежий; `Cache-Control: no-store`.
 
