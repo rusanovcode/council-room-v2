@@ -590,9 +590,6 @@ function render() {
   renderPinnedHint();
   renderSwitcher();
   updateTerminalsVisibility();
-  $("cliInfo").textContent = currentState.cli
-    ? `codex: ${currentState.cli.codex}\nclaude: ${currentState.cli.claude}\nworkdir: ${currentState.workdir}`
-    : "";
 }
 
 // ---- Next-step coach -----------------------------------------------------
@@ -1358,7 +1355,8 @@ function renderStatsPanel() {
     body = accs.map((a) => {
       const key = `${a.tool}:${a.id}`;
       const sub = subs[key] || {};
-      const dl = sub.end ? Math.ceil((new Date(sub.end).getTime() - Date.now()) / 86400000) : null;
+      const dlRaw = sub.end ? Math.ceil((new Date(sub.end).getTime() - Date.now()) / 86400000) : null;
+      const dl = dlRaw !== null && dlRaw < 0 ? null : dlRaw;
       return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
         <label class="sub-row">${escapeHtml(t("ui.subStart"))} <input type="date" data-subkey="${key}" data-field="start" value="${escapeHtml(sub.start || "")}"></label>
         <label class="sub-row">${escapeHtml(t("ui.subEnd"))} <input type="date" data-subkey="${key}" data-field="end" value="${escapeHtml(sub.end || "")}"></label>
@@ -1366,8 +1364,12 @@ function renderStatsPanel() {
     }).join("");
   }
 
-  panel.innerHTML = `<div class="stats-tabs">${tabBar}</div><div class="stats-body">${body}</div>`;
+  const cliBlock = currentState.cli
+    ? `<div class="stats-cli">${escapeHtml("codex: " + currentState.cli.codex)}<br>${escapeHtml("claude: " + currentState.cli.claude)}<br>${escapeHtml("workdir: " + currentState.workdir)}</div>`
+    : "";
+  panel.innerHTML = `<div class="stats-tabs">${tabBar}<button class="stats-close" type="button">×</button></div><div class="stats-body">${body}</div>${cliBlock}`;
   panel.querySelectorAll(".stats-tab").forEach((b) => b.addEventListener("click", () => { statsTab = b.dataset.tab; renderStatsPanel(); }));
+  panel.querySelector(".stats-close")?.addEventListener("click", () => { panelOpen.switcherStats = false; renderSwitcher(); });
   panel.querySelectorAll(".stats-period").forEach((b) => b.addEventListener("click", () => { statsPeriod = b.dataset.period; loadStats(); }));
   panel.querySelectorAll("input[data-subkey]").forEach((inp) => inp.addEventListener("change", () => {
     const key = inp.dataset.subkey;

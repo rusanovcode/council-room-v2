@@ -659,6 +659,7 @@ async function router(req, res) {
       saveRun(run);
       state.run = run;
       state.activeRunId = run.id;
+      applyRunSettings(run);
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -668,6 +669,7 @@ async function router(req, res) {
       const run = loadRun(body.runId);
       state.run = run;
       state.activeRunId = run.id;
+      applyRunSettings(run);
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -974,6 +976,12 @@ async function router(req, res) {
   }
 }
 
+function applyRunSettings(run) {
+  if (run?.settings?.subscriptions) {
+    state.settings.subscriptions = { ...run.settings.subscriptions };
+  }
+}
+
 // Auto-select the most recently created chat on startup so a server restart
 // doesn't land the user on an empty screen ("куда делись чаты?").
 function selectLastRunOnStartup() {
@@ -982,6 +990,7 @@ function selectLastRunOnStartup() {
   const last = runs[runs.length - 1];
   state.run = last;
   state.activeRunId = last.id;
+  applyRunSettings(last);
 }
 
 selectLastRunOnStartup();

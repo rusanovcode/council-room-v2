@@ -267,16 +267,14 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 
 /* Switch-module indicator + account buttons, pinned to the bottom of the left column */
 .switcher-status {
-  margin-top: auto;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--border);
   font-size: 10.5px;
   color: var(--muted);
   user-select: none;
+  margin-left: auto;
 }
 .switcher-left { display: inline-flex; align-items: center; gap: 6px; cursor: help; min-width: 0; }
 .switcher-left #switcherStatusText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -301,7 +299,6 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .switcher-expand:hover { color: var(--accent); }
 /* Account buttons — one row per service (Codex / Claude); API adds a 3rd in the row */
 .switcher-accounts {
-  margin-left: auto;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -332,11 +329,18 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 
 /* Detailed-stats panel — expands upward, content added later */
 .switcher-stats {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 280px;
+  z-index: 200;
+  background: var(--panel);
   border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   padding: 8px 14px;
-  min-height: 40px;
   font-size: 11px;
   color: var(--muted);
+  box-shadow: 2px -2px 8px rgba(0,0,0,.25);
 }
 .switcher-stats.hidden { display: none; }
 .stats-tabs { display: flex; gap: 2px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
@@ -350,6 +354,8 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   cursor: pointer;
 }
 .stats-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.stats-close { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; }
+.stats-close:hover { color: var(--text); }
 .stats-body { display: flex; flex-direction: column; gap: 8px; }
 .stats-acc { background: var(--panel-2); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.5; }
 .stats-acc b { color: var(--accent); }
@@ -357,9 +363,19 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .stats-period { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 2px 7px; border-radius: 3px; cursor: pointer; }
 .stats-period.active { color: var(--text); border-color: var(--accent); }
 .sub-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 3px 0; font-size: 11px; color: var(--muted); }
-.sub-row input { width: auto; flex: 0 0 auto; font-size: 11px; padding: 2px 4px; background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.sub-row input { width: auto; flex: 0 0 auto; font-size: 11px; padding: 2px 4px; background: var(--bg); color: var(--text); border: 1px solid var(--border); color-scheme: dark; }
 .sub-row input::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 .stats-warn { color: var(--amber); font-weight: 600; }
+.stats-cli {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  word-break: break-all;
+  line-height: 1.6;
+}
 
 /* Per-agent account/mode controls */
 .account-row {
