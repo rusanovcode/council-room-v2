@@ -20,8 +20,8 @@ Council Room v2/
 │   ├── questions.js          per-subtask вопросы (questions.jsonl): ID, priority, resolvedBy, verify, near-dup
 │   ├── prompt.js             buildDebatePrompt, parseAgentTail, STATIC_SYSTEM, NO_SCAN_GUARD, STRICT_SCOPE_RULE
 │   ├── cli.js                runCodex/runClaude (spawn, AbortSignal, killTree, accountEnv), spawnLogin
-│   ├── switcher.js           модуль свитч: gateway-клиент (7700) + файловый фолбэк; envForAccount; claudePaths
-│   └── stats.js              окна usage-cache + расход из session-JSONL (для раскрывашки)
+│   ├── switcher.js           модуль свитч: gateway-клиент (7700) + файловый фолбэк; envForAccount; claude/codexPaths; токен-% (claude usage-cache+oauth/usage fetch, codex rollout rate_limits)
+│   └── stats.js              окна claude usage-cache + расход из session-JSONL (для раскрывашки)
 ├── public/                   index.html, app.js (i18n RU/EN, render*, coach), styles.css
 ├── Council Room v2.bat/.command/.sh   лаунчеры (освобождают порт перед стартом)
 ├── HANDOFF.md  ROADMAP.md  DATA_SOURCES.md (этот)
@@ -62,17 +62,21 @@ Council Room v2/
 
 ## 3. Токены и статистика — `lib/stats.js`, `.usage-cache.json`, session-JSONL
 
+Остаток % красит кнопки (`tokenClass`: ≥50 зелёный / ≥16 жёлтый / <16 красный / `null` серый) и наполняет вкладку «Лимит». Остаток окна = `100 − max(used%)`.
+
 | Что | Источник | Есть для |
 |---|---|---|
-| **Остаток % (цвет кнопки)** | `<configDir>/.usage-cache.json` → `five_hour.utilization`, `seven_day.utilization`; остаток = `100 − max(util)` | **только Claude** |
-| **Часовой/недельный сброс** | то же, поле `resets_at`; начало окна = `resets_at − 5ч/7д` | только Claude |
-| **Расход** (input/output/cache/запросы) | `<configDir>/projects/**/*.jsonl`, поле `message.usage` (input_tokens, output_tokens, cache_*); период по `timestamp` | только Claude (у Codex формат session-логов другой) |
-| **Стоимость $** | в сыром JSONL **нет** (CodeBurn считает по прайсингу моделей) — показываем 0/опускаем | — |
-| **Даты подписки** | **источника нет нигде** → ручной ввод, хранится в `settings.subscriptions["claude:acc1"]={start,end}` | ручками |
-| **Codex остаток %/окна** | **нет файлового источника.** `ai-switcher/tokens.json` логирует лишь `usageEvents{ts,exitCode,limitDetected}` (грубо). Реальные цифры — через OAuth API (см. §5, отложено) | — |
+| **Claude — остаток %/окна** | `<configDir>/.usage-cache.json` → `five_hour`/`seven_day` (`utilization`, `resets_at`); начало окна = `resets_at − 5ч/7д` (`stats.usageWindows`, `switcher.claudeTokensPct`) | Claude acc1/acc2 |
+| **Claude — авто-наполнение кэша** | если `.usage-cache.json` нет/устарел (>10 мин): фоновой GET `https://api.anthropic.com/api/oauth/usage` с OAuth-токеном из `<configDir>/.credentials.json` (`claudeAiOauth.accessToken`) → пишем тот же файл. Нужно для headless-аккаунта (claude-acc2 гоняется `-p`, сам кэш не пишет). Истёкший токен → серый (refresh не реализован) | Claude acc1/acc2 |
+| **Codex — остаток %/окна** | `<codexHome>/sessions/**/rollout-*.jsonl` (+`archived_sessions`), события `token_count` → `rate_limits.primary`(5ч)/`.secondary`(нед.): `used_percent`, `resets_at` (**UNIX-сек**). Берём свежайший непустой снапшот (новейший файл часто с null-окнами), кэш 30с (`switcher.latestCodexRateLimits/codexTokensPct/codexUsageWindows`) | Codex acc1/acc2 |
+| **Расход** (input/output/cache/запросы) | `<configDir>/projects/**/*.jsonl`, поле `message.usage`; период по `timestamp` (`stats.spending`) | **только Claude** (Codex-расхода в этих логах нет) |
+| **Стоимость $** | в сыром JSONL **нет** — показываем 0/опускаем | — |
+| **Даты подписки** | источника нет → ручной ввод в `settings.subscriptions["claude:acc1"]={start,end}` (UI вкладка «Подписки») | ручками |
+| **API-ключ профили** | rollout/usage-cache у них нет → серый | — |
 
-`configDir`: acc1 = `%USERPROFILE%\.claude`, acc2 = `C:\AI\ai-switcher\auth\claude-acc2` (`switcher.claudePaths()`).
-Раскрывашка тянет `GET /api/switcher/stats?period=today|week|all` (кэш 60с). Кнопка ↻ refresh шлёт мини-запрос «What is 1+3?» по каждому Claude-аккаунту → наполняет `.usage-cache.json`.
+`configDir` (claude): acc1 = `%USERPROFILE%\.claude`, acc2 = `…\auth\claude-acc2` (`switcher.claudePaths()`).
+`codexHome`: acc1 = `%USERPROFILE%\.codex`, acc2 = `…\auth\codex-acc2` (`switcher.codexPaths()`).
+Раскрывашка тянет `GET /api/switcher/stats?period=today|week|all` (кэш 60с) → `{claude:{acc1,acc2}, codex:{acc1,acc2}}`, каждый `{windows, spending}`. Кнопка ↻ refresh шлёт мини-запрос по Claude-аккаунтам → наполняет `.usage-cache.json`.
 
 ---
 
@@ -88,8 +92,8 @@ Council Room v2/
 - `/api/settings`
 - Статика: `?v=__V__` → подставляется `BUILD_ID` (время старта сервера) → кэш всегда свежий; `Cache-Control: no-store`.
 
-Состояние/настройки: `state.settings` (глобально) и `state.run.settings` (per-chat в state.json).
-localStorage клиента: `uiLang`, `scale`, `coachPos`, `terminalsCollapsed`.
+Состояние/настройки: `state.settings` (глобально, синхронизируется из run при активации через `applyRunSettings`) и `state.run.settings` (per-chat в state.json). Включение `allowFilesystemScan` авто-снимает `strictScope` (в одну сторону).
+localStorage клиента (глобальные UI-префы): `uiLang`, `scale`, `coachPos`, `terminalsCollapsed`, `panels` (раскрывашки), `statsTab`, `autoResolve`, `coachPinned`.
 
 ---
 
@@ -103,7 +107,13 @@ localStorage клиента: `uiLang`, `scale`, `coachPos`, `terminalsCollapsed`
 - `C:\AI\service_limit_table*.md` — карта источников от CodeBurn (env/auth-пути/regex лимитов).
 - `C:\AI\claude2.bat`, `codex2.bat` — запуск CLI на 2-м аккаунте (env-обёртки).
 
-### ОТЛОЖЕНО (следующий этап) — Codex-цифры и авто-подписка через OAuth-usage API
-Чтобы получить **Codex остаток %** и **реальные даты подписки** обоих сервисов: повторить путь
-CodeBurn — читать токен из `auth.json`/`.credentials.json` и звать `wham/usage` (Codex) и
-`oauth/usage` (Claude). Тяжелее (внешние HTTPS + секретные токены) → вынесено отдельно.
+### Сделано (был «следующий этап»)
+- **Codex остаток %/окна** — БЕЗ внешних вызовов: читаем локальные rollout `rate_limits` (см. §3).
+- **Claude остаток %** для headless-аккаунта — фоновой `oauth/usage` с токеном аккаунта (см. §3).
+
+### Остаётся отложенным
+- **Реальные даты подписки** обоих сервисов (сейчас ручками). Источник — `oauth/usage`/`wham/usage`
+  возвращают окна лимитов, но не дату окончания подписки; её даёт `oauth/profile`
+  (`subscription_created_at`, `has_claude_pro/max`) для Claude — можно добавить позже.
+- **Token refresh** при истечении OAuth-токена (Claude fetch): сейчас истёкший → серый, пока CLI сам не обновит.
+- **Codex через `wham/usage`** не нужен — rollout-файлы уже дают окна.
