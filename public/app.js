@@ -157,7 +157,8 @@ const STRINGS = {
     "ui.used": "использовано",
     "ui.now": "сейчас",
     "ui.noData": "нет данных",
-    "ui.codexNoData": "нет данных (Codex — через OAuth API, отложено)",
+    "ui.codexNoData": "нет данных (запусти раунд с этим аккаунтом)",
+    "ui.codexNoSpend": "расход не отслеживается (нет в session-логах Codex)",
     "ui.periodToday": "сегодня",
     "ui.periodWeek": "неделя",
     "ui.periodAll": "всё",
@@ -337,7 +338,8 @@ const STRINGS = {
     "ui.used": "used",
     "ui.now": "now",
     "ui.noData": "no data",
-    "ui.codexNoData": "no data (Codex — via OAuth API, deferred)",
+    "ui.codexNoData": "no data (run a round on this account)",
+    "ui.codexNoSpend": "spend not tracked (not in Codex session logs)",
     "ui.periodToday": "today",
     "ui.periodWeek": "week",
     "ui.periodAll": "all",
@@ -1393,12 +1395,12 @@ function renderStatsPanel() {
       accs.push({ tool, id: p.id, label: isApi ? `${tn} API` : `${tn} ${num}` });
     }
   }
-  const claudeData = (a) => (a.tool === "claude" ? statsData?.claude?.[a.id] : null);
+  const accData = (a) => statsData?.[a.tool]?.[a.id];
   const noDataNote = (a) => a.tool === "codex" ? escapeHtml(t("ui.codexNoData")) : escapeHtml(t("ui.noData"));
 
   if (statsTab === "limits") {
     body = accs.map((a) => {
-      const w = claudeData(a)?.windows;
+      const w = accData(a)?.windows;
       if (!w) return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b> <span class="muted small">${noDataNote(a)}</span></div>`;
       const fh = w.fiveHour, sd = w.sevenDay;
       return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
@@ -1410,8 +1412,8 @@ function renderStatsPanel() {
     const periods = [["today", t("ui.periodToday")], ["week", t("ui.periodWeek")], ["all", t("ui.periodAll")]];
     body = `<div class="stats-periods">${periods.map(([p, l]) => `<button class="stats-period${statsPeriod === p ? " active" : ""}" data-period="${p}">${escapeHtml(l)}</button>`).join("")}</div>`;
     body += accs.map((a) => {
-      const s = claudeData(a)?.spending;
-      if (!s) return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b> <span class="muted small">${noDataNote(a)}</span></div>`;
+      const s = accData(a)?.spending;
+      if (!s) return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b> <span class="muted small">${a.tool === "codex" ? escapeHtml(t("ui.codexNoSpend")) : noDataNote(a)}</span></div>`;
       return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
         <div>${escapeHtml(t("ui.spendIn"))}: ${s.inputK}K · ${escapeHtml(t("ui.spendOut"))}: ${s.outputK}K</div>
         <div class="muted small">cache R ${s.cacheReadK}K / W ${s.cacheWriteK}K · ${escapeHtml(t("ui.sessions"))}: ${s.sessions}</div></div>`;

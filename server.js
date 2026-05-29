@@ -942,6 +942,7 @@ async function router(req, res) {
       const now = Date.now();
       if (!statsCache[key] || now - statsCache[key].at > 60000) {
         const dirs = switcher.claudePaths();
+        const codexDirs = switcher.codexPaths();
         statsCache[key] = {
           at: now,
           data: {
@@ -949,6 +950,12 @@ async function router(req, res) {
             claude: {
               acc1: stats.accountStats(dirs.acc1, period),
               acc2: stats.accountStats(dirs.acc2, period),
+            },
+            // Codex: rolling-window limits from its rollout rate_limits. No spend
+            // figure (codex usage isn't in the Claude session JSONL).
+            codex: {
+              acc1: { windows: switcher.codexUsageWindows(codexDirs.acc1), spending: null },
+              acc2: { windows: switcher.codexUsageWindows(codexDirs.acc2), spending: null },
             },
           },
         };
