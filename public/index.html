@@ -65,9 +65,14 @@
           <div id="cliInfo" class="cli-info"></div>
         </section>
 
-        <div id="switcherStatus" class="switcher-status" data-tooltip-key="t.switcher">
-          <span class="switcher-dot"></span>
-          <span id="switcherStatusText">—</span>
+        <div id="switcherStats" class="switcher-stats hidden"></div>
+        <div id="switcherStatus" class="switcher-status">
+          <span class="switcher-left" data-tooltip-key="t.switcher">
+            <span class="switcher-dot"></span>
+            <span id="switcherStatusText">—</span>
+          </span>
+          <button id="toggleSwitcherStats" class="switcher-expand" type="button" data-i18n-title="ui.switcherStats">▴</button>
+          <span id="switcherAccounts" class="switcher-accounts"></span>
         </div>
       </aside>
 
@@ -284,6 +289,19 @@
         <div class="modal-actions">
           <button id="cancelSubtask" class="ghost" data-i18n="ui.cancel">Отмена</button>
           <button id="confirmSubtask" class="primary" data-i18n="ui.open">Открыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: guided account login -->
+    <div id="loginModal" class="modal hidden">
+      <div class="modal-box">
+        <h3 id="loginModalTitle">Авторизация аккаунта</h3>
+        <div id="loginModalNote" class="login-note hidden"></div>
+        <ol id="loginModalSteps" class="login-steps"></ol>
+        <div class="modal-actions">
+          <button id="cancelLogin" class="ghost" data-i18n="ui.cancel">Отмена</button>
+          <button id="confirmLoginBtn" class="primary" data-i18n="ui.openLogin">Открыть окно входа</button>
         </div>
       </div>
     </div>

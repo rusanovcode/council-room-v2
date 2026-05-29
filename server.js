@@ -881,6 +881,17 @@ async function router(req, res) {
       return sendJson(res, 200, publicState());
     }
 
+    if (method === "POST" && pathname === "/api/switcher/login") {
+      const body = await readBody(req);
+      const tool = body.tool === "claude" ? "claude" : "codex";
+      const account = Number(body.account) === 2 ? 2 : 1;
+      const result = cli.spawnLogin(tool, switcher.envForAccount(tool, account));
+      if (state.run) {
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Запущена авторизация: ${tool} аккаунт ${account}${result.ok ? " (окно терминала открыто)" : ` (ошибка: ${result.error})`}.` });
+      }
+      return sendJson(res, result.ok ? 200 : 500, result);
+    }
+
     if (method === "POST" && pathname === "/api/settings") {
       const body = await readBody(req);
       state.settings = { ...state.settings, ...body };

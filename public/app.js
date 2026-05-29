@@ -138,6 +138,13 @@ const STRINGS = {
     "tip.subtaskTrash": "Корзина подзадач. По «×» подзадача уходит сюда (восстановимо). Клик — read-only просмотр; ↩ — вернуть в стек; «Очистить» — удалить безвозвратно.|||создал лишнюю подзадачу, нажал × → в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть весь мусор.",
     "ui.switcherConnected": "модуль свитч подключён",
     "ui.switcherOffline": "модуль свитч не подключён",
+    "ui.switcherStats": "Подробная статистика",
+    "ui.openLogin": "Открыть окно входа",
+    "ui.relogin": "Перелогиниться",
+    "ui.loginAlready": "✓ Этот аккаунт уже авторизован. Повторный вход обычно не нужен — только если проблемы со входом или сменил аккаунт.",
+    "ui.loginTitle": "Авторизация: {tool} — аккаунт {account}",
+    "ui.loginSteps": "Откроется отдельное окно терминала в окружении этого аккаунта.|В нём запустится команда входа: {cmd}|Следуй подсказкам CLI — обычно откроется браузер. Войди ИМЕННО в нужный аккаунт (не перепутай с другим).|Аккаунт 2: данные входа сохранятся в папку ai-switcher этого аккаунта; аккаунт 1 — в дефолтную.|После сообщения об успехе вернись сюда. Окно терминала можно закрыть.",
+    "tip.acctBtn": "{tool} — аккаунт {account}. Остаток токенов: {pct}.\nЦвет: зелёный ≥50%, жёлтый 16–49%, красный <16%, серый — нет данных. Клик — авторизовать этот аккаунт (откроется окно login).|||Cx2 красный → у Codex акк 2 кончаются токены; кликнул — открылось окно входа, перелогинился.",
     "tip.switcher": "Модуль свитч (ai-switcher) — мультиаккаунт для агентов. Необязателен: если не подключён, всё работает в стандартном режиме на 1 аккаунте.\nПодключён = в ai-switcher настроен второй аккаунт (auth-папки на месте). Тогда доступен свитч/failover между аккаунтами.|||зелёная точка «подключён» → можно выбрать акк 2 и авто-failover. Серая «не подключён» → только акк 1.",
     "tip.account": "Режим: auto — при лимите/ошибке агент сам переключится на другой аккаунт и повторит раунд; manual — жёстко закреплён выбранный аккаунт, без авто-свитча.\nАккаунт: какой использовать как стартовый (в auto) или закреплённый (в manual). Акк 2 доступен только если модуль свитч подключён.|||Codex auto + акк 1: ловит лимит на акк 1 → сам уходит на акк 2. Claude manual + акк 2: всегда только акк 2.",
     "tip.strictScope": "Спец-режим. Когда включён (☑): всё, что НЕ перечислено в секции «Файлы в scope», автоматически считается вне scope, и агентам СТРОГО запрещено это трогать.\nВ промт добавляется жёсткое правило-дополнение (complement). Удобно, когда проще перечислить разрешённое, чем запрещённое.|||в «Файлы в scope» три файла. Включаешь ☑ — агенты понимают: любой другой файл/папку проекта трогать нельзя, даже если он не указан явно в «Файлы вне scope».",
@@ -283,6 +290,13 @@ const STRINGS = {
     "tip.subtaskTrash": "Subtask trash. The «×» sends a subtask here (recoverable). Click for a read-only preview; ↩ restores to the stack; «Empty» deletes permanently.|||made an extra subtask, hit × → in trash. Changed your mind — ↩ restored it. Or «Empty» to wipe the junk.",
     "ui.switcherConnected": "switch module connected",
     "ui.switcherOffline": "switch module not connected",
+    "ui.switcherStats": "Detailed stats",
+    "ui.openLogin": "Open login window",
+    "ui.relogin": "Re-login",
+    "ui.loginAlready": "✓ This account is already authorized. Re-login is usually unnecessary — only if you have sign-in trouble or switched accounts.",
+    "ui.loginTitle": "Authorize: {tool} — account {account}",
+    "ui.loginSteps": "A separate terminal window opens in this account's environment.|It runs the login command: {cmd}|Follow the CLI prompts — a browser usually opens. Sign in with the RIGHT account (don't mix them up).|Account 2: credentials save into this account's ai-switcher folder; account 1 — the default one.|After the success message, come back here. You can close the terminal window.",
+    "tip.acctBtn": "{tool} — account {account}. Tokens left: {pct}.\nColour: green ≥50%, yellow 16–49%, red <16%, grey — no data. Click to authorize this account (opens a login window).|||Cx2 red → Codex acc 2 is running out of tokens; clicked it → a login window opened, re-logged in.",
     "tip.switcher": "Switch module (ai-switcher) — multi-account for the agents. Optional: if not connected, everything runs in standard single-account mode.\nConnected = a second account is set up in ai-switcher (auth folders present). Then switching/failover between accounts is available.|||green dot «connected» → you can pick acc 2 and auto-failover. Grey «not connected» → only acc 1.",
     "tip.account": "Mode: auto — on a limit/error the agent switches to the other account and retries the round; manual — the chosen account is pinned, no auto-switch.\nAccount: which to use as the start account (in auto) or the pinned one (in manual). Acc 2 is only available when the switch module is connected.|||Codex auto + acc 1: hits a limit on acc 1 → moves to acc 2 itself. Claude manual + acc 2: always acc 2 only.",
     "tip.strictScope": "Special mode. When on (☑): everything NOT listed in the «Files in Scope» section is automatically considered out of scope, and agents are STRICTLY forbidden to touch it.\nA hard complement rule is injected into the prompt. Handy when it's easier to list what's allowed than what's forbidden.|||«Files in Scope» has three files. Turn on ☑ — agents understand any other project file/folder must not be touched, even if not explicitly listed in «Files Out of Scope».",
@@ -539,7 +553,7 @@ function render() {
 
 let nextStepDismissed = false;
 let coachPinned = false;
-const panelOpen = { chatArchive: false, subtaskArchive: false, subtaskTrash: false };
+const panelOpen = { chatArchive: false, subtaskArchive: false, subtaskTrash: false, switcherStats: false };
 let previewSubtaskId = null;
 
 function openPreview(id) {
@@ -1188,12 +1202,71 @@ function renderQuestionsBlock(block, tools, help, label) {
   block.appendChild(add);
 }
 
+let pendingLogin = null;
+function openLoginModal(tool, account, authorized) {
+  pendingLogin = { tool, account };
+  const cmd = tool === "codex" ? "codex login" : (tool === "claude" ? "claude /login" : "—");
+  $("loginModalTitle").textContent = (authorized ? "✓ " : "") + t("ui.loginTitle", { tool, account });
+
+  const note = $("loginModalNote");
+  note.classList.toggle("hidden", !authorized);
+  if (authorized) note.textContent = t("ui.loginAlready");
+
+  const stepsEl = $("loginModalSteps");
+  stepsEl.innerHTML = "";
+  for (const step of t("ui.loginSteps", { tool, account, cmd }).split("|")) {
+    const li = document.createElement("li");
+    li.textContent = step;
+    stepsEl.appendChild(li);
+  }
+  // Already signed in → re-login is optional, not the implied default.
+  $("confirmLoginBtn").textContent = authorized ? t("ui.relogin") : t("ui.openLogin");
+  $("loginModal").classList.remove("hidden");
+}
+
+function tokenClass(pct) {
+  if (pct === null || pct === undefined || Number.isNaN(Number(pct))) return "tok-unknown";
+  const n = Number(pct);
+  if (n >= 50) return "tok-green";
+  if (n >= 16) return "tok-yellow";
+  return "tok-red";
+}
+
 function renderSwitcher() {
   const el = $("switcherStatus");
   if (!el) return;
-  const connected = Boolean(currentState.switcher?.connected);
+  const sw = currentState.switcher || {};
+  const connected = Boolean(sw.connected);
   el.classList.toggle("connected", connected);
   $("switcherStatusText").textContent = connected ? t("ui.switcherConnected") : t("ui.switcherOffline");
+
+  // 4 account buttons (2 codex, 2 claude); colour = remaining-token bucket.
+  // Click → authorize that account (opens a login terminal in its env).
+  const box = $("switcherAccounts");
+  box.innerHTML = "";
+  const accounts = sw.accounts || {};
+  const labels = { codex: "Cx", claude: "Cl", api: "API" };
+  // Only show accounts that exist; collect first so we can size the grid.
+  const shown = [];
+  for (const tool of ["codex", "claude", "api"]) {
+    for (const a of (accounts[tool] || []).filter((x) => x.available)) shown.push({ tool, ...a });
+  }
+  // Layout: 4 → 2 per row; otherwise up to 3 per row, remainder wraps below.
+  const cols = shown.length === 4 ? 2 : Math.min(Math.max(shown.length, 1), 3);
+  box.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  for (const a of shown) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `acct-btn ${tokenClass(a.tokensPct)}${a.authorized ? "" : " unauthorized"}`;
+    btn.textContent = a.tool === "api" ? "API" : `${labels[a.tool]}${a.account}`;
+    btn.dataset.tooltipText = t("tip.acctBtn", { tool: a.tool, account: a.account, pct: a.tokensPct == null ? "—" : `${a.tokensPct}%` });
+    btn.addEventListener("click", () => openLoginModal(a.tool, a.account, a.authorized));
+    box.appendChild(btn);
+  }
+
+  // Detailed-stats expander (content added later).
+  $("switcherStats").classList.toggle("hidden", !panelOpen.switcherStats);
+  $("toggleSwitcherStats").textContent = panelOpen.switcherStats ? "▾" : "▴";
 }
 
 function renderSettings() {
@@ -1302,6 +1375,12 @@ function bindUi() {
   $("toggleSubtaskArchive").addEventListener("click", () => { panelOpen.subtaskArchive = !panelOpen.subtaskArchive; render(); });
   $("toggleSubtaskTrash").addEventListener("click", () => { panelOpen.subtaskTrash = !panelOpen.subtaskTrash; render(); });
   $("emptyTrash").addEventListener("click", () => { if (confirm(t("ui.confirmEmptyTrash"))) api("POST", "/api/subtasks/trash/empty", {}); });
+  $("toggleSwitcherStats").addEventListener("click", () => { panelOpen.switcherStats = !panelOpen.switcherStats; render(); });
+  $("cancelLogin").addEventListener("click", () => $("loginModal").classList.add("hidden"));
+  $("confirmLoginBtn").addEventListener("click", () => {
+    $("loginModal").classList.add("hidden");
+    if (pendingLogin) api("POST", "/api/switcher/login", pendingLogin);
+  });
   $("cancelSubtask").addEventListener("click", () => $("openSubtaskModal").classList.add("hidden"));
   $("confirmSubtask").addEventListener("click", async () => {
     const title = $("subtaskTitleInput").value.trim();

@@ -265,19 +265,21 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   word-break: break-all;
 }
 
-/* Switch-module indicator, pinned to the bottom of the left column */
+/* Switch-module indicator + account buttons, pinned to the bottom of the left column */
 .switcher-status {
   margin-top: auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 8px 14px;
   border-top: 1px solid var(--border);
   font-size: 10.5px;
   color: var(--muted);
-  cursor: help;
   user-select: none;
 }
+.switcher-left { display: inline-flex; align-items: center; gap: 6px; cursor: help; min-width: 0; }
+.switcher-left #switcherStatusText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switcher-dot {
   width: 7px;
   height: 7px;
@@ -285,8 +287,54 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   background: var(--muted);
   flex-shrink: 0;
 }
-.switcher-status.connected { color: var(--green); }
+.switcher-status.connected .switcher-left { color: var(--green); }
 .switcher-status.connected .switcher-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
+.switcher-expand {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+  line-height: 1;
+}
+.switcher-expand:hover { color: var(--accent); }
+/* Account buttons — grid sized in JS (4→2 cols, else up to 3); grows upward as rows add */
+.switcher-accounts {
+  margin-left: auto;
+  display: grid;
+  gap: 3px;
+}
+.acct-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  min-width: 30px;
+  text-align: center;
+}
+.acct-btn.tok-green { border-color: var(--green); color: var(--green); }
+.acct-btn.tok-yellow { border-color: var(--amber); color: var(--amber); }
+.acct-btn.tok-red { border-color: var(--red); color: var(--red); }
+.acct-btn.tok-unknown { border-color: var(--border); color: var(--muted); }
+.acct-btn.unauthorized { border-style: dashed; opacity: 0.6; }
+.acct-btn:hover { background: var(--border); }
+
+/* Detailed-stats panel — expands upward, content added later */
+.switcher-stats {
+  border-top: 1px solid var(--border);
+  padding: 8px 14px;
+  min-height: 40px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.switcher-stats.hidden { display: none; }
 
 /* Per-agent account/mode controls */
 .account-row {
@@ -659,6 +707,18 @@ button.square {
   line-height: 1.4;
 }
 .modal-box h3 { margin: 0 0 10px; }
+.login-steps { margin: 0 0 4px; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; }
+.login-steps li { font-size: 13px; line-height: 1.45; color: var(--text); }
+.login-note {
+  background: rgba(78, 195, 138, 0.12);
+  border: 1px solid rgba(78, 195, 138, 0.4);
+  color: var(--green);
+  border-radius: 4px;
+  padding: 6px 9px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.login-note.hidden { display: none; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 
 /* Help badge + tooltip */
