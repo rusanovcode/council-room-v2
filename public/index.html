@@ -82,6 +82,9 @@
             <button id="toggleMsgTrash" class="ghost" type="button" data-tooltip-key="t.msgTrash">
               <span data-i18n="ui.msgTrash">Корзина ответов</span> ▾
             </button>
+            <button id="checkUpdates" class="ghost" type="button" data-i18n-title="ui.checkUpdatesTitle">
+              <span data-i18n="ui.checkUpdates">Обновления</span> ⟳
+            </button>
             <span class="head-divider"></span>
             <button id="fontDown" class="ghost square" type="button" data-tooltip-key="t.fontDown">A−</button>
             <button id="fontUp" class="ghost square" type="button" data-tooltip-key="t.fontUp">A+</button>
@@ -310,6 +313,18 @@
         <div class="modal-actions">
           <button id="cancelLogin" class="ghost" data-i18n="ui.cancel">Отмена</button>
           <button id="confirmLoginBtn" class="primary" data-i18n="ui.openLogin">Открыть окно входа</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: check / apply GitHub updates -->
+    <div id="updateModal" class="modal hidden">
+      <div class="modal-box">
+        <h3 data-i18n="ui.updateTitle">Обновление</h3>
+        <div id="updateModalBody" class="update-body"></div>
+        <div class="modal-actions">
+          <button id="updateCancel" class="ghost" data-i18n="ui.cancel">Отмена</button>
+          <button id="updateConfirm" class="primary hidden" data-i18n="ui.updateApply">Обновить</button>
         </div>
       </div>
     </div>

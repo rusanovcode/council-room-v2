@@ -2,6 +2,7 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const url = require("node:url");
+const { execFile } = require("node:child_process");
 
 const store = require("./lib/store");
 const subtasks = require("./lib/subtasks");
@@ -66,6 +67,16 @@ let statsCache = {};
 let statsVersion = 0;
 async function refreshSwitcher() {
   try { switcherStatus = await switcher.status(); } catch { switcherStatus = switcher.detect(); }
+}
+
+// Run a git command in the project root. Resolves with {ok, stdout, stderr} and
+// never rejects, so callers can branch on `ok` without try/catch.
+function git(args, timeout = 30000) {
+  return new Promise((resolve) => {
+    execFile("git", args, { cwd: ROOT, timeout, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve({ ok: !err, stdout: String(stdout || "").trim(), stderr: String(stderr || "").trim() });
+    });
+  });
 }
 
 const sseClients = new Set();
@@ -184,7 +195,7 @@ function broadcastStream(agent, chunk, { subtaskId = "", round = 0, reset = fals
   }
 }
 
-function addMessage({ role, name, kind = "", text, subtaskId = "", round = 0 }) {
+function addMessage({ role, name, kind = "", text, textRu = "", subtaskId = "", round = 0 }) {
   if (!state.run) return null;
   const item = {
     id: store.makeId("msg"),
@@ -194,7 +205,11 @@ function addMessage({ role, name, kind = "", text, subtaskId = "", round = 0 }) 
     kind,
     subtaskId,
     round,
+    // Service/trace messages are bilingual: `text` holds English, `textRu` the
+    // Russian variant. The client renders the one matching the UI language
+    // (live-switchable). Agent replies pass only `text` (their own language).
     text: String(text || "").trim(),
+    ...(textRu ? { textRu: String(textRu).trim() } : {}),
   };
   store.appendJsonl(transcriptPath(state.run.id), item);
   broadcast();
@@ -227,7 +242,7 @@ async function runRound({ guidance = "" } = {}) {
   if (state.busy) throw new Error("Busy");
   const dir = runDir(state.run.id);
   const active = subtasks.activeSubtask(dir);
-  if (!active) throw new Error("No active subtask — открой подзадачу перед раундом");
+  if (!active) throw new Error("No active subtask — open a subtask before running a round");
 
   const ac = new AbortController();
   activeAbort = ac;
@@ -293,7 +308,8 @@ async function runRound({ guidance = "" } = {}) {
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Раунд ${round} (subtask ${active.id})${verifyMode ? " — ФИНАЛЬНАЯ ПРОВЕРКА (максимальные агенты: codex " + codexModel + "/" + codexEffort + ", claude " + claudeModel + "/" + claudeEffort + ")" : ""}: запуск Codex и Claude параллельно. Codex prompt ${codexPrompt.length} chars, Claude prompt ${claudePrompt.length} chars.`,
+      text: `Round ${round} (subtask ${active.id})${verifyMode ? " — FINAL VERIFICATION (max agents: codex " + codexModel + "/" + codexEffort + ", claude " + claudeModel + "/" + claudeEffort + ")" : ""}: launching Codex and Claude in parallel. Codex prompt ${codexPrompt.length} chars, Claude prompt ${claudePrompt.length} chars.`,
+      textRu: `Раунд ${round} (subtask ${active.id})${verifyMode ? " — ФИНАЛЬНАЯ ПРОВЕРКА (максимальные агенты: codex " + codexModel + "/" + codexEffort + ", claude " + claudeModel + "/" + claudeEffort + ")" : ""}: запуск Codex и Claude параллельно. Codex prompt ${codexPrompt.length} chars, Claude prompt ${claudePrompt.length} chars.`,
       subtaskId: active.id,
       round,
     });
@@ -348,7 +364,8 @@ async function runRound({ guidance = "" } = {}) {
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Аккаунты раунда: Codex ${codexAccount} (${codexMode}), Claude ${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
+      text: `Round accounts: Codex ${codexAccount} (${codexMode}), Claude ${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Switch module not connected — standard mode."}`,
+      textRu: `Аккаунты раунда: Codex ${codexAccount} (${codexMode}), Claude ${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
       subtaskId: active.id,
       round,
     });
@@ -359,7 +376,7 @@ async function runRound({ guidance = "" } = {}) {
     if (!ac.signal.aborted && !codexResult.aborted && !codexResult.ok && codexMode === "auto" && sw.connected) {
       const other = codexAccount === "acc1" ? "acc2" : "acc1";
       if (switcher.accountAvailable("codex", other)) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Codex: ошибка/лимит на ${codexAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Codex: error/limit on ${codexAccount} → switching to ${other} (auto-failover).`, textRu: `Codex: ошибка/лимит на ${codexAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
         broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
         codexResult = await runCodexOn(other);
         codexAccount = other;
@@ -368,7 +385,7 @@ async function runRound({ guidance = "" } = {}) {
     if (!ac.signal.aborted && !claudeResult.aborted && !claudeResult.ok && claudeMode === "auto" && sw.connected) {
       const other = claudeAccount === "acc1" ? "acc2" : "acc1";
       if (switcher.accountAvailable("claude", other)) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Claude: ошибка/лимит на ${claudeAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Claude: error/limit on ${claudeAccount} → switching to ${other} (auto-failover).`, textRu: `Claude: ошибка/лимит на ${claudeAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
         broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
         claudeResult = await runClaudeOn(other);
         claudeAccount = other;
@@ -380,7 +397,8 @@ async function runRound({ guidance = "" } = {}) {
         role: "system",
         name: "Council Room",
         kind: "process",
-        text: `Раунд ${round} (subtask ${active.id}) прерван пользователем — частичный результат отброшен (раунд не засчитан).`,
+        text: `Round ${round} (subtask ${active.id}) cancelled by user — partial result discarded (round not counted).`,
+        textRu: `Раунд ${round} (subtask ${active.id}) прерван пользователем — частичный результат отброшен (раунд не засчитан).`,
         subtaskId: active.id,
         round,
       });
@@ -424,7 +442,7 @@ async function runRound({ guidance = "" } = {}) {
         const before = questions.forSubtask(dir, active.id).find((x) => x.id === pr.id);
         questions.setPriority(dir, pr.id, pr.priority);
         if (before && before.priority === "minor" && pr.priority === "critical" && before.status === "open") {
-          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ ${agent} повысил вопрос ${pr.id} до CRITICAL — теперь он блокирует исполнение.`, subtaskId: active.id, round });
+          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ ${agent} raised question ${pr.id} to CRITICAL — it now blocks execution.`, textRu: `⚠️ ${agent} повысил вопрос ${pr.id} до CRITICAL — теперь он блокирует исполнение.`, subtaskId: active.id, round });
         }
       }
     }
@@ -436,14 +454,14 @@ async function runRound({ guidance = "" } = {}) {
       const reopen = new Set([...(codexTail.verify?.reopen || []), ...(claudeTail.verify?.reopen || [])]);
       for (const id of reopen) questions.reopen(dir, id);
       if (reopen.size) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Финальная проверка: возвращены в работу — ${[...reopen].join(", ")}.`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Final verification: returned to work — ${[...reopen].join(", ")}.`, textRu: `Финальная проверка: возвращены в работу — ${[...reopen].join(", ")}.`, subtaskId: active.id, round });
       } else if (codexTail.verify?.ok && claudeTail.verify?.ok) {
         questions.markSubtaskVerified(dir, active.id);
         verifyPassed = true;
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Финальная проверка пройдена обоими — критичные вопросы verified, подзадача готова к закрытию.`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Final verification passed by both — critical questions verified, subtask ready to close.`, textRu: `Финальная проверка пройдена обоими — критичные вопросы verified, подзадача готова к закрытию.`, subtaskId: active.id, round });
         const stillMinor = questions.openForSubtask(dir, active.id).filter((q) => q.priority === "minor");
         if (stillMinor.length) {
-          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ Отложено ${stillMinor.length} второстепенных вопрос(ов) — догнать позже: ${stillMinor.map((q) => q.id).join(", ")}. Если какой-то станет блокирующим — повысь до critical.`, subtaskId: active.id, round });
+          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ Deferred ${stillMinor.length} minor question(s) — catch up later: ${stillMinor.map((q) => q.id).join(", ")}. If any becomes blocking — raise it to critical.`, textRu: `⚠️ Отложено ${stillMinor.length} второстепенных вопрос(ов) — догнать позже: ${stillMinor.map((q) => q.id).join(", ")}. Если какой-то станет блокирующим — повысь до critical.`, subtaskId: active.id, round });
         }
       }
     }
@@ -454,7 +472,8 @@ async function runRound({ guidance = "" } = {}) {
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Вопросы: открыто ${openNow.length} (critical ${openNow.filter((q) => q.priority === "critical").length} / minor ${openNow.filter((q) => q.priority === "minor").length}), решено ${qStats.filter((q) => q.status === "resolved").length}, проверено ${qStats.filter((q) => q.status === "verified").length}.`,
+      text: `Questions: open ${openNow.length} (critical ${openNow.filter((q) => q.priority === "critical").length} / minor ${openNow.filter((q) => q.priority === "minor").length}), resolved ${qStats.filter((q) => q.status === "resolved").length}, verified ${qStats.filter((q) => q.status === "verified").length}.`,
+      textRu: `Вопросы: открыто ${openNow.length} (critical ${openNow.filter((q) => q.priority === "critical").length} / minor ${openNow.filter((q) => q.priority === "minor").length}), решено ${qStats.filter((q) => q.status === "resolved").length}, проверено ${qStats.filter((q) => q.status === "verified").length}.`,
       subtaskId: active.id,
       round,
     });
@@ -468,7 +487,8 @@ async function runRound({ guidance = "" } = {}) {
         role: "system",
         name: "Council Room",
         kind: "process",
-        text: `Раунд ${round}: stale (нет новых facts/risks/alternatives ни у одного агента). Рекомендуется закрыть подзадачу или ввести guidance.`,
+        text: `Round ${round}: stale (no new facts/risks/alternatives from either agent). Consider closing the subtask or giving guidance.`,
+        textRu: `Раунд ${round}: stale (нет новых facts/risks/alternatives ни у одного агента). Рекомендуется закрыть подзадачу или ввести guidance.`,
         subtaskId: active.id,
         round,
       });
@@ -478,7 +498,8 @@ async function runRound({ guidance = "" } = {}) {
         role: "system",
         name: "Council Room",
         kind: "process",
-        text: `Раунд ${round}: оба агента сообщили Status: resolve. Можно закрывать подзадачу.`,
+        text: `Round ${round}: both agents reported Status: resolve. The subtask can be closed.`,
+        textRu: `Раунд ${round}: оба агента сообщили Status: resolve. Можно закрывать подзадачу.`,
         subtaskId: active.id,
         round,
       });
@@ -489,7 +510,8 @@ async function runRound({ guidance = "" } = {}) {
         role: "system",
         name: "Council Room",
         kind: "process",
-        text: `Раунд ${round}: один из агентов сообщил Status: block — требуется решение пользователя.`,
+        text: `Round ${round}: one agent reported Status: block — user decision required.`,
+        textRu: `Раунд ${round}: один из агентов сообщил Status: block — требуется решение пользователя.`,
         subtaskId: active.id,
         round,
       });
@@ -545,14 +567,15 @@ async function runAutopilot({ autoResolve = false, guidance = "" } = {}) {
   if (state.autopilot.running) throw new Error("Autopilot already running");
   const dir = runDir(state.run.id);
   const active = subtasks.activeSubtask(dir);
-  if (!active) throw new Error("No active subtask — открой подзадачу перед автопилотом");
+  if (!active) throw new Error("No active subtask — open a subtask before autopilot");
 
   state.autopilot = { running: true, subtaskId: active.id, reason: "", startedAt: store.now(), round: active.rounds };
   addMessage({
     role: "system",
     name: "Council Room",
     kind: "process",
-    text: `Autopilot запущен по подзадаче ${active.id} (mode ${active.mode}, budget ${ROUND_BUDGET[active.mode] || 6} раундов, авто-закрытие ${autoResolve ? "ON" : "OFF"}).`,
+    text: `Autopilot started on subtask ${active.id} (mode ${active.mode}, budget ${ROUND_BUDGET[active.mode] || 6} rounds, auto-resolve ${autoResolve ? "ON" : "OFF"}).`,
+    textRu: `Autopilot запущен по подзадаче ${active.id} (mode ${active.mode}, budget ${ROUND_BUDGET[active.mode] || 6} раундов, авто-закрытие ${autoResolve ? "ON" : "OFF"}).`,
     subtaskId: active.id,
   });
   broadcast();
@@ -588,7 +611,8 @@ async function runAutopilot({ autoResolve = false, guidance = "" } = {}) {
             role: "system",
             name: "Council Room",
             kind: "subtask-resolve",
-            text: `Подзадача ${cur.id} авто-закрыта автопилотом. Резюме: ${summary}`,
+            text: `Subtask ${cur.id} auto-resolved by autopilot. Summary: ${summary}`,
+            textRu: `Подзадача ${cur.id} авто-закрыта автопилотом. Резюме: ${summary}`,
             subtaskId: cur.id,
           });
           stopAutopilot("debate-complete-resolved");
@@ -727,7 +751,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-open",
-        text: `Открыта подзадача: ${subtask.title} (id ${subtask.id}, mode ${subtask.mode}).`,
+        text: `Subtask opened: ${subtask.title} (id ${subtask.id}, mode ${subtask.mode}).`,
+        textRu: `Открыта подзадача: ${subtask.title} (id ${subtask.id}, mode ${subtask.mode}).`,
         subtaskId: subtask.id,
       });
       broadcast();
@@ -743,7 +768,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-resolve",
-        text: `Подзадача ${resolved.id} закрыта.${body.summary ? ` Резюме: ${body.summary}` : ""}`,
+        text: `Subtask ${resolved.id} resolved.${body.summary ? ` Summary: ${body.summary}` : ""}`,
+        textRu: `Подзадача ${resolved.id} закрыта.${body.summary ? ` Резюме: ${body.summary}` : ""}`,
         subtaskId: resolved.id,
       });
       broadcast();
@@ -759,7 +785,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-freeze",
-        text: `Подзадача ${frozen.id} заморожена. Причина: ${body.reason || "не указана"}.`,
+        text: `Subtask ${frozen.id} frozen. Reason: ${body.reason || "not specified"}.`,
+        textRu: `Подзадача ${frozen.id} заморожена. Причина: ${body.reason || "не указана"}.`,
         subtaskId: frozen.id,
       });
       broadcast();
@@ -775,7 +802,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-edit",
-        text: `Подзадача ${edited.id} отредактирована: title="${edited.title}", mode=${edited.mode}.`,
+        text: `Subtask ${edited.id} edited: title="${edited.title}", mode=${edited.mode}.`,
+        textRu: `Подзадача ${edited.id} отредактирована: title="${edited.title}", mode=${edited.mode}.`,
         subtaskId: edited.id,
       });
       broadcast();
@@ -791,7 +819,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-delete",
-        text: `Подзадача ${body.id} удалена (раундов не было).`,
+        text: `Subtask ${body.id} deleted (no rounds yet).`,
+        textRu: `Подзадача ${body.id} удалена (раундов не было).`,
       });
       broadcast();
       return sendJson(res, 200, publicState());
@@ -803,8 +832,9 @@ async function router(req, res) {
       const dir = runDir(state.run.id);
       const bin = pathname.endsWith("/trash") ? "trash" : (pathname.endsWith("/archive") ? "archive" : "");
       const item = subtasks.setBin(dir, body.id, bin);
-      const label = bin === "trash" ? "в корзину" : (bin === "archive" ? "в архив" : "восстановлена в стек");
-      addMessage({ role: "system", name: "Council Room", kind: `subtask-${bin || "restore"}`, text: `Подзадача ${item.id} перемещена ${label}.`, subtaskId: item.id });
+      const label = bin === "trash" ? "to trash" : (bin === "archive" ? "to archive" : "back to the stack");
+      const labelRu = bin === "trash" ? "в корзину" : (bin === "archive" ? "в архив" : "восстановлена в стек");
+      addMessage({ role: "system", name: "Council Room", kind: `subtask-${bin || "restore"}`, text: `Subtask ${item.id} moved ${label}.`, textRu: `Подзадача ${item.id} перемещена ${labelRu}.`, subtaskId: item.id });
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -826,7 +856,7 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const dir = runDir(state.run.id);
       const { removed } = subtasks.emptyTrash(dir);
-      addMessage({ role: "system", name: "Council Room", kind: "subtask-trash", text: `Корзина подзадач очищена (удалено: ${removed}).` });
+      addMessage({ role: "system", name: "Council Room", kind: "subtask-trash", text: `Subtask trash emptied (removed: ${removed}).`, textRu: `Корзина подзадач очищена (удалено: ${removed}).` });
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -840,7 +870,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-reopen",
-        text: `Подзадача ${reopened.id} переоткрыта.`,
+        text: `Subtask ${reopened.id} reopened.`,
+        textRu: `Подзадача ${reopened.id} переоткрыта.`,
         subtaskId: reopened.id,
       });
       broadcast();
@@ -851,7 +882,7 @@ async function router(req, res) {
       if (state.autopilot.running) return sendJson(res, 409, { error: "Autopilot is running — stop it before a manual round" });
       const body = await readBody(req);
       runRound({ guidance: body.guidance || "" }).catch((error) => {
-        addMessage({ role: "system", name: "Council Room", kind: "error", text: `Round failed: ${error.message}` });
+        addMessage({ role: "system", name: "Council Room", kind: "error", text: `Round failed: ${error.message}`, textRu: `Раунд завершился ошибкой: ${error.message}` });
       });
       return sendJson(res, 202, { accepted: true });
     }
@@ -871,7 +902,7 @@ async function router(req, res) {
       state.autopilot.running = false;
       if (wasRunning) {
         state.autopilot.reason = "user-stop";
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: "Autopilot stopped: user-stop.", subtaskId: state.autopilot.subtaskId || "" });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: "Autopilot stopped: user-stop.", textRu: "Autopilot остановлен: пользователь.", subtaskId: state.autopilot.subtaskId || "" });
       }
       try { activeAbort?.abort(); } catch {}
       // Hard-kill the agent process trees — abort/SIGTERM alone leaves the cmd.exe-wrapped codex orphaned on Windows.
@@ -934,7 +965,7 @@ async function router(req, res) {
       const account = Number(body.account) === 2 ? 2 : 1;
       const result = cli.spawnLogin(tool, switcher.envForAccount(tool, account));
       if (state.run) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Запущена авторизация: ${tool} аккаунт ${account}${result.ok ? " (окно терминала открыто)" : ` (ошибка: ${result.error})`}.` });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Authorization started: ${tool} account ${account}${result.ok ? " (terminal window opened)" : ` (error: ${result.error})`}.`, textRu: `Запущена авторизация: ${tool} аккаунт ${account}${result.ok ? " (окно терминала открыто)" : ` (ошибка: ${result.error})`}.` });
       }
       return sendJson(res, result.ok ? 200 : 500, result);
     }
@@ -1007,17 +1038,19 @@ async function router(req, res) {
       (async () => {
         if (!targets.length) {
           addMessage({ role: "system", name: "Council Room", kind: "process", subtaskId: sid,
-            text: "Мониторинг токенов: нет авторизованных аккаунтов для опроса." });
+            text: "Token monitor: no authorized accounts to poll.",
+            textRu: "Мониторинг токенов: нет авторизованных аккаунтов для опроса." });
           return;
         }
         const before = {}; // tool:num → remaining % before the ping
         const list = targets.map(({ tool, num }) => {
           before[`${tool}${num}`] = pctOf(switcherStatus, tool, num);
-          return `${tool} акк ${num} (${CHEAP_MODEL[tool]})`;
+          return `${tool} acc ${num} (${CHEAP_MODEL[tool]})`;
         }).join(", ");
         addMessage({
           role: "system", name: "Council Room", kind: "process", subtaskId: sid,
-          text: `Мониторинг токенов: мини-запрос («What is 1+3?») к ${targets.length} аккаунт(ам) самой дешёвой моделью — ${list}.`,
+          text: `Token monitor: tiny request («What is 1+3?») to ${targets.length} account(s) on the cheapest model — ${list}.`,
+          textRu: `Мониторинг токенов: мини-запрос («What is 1+3?») к ${targets.length} аккаунт(ам) самой дешёвой моделью — ${list}.`,
         });
         await Promise.all(targets.map(async ({ tool, num }) => {
           const model = CHEAP_MODEL[tool];
@@ -1029,11 +1062,13 @@ async function router(req, res) {
             accountEnv: switcher.envForAccount(tool, num),
             ...(tool === "codex" ? { ephemeral: false } : {}), // persist rollout → fresh rate_limits
           }).catch((e) => ({ ok: false, text: e?.message || "error" }));
-          const secs = r?.result?.durationMs ? `, ${(r.result.durationMs / 1000).toFixed(1)}с` : "";
-          const reply = r?.ok ? `ответ «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `ошибка/лимит (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
+          const secs = r?.result?.durationMs ? `, ${(r.result.durationMs / 1000).toFixed(1)}s` : "";
+          const okEn = r?.ok ? `reply «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `error/limit (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
+          const okRu = r?.ok ? `ответ «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `ошибка/лимит (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
           addMessage({
             role: "system", name: "Council Room", kind: "process", subtaskId: sid,
-            text: `Мониторинг токенов: ${tool} акк ${num} (${model})${secs} → ${reply}.`,
+            text: `Token monitor: ${tool} acc ${num} (${model})${secs} → ${okEn}.`,
+            textRu: `Мониторинг токенов: ${tool} акк ${num} (${model})${secs} → ${okRu}.`,
           });
         }));
         await switcher.refreshUsage(); // force the displayed % to actually move
@@ -1050,10 +1085,12 @@ async function router(req, res) {
           const win = tool === "claude"
             ? stats.usageWindows(switcher.claudePaths()[`acc${num}`])
             : switcher.codexUsageWindows(switcher.codexPaths()[`acc${num}`]);
-          const winStr = win ? ` [окна: 5ч ${winRem(win.fiveHour)} · нед ${winRem(win.sevenDay)}]` : " [окна: нет данных]";
+          const winStr = win ? ` [windows: 5h ${winRem(win.fiveHour)} · weekly ${winRem(win.sevenDay)}]` : " [windows: no data]";
+          const winStrRu = win ? ` [окна: 5ч ${winRem(win.fiveHour)} · нед ${winRem(win.sevenDay)}]` : " [окна: нет данных]";
           addMessage({
             role: "system", name: "Council Room", kind: "process", subtaskId: sid,
-            text: `Мониторинг токенов: ${tool} акк ${num} — остаток ${fmtPct(b)} → ${fmtPct(a)}${winStr}.`,
+            text: `Token monitor: ${tool} acc ${num} — remaining ${fmtPct(b)} → ${fmtPct(a)}${winStr}.`,
+            textRu: `Мониторинг токенов: ${tool} акк ${num} — остаток ${fmtPct(b)} → ${fmtPct(a)}${winStrRu}.`,
           });
         }
         broadcast();
@@ -1073,6 +1110,50 @@ async function router(req, res) {
       }
       broadcast();
       return sendJson(res, 200, publicState());
+    }
+
+    if (method === "GET" && pathname === "/api/update/check") {
+      // Compare local HEAD with the tracked upstream branch on GitHub.
+      const repo = (await git(["rev-parse", "--is-inside-work-tree"])).stdout === "true";
+      if (!repo) return sendJson(res, 200, { ok: false, error: "Not a git repository — updates are unavailable." });
+      const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).stdout || "main";
+      const fetched = await git(["fetch", "origin", branch, "--quiet"]);
+      if (!fetched.ok) return sendJson(res, 200, { ok: false, error: `git fetch failed: ${fetched.stderr || "no network / no remote"}` });
+      const upstream = `origin/${branch}`;
+      const local = (await git(["rev-parse", "HEAD"])).stdout;
+      const remote = (await git(["rev-parse", upstream])).stdout;
+      const behind = Number((await git(["rev-list", "--count", `HEAD..${upstream}`])).stdout) || 0;
+      const ahead = Number((await git(["rev-list", "--count", `${upstream}..HEAD`])).stdout) || 0;
+      const log = behind > 0 ? (await git(["log", "--no-merges", "--pretty=%h %s", `HEAD..${upstream}`])).stdout : "";
+      const dirty = Boolean((await git(["status", "--porcelain"])).stdout);
+      return sendJson(res, 200, {
+        ok: true,
+        branch,
+        local: local.slice(0, 7),
+        remote: remote.slice(0, 7),
+        behind,
+        ahead,
+        updateAvailable: behind > 0,
+        commits: log ? log.split("\n").filter(Boolean) : [],
+        dirty,
+      });
+    }
+
+    if (method === "POST" && pathname === "/api/update/apply") {
+      // Fast-forward only. Never touches untracked/gitignored files (rooms/ chats,
+      // per-run settings), so chats and settings always survive an update.
+      const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).stdout || "main";
+      const fetched = await git(["fetch", "origin", branch, "--quiet"]);
+      if (!fetched.ok) return sendJson(res, 200, { ok: false, error: `git fetch failed: ${fetched.stderr || "no network / no remote"}` });
+      const merged = await git(["merge", "--ff-only", `origin/${branch}`]);
+      if (!merged.ok) {
+        return sendJson(res, 200, {
+          ok: false,
+          error: `Fast-forward update failed (local changes diverged): ${merged.stderr || merged.stdout}`.trim(),
+        });
+      }
+      const head = (await git(["rev-parse", "--short", "HEAD"])).stdout;
+      return sendJson(res, 200, { ok: true, head, restartRequired: true });
     }
 
     if (method === "GET") return serveStatic(req, res);
@@ -1115,8 +1196,8 @@ setInterval(() => { refreshSwitcher().then(broadcast); }, 15000).unref();
 const server = http.createServer(router);
 server.on("error", (err) => {
   if (err && err.code === "EADDRINUSE") {
-    console.error(`\n[Council Room v2] Порт ${PORT} уже занят — вероятно, запущен старый экземпляр.`);
-    console.error(`Закрой его и перезапусти через "Council Room v2.bat" (он сам освобождает порт), либо: taskkill /F /PID <pid с netstat -ano | findstr :${PORT}>.`);
+    console.error(`\n[Council Room v2] Port ${PORT} is already in use — an old instance is probably running.`);
+    console.error(`Close it and restart via "Council Room v2.bat" (it frees the port), or: taskkill /F /PID <pid from netstat -ano | findstr :${PORT}>.`);
   } else {
     console.error(err);
   }

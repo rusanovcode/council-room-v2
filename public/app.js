@@ -128,6 +128,7 @@ const STRINGS = {
     "tip.verifyBadge": "Финальная проверка: открытых вопросов не осталось, все решённые собраны в пакет.\nСледующий раунд — проверочный, его гоняют МАКСИМАЛЬНЫЕ агенты (топ-модель + max reasoning). Если оба подтвердят весь пакет — подзадача готова к закрытию; любой вернёт вопрос в работу — цикл продолжится.|||3 вопроса решены обоими → бейдж VERIFY. Жмёшь раунд (или autopilot): codex gpt-5.5/xhigh и claude opus/max перепроверяют пакет. Оба «Verify: ok» → можно закрывать.",
     "ui.codexAccount": "Codex — аккаунт",
     "ui.claudeAccount": "Claude — аккаунт",
+    "ui.accShort": "акк",
     "ui.archived": "Архив",
     "ui.trash": "Корзина",
     "ui.emptyTrash": "Очистить",
@@ -144,6 +145,18 @@ const STRINGS = {
     "ui.switcherConnected": "модуль свитч подключён",
     "ui.switcherOffline": "модуль свитч не подключён",
     "ui.toggleStatement": "Развернуть / свернуть текст постановки подзадачи",
+    "ui.checkUpdates": "Обновления",
+    "ui.checkUpdatesTitle": "Проверить обновления на GitHub",
+    "ui.updateTitle": "Обновление",
+    "ui.updateChecking": "Проверяю обновления на GitHub…",
+    "ui.updateUpToDate": "Установлена актуальная версия ({sha}).",
+    "ui.updateAvailable": "Доступно обновление: {n} коммит(ов). Текущая {local} → новая {remote}.",
+    "ui.updateChanges": "Изменения:",
+    "ui.updateApply": "Обновить",
+    "ui.updateApplying": "Обновляю…",
+    "ui.updateDone": "Обновлено до {head}. Чаты и настройки сохранены. Перезапусти приложение (Council Room v2.bat), чтобы применить.",
+    "ui.updateError": "Ошибка: {error}",
+    "ui.updateDirtyNote": "⚠️ Есть незакоммиченные локальные изменения — обновление может не примениться.",
     "ui.switcherStats": "Подробная статистика",
     "ui.refreshTokens": "Обновить остаток токенов (мини-запрос самой дешёвой моделью к каждому аккаунту)",
     "ui.confirmRefresh": "Обновить остаток токенов?\n\nК каждому авторизованному аккаунту (Codex и Claude) будет отправлен крошечный запрос («What is 1+3?») самой дешёвой моделью (Codex gpt-5.4-mini / Claude haiku), чтобы обновить данные по использованию. Виден в логе «Служебные события». Тратит немного подписки.",
@@ -310,6 +323,7 @@ const STRINGS = {
     "tip.verifyBadge": "Final verification: no open questions left, all resolved ones are batched.\nThe next round is a verification pass run by the STRONGEST agents (top model + max reasoning). If both confirm the whole batch — the subtask is ready to close; if either reopens a question — the cycle continues.|||3 questions resolved by both → VERIFY badge. Run a round (or autopilot): codex gpt-5.5/xhigh and claude opus/max recheck the batch. Both «Verify: ok» → ready to close.",
     "ui.codexAccount": "Codex — account",
     "ui.claudeAccount": "Claude — account",
+    "ui.accShort": "acc",
     "ui.archived": "Archive",
     "ui.trash": "Trash",
     "ui.emptyTrash": "Empty",
@@ -326,6 +340,18 @@ const STRINGS = {
     "ui.switcherConnected": "switch module connected",
     "ui.switcherOffline": "switch module not connected",
     "ui.toggleStatement": "Expand / collapse the subtask statement",
+    "ui.checkUpdates": "Updates",
+    "ui.checkUpdatesTitle": "Check for updates on GitHub",
+    "ui.updateTitle": "Update",
+    "ui.updateChecking": "Checking GitHub for updates…",
+    "ui.updateUpToDate": "You are on the latest version ({sha}).",
+    "ui.updateAvailable": "Update available: {n} commit(s). Current {local} → new {remote}.",
+    "ui.updateChanges": "Changes:",
+    "ui.updateApply": "Update",
+    "ui.updateApplying": "Updating…",
+    "ui.updateDone": "Updated to {head}. Chats and settings are preserved. Restart the app (Council Room v2.bat) to apply.",
+    "ui.updateError": "Error: {error}",
+    "ui.updateDirtyNote": "⚠️ There are uncommitted local changes — the update may not apply.",
     "ui.switcherStats": "Detailed stats",
     "ui.refreshTokens": "Refresh remaining tokens (tiny request on the cheapest model to each account)",
     "ui.confirmRefresh": "Refresh remaining tokens?\n\nA tiny request («What is 1+3?») is sent to every authorized account (Codex and Claude) on the cheapest model (Codex gpt-5.4-mini / Claude haiku) to update usage data. Shown in the Process trace. Spends a little subscription.",
@@ -1085,6 +1111,13 @@ function renderAutopilot() {
   if (autoResolve) autoResolve.disabled = running;
 }
 
+// Service/trace messages carry a Russian variant (textRu); show it when the UI
+// is Russian, English (text) otherwise. Agent replies have no textRu → their own
+// language. Switches live on language toggle (render() re-runs).
+function msgText(msg) {
+  return (UI_LANG === "ru" && msg.textRu) ? msg.textRu : (msg.text || "");
+}
+
 function renderConversation() {
   const target = $("conversation");
   const trace = $("traceList");
@@ -1126,7 +1159,7 @@ function renderConversation() {
     if (isProcess) {
       const row = document.createElement("div");
       row.className = "trace-row";
-      row.textContent = `[${formatTime(msg.at)}] ${msg.name}: ${msg.text}`;
+      row.textContent = `[${formatTime(msg.at)}] ${msg.name}: ${msgText(msg)}`;
       trace.appendChild(row);
       continue;
     }
@@ -1140,7 +1173,7 @@ function renderConversation() {
       : "";
     card.innerHTML = `
       <div class="name"><span>${escapeHtml(msg.name)}</span><span class="name-right">${escapeHtml(meta)} · ${formatTime(msg.at)}${trashBtn}</span></div>
-      <div class="text">${escapeHtml(msg.text)}</div>
+      <div class="text">${escapeHtml(msgText(msg))}</div>
     `;
     target.appendChild(card);
   }
@@ -1567,7 +1600,7 @@ function renderSettings() {
       accEl.innerHTML = list.map((p) => {
         const isApi = p.id === "apikey" || p.mode === "api";
         const num = p.id === "acc1" ? 1 : p.id === "acc2" ? 2 : null;
-        const label = isApi ? "API" : `акк ${num}`;
+        const label = isApi ? "API" : `${t("ui.accShort")} ${num}`;
         // apikey isn't run-routable from here yet (gateway-only) → shown but disabled.
         return `<option value="${p.id}"${isApi ? " disabled" : ""}${p.id === cur ? " selected" : ""}>${label}</option>`;
       }).join("");
@@ -1613,9 +1646,48 @@ function openSubtaskModal({ editId = "", title = "", mode = "STANDARD" } = {}) {
   }, 0);
 }
 
+// Check GitHub for a newer version and show the result in a modal. Update is
+// fast-forward only on the server, so chats/settings (gitignored) always survive.
+async function openUpdateModal() {
+  const modal = $("updateModal");
+  const body = $("updateModalBody");
+  const confirmBtn = $("updateConfirm");
+  confirmBtn.classList.add("hidden");
+  body.textContent = t("ui.updateChecking");
+  modal.classList.remove("hidden");
+  let info;
+  try { info = await api("GET", "/api/update/check"); }
+  catch (e) { body.textContent = t("ui.updateError", { error: e.message }); return; }
+  if (!info || !info.ok) { body.textContent = t("ui.updateError", { error: (info && info.error) || "?" }); return; }
+  if (!info.updateAvailable) { body.textContent = t("ui.updateUpToDate", { sha: info.local }); return; }
+  const parts = [`<div>${escapeHtml(t("ui.updateAvailable", { n: info.behind, local: info.local, remote: info.remote }))}</div>`];
+  if (info.commits && info.commits.length) {
+    parts.push(`<div class="update-changes">${escapeHtml(t("ui.updateChanges"))}</div>`);
+    parts.push(`<ul class="update-commits">${info.commits.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`);
+  }
+  if (info.dirty) parts.push(`<div class="update-warn">${escapeHtml(t("ui.updateDirtyNote"))}</div>`);
+  body.innerHTML = parts.join("");
+  confirmBtn.classList.remove("hidden");
+}
+
+async function applyUpdate() {
+  const body = $("updateModalBody");
+  $("updateConfirm").classList.add("hidden");
+  body.textContent = t("ui.updateApplying");
+  let res;
+  try { res = await api("POST", "/api/update/apply", {}); }
+  catch (e) { body.textContent = t("ui.updateError", { error: e.message }); return; }
+  if (!res || !res.ok) { body.textContent = t("ui.updateError", { error: (res && res.error) || "?" }); return; }
+  body.textContent = t("ui.updateDone", { head: res.head });
+}
+
 function bindUi() {
   $("fontUp").addEventListener("click", () => bumpScale(SCALE_STEP));
   $("fontDown").addEventListener("click", () => bumpScale(-SCALE_STEP));
+
+  $("checkUpdates").addEventListener("click", openUpdateModal);
+  $("updateCancel").addEventListener("click", () => $("updateModal").classList.add("hidden"));
+  $("updateConfirm").addEventListener("click", applyUpdate);
 
   $("nextStepClose").addEventListener("click", () => {
     nextStepDismissed = true;

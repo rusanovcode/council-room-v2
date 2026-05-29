@@ -902,6 +902,13 @@ button.square {
 .login-note.hidden { display: none; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 
+/* Update modal */
+.update-body { font-size: 13px; line-height: 1.5; max-height: 50vh; overflow-y: auto; }
+.update-changes { margin-top: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.update-commits { margin: 4px 0 0; padding-left: 18px; font-family: var(--mono); font-size: 11px; color: var(--text); }
+.update-commits li { margin: 2px 0; }
+.update-warn { margin-top: 8px; color: var(--amber); font-size: 12px; }
+
 /* Help badge + tooltip */
 .help {
   display: inline-flex;
