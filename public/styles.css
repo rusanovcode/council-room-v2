@@ -1226,11 +1226,12 @@ button.square {
 }
 .profile-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.profile-head .p-label { flex: 1 1 auto; min-width: 60px; }
-.profile-head .p-provider { flex: 0 0 auto; }
+.profile-head .p-label { flex: 1 1 60px; min-width: 0; }
+.profile-head .p-provider { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .profile-fields {
   display: flex;
   flex-wrap: wrap;
@@ -1244,8 +1245,21 @@ button.square {
   font-size: 11px;
   color: var(--muted);
   flex: 1 1 120px;
+  min-width: 0; /* let fields shrink below their content so they never overflow the row */
 }
 .p-field input, .p-field select { width: 100%; }
+/* API-key field: green ✓ overlay when a key is already saved. */
+.p-key-wrap { position: relative; display: block; width: 100%; }
+.p-apikey.has-key { padding-right: 22px; }
+.p-key-wrap .key-ok {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--green);
+  font-weight: 700;
+  pointer-events: none;
+}
 .key-badge {
   font-size: 10px;
   padding: 1px 6px;

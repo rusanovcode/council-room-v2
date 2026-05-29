@@ -1788,7 +1788,12 @@ function renderProfileRow(p) {
     fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
     if (p.provider !== "ollama") {
       fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
-      fields += `<label class="p-field"><span>${t("ui.profileApiKey")} ${helpIcon("profileApiKey")}</span><input type="password" class="p-apikey" value="" autocomplete="off" placeholder="${creds[p.id] ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}"></label>`;
+      const keyOk = Boolean(creds[p.id]);
+      fields += `<label class="p-field"><span>${t("ui.profileApiKey")} ${helpIcon("profileApiKey")}</span>
+        <span class="p-key-wrap">
+          <input type="password" class="p-apikey${keyOk ? " has-key" : ""}" value="" autocomplete="off" placeholder="${keyOk ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}">
+          ${keyOk ? `<span class="key-ok" title="${escapeHtml(t("ui.keySet"))}">✓</span>` : ""}
+        </span></label>`;
     }
   }
   return `<div class="profile-row" data-id="${escapeHtml(p.id)}">
