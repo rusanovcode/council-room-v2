@@ -15,6 +15,8 @@ const prompt = require("./lib/prompt");
 const cli = require("./lib/cli");
 const switcher = require("./lib/switcher");
 const stats = require("./lib/stats");
+const profiles = require("./lib/profiles");
+const roles = require("./lib/roles");
 
 const ROOT = __dirname;
 const ROOMS_DIR = path.join(ROOT, "rooms");
@@ -54,8 +56,9 @@ const ROUND_BUDGET = { LIGHT: 3, STANDARD: 6, STRICT: 10, CRITICAL: 12 };
 
 // The FINAL VERIFICATION pass (the gate that closes a subtask) is always run by
 // the strongest available agents at max reasoning, regardless of the cheaper
-// models used for regular debate rounds.
-const VERIFY_AGENTS = { codexModel: "gpt-5.5", codexEffort: "xhigh", claudeModel: "opus", claudeEffort: "max" };
+// models used for regular debate rounds. Single source of truth in lib/profiles
+// (derived roles carry it as their verify override) so this never drifts.
+const VERIFY_AGENTS = profiles.VERIFY_AGENTS;
 
 // Shared across manual round and autopilot so the Stop button can cancel either.
 let activeAbort = null;
@@ -321,17 +324,19 @@ async function runRound({ guidance = "" } = {}) {
     broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
     broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
 
-    // Account selection (multi-account via the optional switch module). Account
-    // refs are profile ids: "acc1" | "acc2" (number 1/2 also accepted for compat).
+    // Resolve the two debate slots into roles (a profile chain + failover). Legacy
+    // settings derive the old Codex/Claude + acc1/acc2 behavior; explicit Phase 5
+    // settings (settings.profiles + settings.roles) override it. Slot "codex" =
+    // role A, slot "claude" = role B (historical keys kept for back-compat).
     const sw = switcher.detect();
-    const codexMode = state.run.settings.codexMode || "auto";
-    const claudeMode = state.run.settings.claudeMode || "auto";
-    const pickAccount = (tool, acc) => {
-      const wantAcc2 = acc === "acc2" || Number(acc) === 2;
-      return wantAcc2 && switcher.accountAvailable(tool, "acc2") ? "acc2" : "acc1";
+    const swInfo = {
+      connected: sw.connected,
+      codexAcc2: switcher.accountAvailable("codex", "acc2"),
+      claudeAcc2: switcher.accountAvailable("claude", "acc2"),
     };
-    let codexAccount = pickAccount("codex", state.run.settings.codexAccount);
-    let claudeAccount = pickAccount("claude", state.run.settings.claudeAccount);
+    const eff = profiles.effectiveConfig(state.run.settings, swInfo);
+    const roleA = eff.roles.a; // drives slot "codex"
+    const roleB = eff.roles.b; // drives slot "claude"
 
     const stamp = `R${round}-${active.id}`;
     activeChildren = new Set();
@@ -339,61 +344,41 @@ async function runRound({ guidance = "" } = {}) {
       activeChildren.add(child);
       child.on("close", () => activeChildren.delete(child));
     };
-    const runCodexOn = (account) => cli.runCodex(codexPrompt, {
+    // Run one slot via its role. Failover (auto mode) and the verify-pass model
+    // override are handled inside roles.runRole; onFailover logs the switch and
+    // clears the live terminal, exactly like the old per-account retry did.
+    const runSlot = (role, agentPrompt) => roles.runRole(role, agentPrompt, {
       workdir: WORKDIR,
-      model: codexModel,
-      effort: codexEffort,
-      outFile: path.join(dir, `${stamp}-codex.txt`),
-      logFile: path.join(dir, `${stamp}-codex.log`),
       isolated: !allowScan,
       signal: ac.signal,
-      onStream: (chunk) => broadcastStream("codex", chunk, { subtaskId: active.id, round }),
+      onStream: (chunk) => broadcastStream(role.slot, chunk, { subtaskId: active.id, round }),
       onChild: trackChild,
-      accountEnv: switcher.envForAccount("codex", account),
-    });
-    const runClaudeOn = (account) => cli.runClaude(claudePrompt, {
-      workdir: WORKDIR,
-      model: claudeModel,
-      effort: claudeEffort,
-      logFile: path.join(dir, `${stamp}-claude.log`),
-      isolated: !allowScan,
-      signal: ac.signal,
-      onStream: (chunk) => broadcastStream("claude", chunk, { subtaskId: active.id, round }),
-      onChild: trackChild,
-      accountEnv: switcher.envForAccount("claude", account),
+      outFile: role.slot === "codex" ? path.join(dir, `${stamp}-codex.txt`) : undefined,
+      logFile: path.join(dir, `${stamp}-${role.slot}.log`),
+      verify: verifyMode ? role.verify : null,
+      onFailover: (next, prev) => {
+        addMessage({
+          role: "system", name: "Council Room", kind: "process",
+          text: `${role.label}: error/limit on ${prev.label || prev.id} → switching to ${next.label || next.id} (auto-failover).`,
+          textRu: `${role.label}: ошибка/лимит на ${prev.label || prev.id} → переключаюсь на ${next.label || next.id} (auto-failover).`,
+          subtaskId: active.id, round,
+        });
+        broadcastStream(role.slot, "", { subtaskId: active.id, round, reset: true });
+      },
     });
 
+    const backendOf = (role) => (role.chain[0] ? (role.chain[0].label || role.chain[0].id) : "—");
     addMessage({
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Round accounts: Codex ${codexAccount} (${codexMode}), Claude ${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Switch module not connected — standard mode."}`,
-      textRu: `Аккаунты раунда: Codex ${codexAccount} (${codexMode}), Claude ${claudeAccount} (${claudeMode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
+      text: `Round backends: ${roleA.label} via ${backendOf(roleA)} (${roleA.mode}), ${roleB.label} via ${backendOf(roleB)} (${roleB.mode}).${sw.connected ? "" : " Switch module not connected — standard mode."}`,
+      textRu: `Бэкенды раунда: ${roleA.label} через ${backendOf(roleA)} (${roleA.mode}), ${roleB.label} через ${backendOf(roleB)} (${roleB.mode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
       subtaskId: active.id,
       round,
     });
 
-    let [codexResult, claudeResult] = await Promise.all([runCodexOn(codexAccount), runClaudeOn(claudeAccount)]);
-
-    // Auto-failover: a failed agent in "auto" mode retries once on the other account.
-    if (!ac.signal.aborted && !codexResult.aborted && !codexResult.ok && codexMode === "auto" && sw.connected) {
-      const other = codexAccount === "acc1" ? "acc2" : "acc1";
-      if (switcher.accountAvailable("codex", other)) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Codex: error/limit on ${codexAccount} → switching to ${other} (auto-failover).`, textRu: `Codex: ошибка/лимит на ${codexAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
-        broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
-        codexResult = await runCodexOn(other);
-        codexAccount = other;
-      }
-    }
-    if (!ac.signal.aborted && !claudeResult.aborted && !claudeResult.ok && claudeMode === "auto" && sw.connected) {
-      const other = claudeAccount === "acc1" ? "acc2" : "acc1";
-      if (switcher.accountAvailable("claude", other)) {
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Claude: error/limit on ${claudeAccount} → switching to ${other} (auto-failover).`, textRu: `Claude: ошибка/лимит на ${claudeAccount} → переключаюсь на ${other} (auto-failover).`, subtaskId: active.id, round });
-        broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
-        claudeResult = await runClaudeOn(other);
-        claudeAccount = other;
-      }
-    }
+    const [codexResult, claudeResult] = await Promise.all([runSlot(roleA, codexPrompt), runSlot(roleB, claudePrompt)]);
 
     if (ac.signal.aborted) {
       addMessage({
