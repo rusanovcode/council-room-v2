@@ -4,6 +4,7 @@
   "private": true,
   "description": "Council Room v2 — Subtask Stack + Knowledge Base + scoped debate",
   "main": "server.js",
+  "license": "MIT",
   "scripts": {
     "start": "node server.js"
   }

@@ -94,3 +94,9 @@ rooms/                 данные чатов (в .gitignore)
 - [`HANDOFF.md`](HANDOFF.md) — что сделано/проверено, состояние по фазам.
 - [`ROADMAP.md`](ROADMAP.md) — план Phase 2/3/4.
 - [`DATA_SOURCES.md`](DATA_SOURCES.md) — откуда берутся токены/статистика, эндпоинты, switch-модуль.
+
+---
+
+## Лицензия
+
+[MIT](LICENSE) © 2026 rusanovcode
