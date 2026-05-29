@@ -1070,6 +1070,12 @@ function renderAutopilot() {
 function renderConversation() {
   const target = $("conversation");
   const trace = $("traceList");
+  // Preserve the reading position: only auto-scroll to the bottom when the user
+  // is already near it. Re-renders fire on every SSE broadcast (frequent during
+  // autopilot), so an unconditional scroll-to-bottom yanks the user away from
+  // whatever response they're reading.
+  const stick = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
+  const prevScrollTop = target.scrollTop;
   target.innerHTML = "";
   trace.innerHTML = "";
   const messages = currentState.run?.messages || [];
@@ -1149,7 +1155,8 @@ function renderConversation() {
     }
     target.appendChild(bin);
   }
-  target.scrollTop = target.scrollHeight;
+  // Stick to the bottom only if the user was already there; otherwise keep their place.
+  target.scrollTop = stick ? target.scrollHeight : prevScrollTop;
 }
 
 function renderKnowledge() {
