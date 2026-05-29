@@ -1453,7 +1453,8 @@ function tokenClass(pct) {
   const n = Number(pct);
   if (n >= 50) return "tok-green";
   if (n >= 16) return "tok-yellow";
-  return "tok-red";
+  if (n >= 1) return "tok-red";
+  return "tok-black"; // < 1% left — effectively exhausted
 }
 
 function renderSwitcher() {
