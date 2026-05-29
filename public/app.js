@@ -1449,12 +1449,12 @@ function renderStatsPanel() {
 }
 
 function tokenClass(pct) {
-  if (pct === null || pct === undefined || Number.isNaN(Number(pct))) return "tok-unknown";
+  if (pct === null || pct === undefined || Number.isNaN(Number(pct))) return "tok-unknown"; // no data / not connected → black
   const n = Number(pct);
   if (n >= 50) return "tok-green";
   if (n >= 16) return "tok-yellow";
   if (n >= 1) return "tok-red";
-  return "tok-black"; // < 1% left — effectively exhausted
+  return "tok-empty"; // < 1% left → grey
 }
 
 function renderSwitcher() {
