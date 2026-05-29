@@ -566,6 +566,9 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   gap: 10px;
   flex-wrap: wrap;
 }
+/* Fixed widths so RU↔EN label changes don't reflow the row / shift the switcher block. */
+#runRound { min-width: 156px; }
+#autopilot { min-width: 100px; }
 .autoresolve-row {
   display: flex;
   align-items: center;
@@ -750,7 +753,12 @@ label.toggle-row.danger-toggle > input:checked + span::after {
 
 .muted { color: var(--muted); }
 .small { font-size: 11px; }
-.head-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* nowrap so the font/lang controls never drop to a 2nd line when RU labels are
+   wider than EN (that reflow made the buttons "jump" on language toggle); the
+   title yields space instead. */
+.head-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; flex-shrink: 0; }
+.col.center .col-head > div:first-child { min-width: 0; }
+#activeSubtaskTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .head-divider {
   width: 1px;
   height: 18px;
