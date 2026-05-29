@@ -22,10 +22,12 @@ Council Room v2/
 │   ├── cli.js                runCodex/runClaude (spawn, AbortSignal, killTree, accountEnv), spawnLogin
 │   ├── switcher.js           модуль свитч: gateway-клиент (7700) + файловый фолбэк; envForAccount; claude/codexPaths; токен-% (claude usage-cache+oauth/usage fetch, codex rollout rate_limits)
 │   ├── providers.js          [Phase 5] слой провайдеров: runProfile(profile,prompt,opts)→{ok,text,aborted,result}; openai-compatible + ollama; пресеты; credentialRef→env; mode() = PROVIDERS_MODE full|api
+│   ├── profiles.js           [Phase 5] схема профиль/роль; effectiveConfig (явные settings.profiles/roles ИЛИ legacy→одна форма); legacyChain (acc1/acc2 + failover); CRUD/валидация; VERIFY_AGENTS
+│   ├── roles.js              [Phase 5] runProfile (диспетчер CLI/сеть, CLI off в api) + runRole (цепочка failover auto/manual, verify-override) — то, что зовёт runRound вместо хардкода Codex/Claude
 │   ├── env.js                [Phase 5] zero-dep загрузчик .env (не перетирает реальное окружение); зовётся в server.js до прочих require
 │   └── stats.js              окна claude usage-cache + расход из session-JSONL (для раскрывашки)
 ├── public/                   index.html, app.js (i18n RU/EN, render*, coach), styles.css
-├── test/providers.test.js    [Phase 5] самотест адаптера на локальном мок-сервере (node test/providers.test.js)
+├── test/                     [Phase 5] providers.test.js (адаптер), roles.test.js (профили/роли/failover), round.integration.test.js (реальный runRound через мок). Запуск: node test/<f>.js
 ├── .env.example              [Phase 5] шаблон env (ключи провайдеров + PROVIDERS_MODE); реальный .env gitignored
 ├── Council Room v2.bat/.command/.sh   лаунчеры (освобождают порт перед стартом)
 ├── HANDOFF.md  ROADMAP.md  DATA_SOURCES.md (этот)
@@ -97,6 +99,7 @@ Council Room v2/
 - Статика: `?v=__V__` → подставляется `BUILD_ID` (время старта сервера) → кэш всегда свежий; `Cache-Control: no-store`.
 
 Состояние/настройки: `state.settings` (глобально, синхронизируется из run при активации через `applyRunSettings`) и `state.run.settings` (per-chat в state.json). Включение `allowFilesystemScan` авто-снимает `strictScope` (в одну сторону).
+[Phase 5] Настройки могут содержать `profiles:[{id,label,provider,model,effort,account?,baseUrl?,credentialRef?}]` и `roles:{a,b}` (явная конфигурация спорщиков). Если заданы — переопределяют legacy codex/claude-поля (`profiles.effectiveConfig`). `/api/settings` валидирует `body.profiles`. `publicState().providers = {mode, presets, types, credentials{profileId→keyPresent}}` для UI. `PROVIDERS_MODE` (env): `full` (CLI+switcher+OAuth) / `api` (только API-ключи + Ollama, CLI off).
 localStorage клиента (глобальные UI-префы): `uiLang`, `scale`, `coachPos`, `terminalsCollapsed`, `panels` (раскрывашки), `statsTab`, `autoResolve`, `coachPinned`.
 
 ---

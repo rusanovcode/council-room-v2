@@ -198,6 +198,27 @@ const STRINGS = {
     "coach.autopilot.title": "Autopilot работает",
     "coach.autopilot.body": "Codex и Claude идут раунд за раундом по активной подзадаче. Остановится сам по стоп-условию (оба resolve / stale×2 / block / лимит раундов). Можешь прервать в любой момент.",
     "coach.autopilot.action": "⏹ Остановить autopilot",
+    "ui.providersPanel": "Профили и роли",
+    "ui.profiles": "Профили",
+    "ui.addProfile": "+ Профиль",
+    "ui.applyProviders": "Применить",
+    "ui.providersSaved": "Сохранено ✓",
+    "ui.noProfiles": "Профилей нет — раунд использует поведение по умолчанию (Codex/Claude).",
+    "ui.profileProvider": "Провайдер",
+    "ui.profileModel": "Модель",
+    "ui.profileAccount": "Аккаунт",
+    "ui.profileBaseUrl": "Base URL",
+    "ui.profileCredRef": "Env-переменная ключа",
+    "ui.profileLabel": "Подпись",
+    "ui.keySet": "ключ задан",
+    "ui.keyMissing": "нет ключа",
+    "ui.remove": "Удалить",
+    "ui.roleMode": "Режим",
+    "ui.roleChain": "Бэкенды (failover по порядку)",
+    "ui.apiModeNote": "Режим API: подписочные CLI (Codex/Claude) отключены. Настрой роли через профили ниже.",
+    "tip.providersPanel": "Единый слой провайдеров (Фаза 5). Профиль — это именованный бэкенд: API-провайдер (по ключу из .env), локальная Ollama или (в full-сборке) подписочный CLI. Роль A управляет слотом Codex, роль B — слотом Claude; каждая роль указывает на цепочку профилей (первый + failover). Если роли заданы здесь — они переопределяют простые контролы Codex/Claude выше.|||Роль A: [deepseek-chat]. Роль B: [ollama-llama3 → deepseek-chat] (auto) — на ошибке llama3 переключится на deepseek.",
+    "tip.profileCredRef": "Имя переменной окружения, где лежит API-ключ (например DEEPSEEK_API_KEY). Сам ключ хранится в .env (он в .gitignore) или в окружении — НЕ в репозитории и не в state.json.|||DEEPSEEK_API_KEY → в .env строка DEEPSEEK_API_KEY=sk-...",
+    "tip.roleChain": "Упорядоченная цепочка профилей. Режим auto: на ошибке/лимите первого пробуется следующий (failover). Режим manual: только первый, без переключения. Порядок = порядок профилей в списке выше.|||auto + [A, B]: A упал → пробуем B. manual + [A, B]: только A.",
   },
   en: {
     "ui.newChat": "+ New chat",
@@ -393,6 +414,27 @@ const STRINGS = {
     "coach.autopilot.title": "Autopilot running",
     "coach.autopilot.body": "Codex and Claude are going round after round on the active subtask. It stops on its own at a stop-condition (both resolve / stale×2 / block / round budget). You can interrupt anytime.",
     "coach.autopilot.action": "⏹ Stop autopilot",
+    "ui.providersPanel": "Profiles & Roles",
+    "ui.profiles": "Profiles",
+    "ui.addProfile": "+ Profile",
+    "ui.applyProviders": "Apply",
+    "ui.providersSaved": "Saved ✓",
+    "ui.noProfiles": "No profiles — the round uses the default Codex/Claude behavior.",
+    "ui.profileProvider": "Provider",
+    "ui.profileModel": "Model",
+    "ui.profileAccount": "Account",
+    "ui.profileBaseUrl": "Base URL",
+    "ui.profileCredRef": "API key env var",
+    "ui.profileLabel": "Label",
+    "ui.keySet": "key set",
+    "ui.keyMissing": "key missing",
+    "ui.remove": "Remove",
+    "ui.roleMode": "Mode",
+    "ui.roleChain": "Backends (failover in order)",
+    "ui.apiModeNote": "API mode: subscription CLIs (Codex/Claude) are disabled. Configure roles via the profiles below.",
+    "tip.providersPanel": "Unified provider layer (Phase 5). A profile is a named backend: an API provider (key from .env), local Ollama, or (full build) a subscription CLI. Role A drives the Codex slot, role B the Claude slot; each role points at a profile chain (primary + failover). Roles defined here override the simple Codex/Claude controls above.|||Role A: [deepseek-chat]. Role B: [ollama-llama3 → deepseek-chat] (auto) — on a llama3 error it fails over to deepseek.",
+    "tip.profileCredRef": "Name of the environment variable holding the API key (e.g. DEEPSEEK_API_KEY). The key itself lives in .env (gitignored) or the environment — NEVER in the repo or state.json.|||DEEPSEEK_API_KEY → a line DEEPSEEK_API_KEY=sk-... in .env",
+    "tip.roleChain": "Ordered profile chain. auto mode: on an error/limit of the first, the next is tried (failover). manual mode: first only, no switching. Order = the profile order in the list above.|||auto + [A, B]: A fails → try B. manual + [A, B]: A only.",
   },
 };
 
@@ -1610,6 +1652,205 @@ function renderSettings() {
       accEl.disabled = offline;
     }
   }
+  // Phase 5: build-mode gating + provider profiles/roles panel.
+  const pmode = (currentState.providers && currentState.providers.mode) || "full";
+  const legacy = $("legacyAgents");
+  if (legacy) legacy.style.display = pmode === "api" ? "none" : "";
+  const badge = $("buildModeBadge");
+  if (badge) { badge.textContent = pmode; badge.className = `mode-badge ${pmode}`; }
+  renderProvidersInit();
+}
+
+// ---- Phase 5: provider profiles + debate roles editor --------------------
+// The panel edits a local DRAFT so SSE state updates don't clobber in-progress
+// edits. The draft is (re)initialized from the active chat's settings when the
+// chat changes or the UI language flips; otherwise it persists across renders.
+let providersDraft = null;
+let providersForRunId = undefined;
+let providersLang = null;
+
+function blankRoles() {
+  return {
+    a: { slot: "codex", label: "Codex", mode: "auto", profileIds: [] },
+    b: { slot: "claude", label: "Claude Code", mode: "auto", profileIds: [] },
+  };
+}
+
+function initProvidersDraft() {
+  const s = currentState.settings || {};
+  if (Array.isArray(s.profiles) && s.profiles.length && s.roles && s.roles.a && s.roles.b) {
+    providersDraft = JSON.parse(JSON.stringify({ profiles: s.profiles, roles: s.roles }));
+  } else {
+    providersDraft = { profiles: [], roles: blankRoles() };
+  }
+}
+
+function renderProvidersInit() {
+  const rid = currentState.activeRunId || null;
+  if (providersDraft === null || providersForRunId !== rid) {
+    providersForRunId = rid;
+    initProvidersDraft();
+    renderProviders();
+  } else if (providersLang !== UI_LANG) {
+    syncProvidersFromDOM(); // preserve edits across a language flip
+    renderProviders();
+  }
+  providersLang = UI_LANG;
+}
+
+function isCliProviderId(provider) { return provider === "cli-codex" || provider === "cli-claude"; }
+
+function presetById(id) {
+  return ((currentState.providers && currentState.providers.presets) || []).find((p) => p.id === id) || null;
+}
+
+function providerOptions() {
+  const info = currentState.providers || {};
+  const opts = (info.presets || []).map((p) => p.id);
+  opts.push("openai-compatible", "ollama");
+  if ((info.mode || "full") !== "api") opts.push("cli-codex", "cli-claude");
+  return opts;
+}
+
+function helpIcon(tipKey) {
+  const tip = t(`tip.${tipKey}`);
+  return `<span class="help" data-tooltip-key="t.${tipKey}" data-tooltip-text="${escapeHtml(tip)}">?</span>`;
+}
+
+function renderProfileRow(p) {
+  const provSel = providerOptions().map((o) => `<option value="${o}"${o === p.provider ? " selected" : ""}>${o}</option>`).join("");
+  const cli = isCliProviderId(p.provider);
+  const preset = presetById(p.provider);
+  const creds = (currentState.providers && currentState.providers.credentials) || {};
+  const needsKey = !cli && p.provider !== "ollama" && (preset ? preset.needsKey : true);
+  const keyBadge = needsKey
+    ? `<span class="key-badge ${creds[p.id] ? "ok" : "miss"}">${creds[p.id] ? t("ui.keySet") : t("ui.keyMissing")}</span>`
+    : "";
+  let fields = `<label class="p-field"><span>${t("ui.profileModel")}</span><input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="${cli ? "auto" : "model"}"></label>`;
+  if (cli) {
+    fields += `<label class="p-field"><span>${t("ui.profileAccount")}</span><select class="p-account">
+      <option value="acc1"${p.account === "acc1" ? " selected" : ""}>acc1</option>
+      <option value="acc2"${p.account === "acc2" ? " selected" : ""}>acc2</option>
+    </select></label>`;
+  } else {
+    fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
+    if (p.provider !== "ollama") {
+      fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
+    }
+  }
+  return `<div class="profile-row" data-id="${escapeHtml(p.id)}">
+    <div class="profile-head">
+      <input class="p-label" value="${escapeHtml(p.label || "")}" placeholder="${t("ui.profileLabel")}">
+      <select class="p-provider">${provSel}</select>
+      ${keyBadge}
+      <button type="button" class="p-remove" title="${t("ui.remove")}">×</button>
+    </div>
+    <div class="profile-fields">${fields}</div>
+  </div>`;
+}
+
+function renderRoleEditor(slot) {
+  const r = providersDraft.roles[slot];
+  const title = slot === "a" ? "A · Codex" : "B · Claude";
+  const checks = providersDraft.profiles.map((p) => {
+    const checked = (r.profileIds || []).includes(p.id);
+    return `<label class="chain-item"><input type="checkbox" class="role-chain" data-id="${escapeHtml(p.id)}"${checked ? " checked" : ""}> ${escapeHtml(p.label || p.id)}</label>`;
+  }).join("") || `<span class="muted small">—</span>`;
+  return `<div class="role-card" data-slot="${slot}">
+    <div class="role-title">${title}</div>
+    <label class="p-field"><span>${t("ui.profileLabel")}</span><input class="role-label" value="${escapeHtml(r.label || "")}"></label>
+    <label class="p-field"><span>${t("ui.roleMode")}</span><select class="role-mode">
+      <option value="auto"${r.mode === "auto" ? " selected" : ""}>auto</option>
+      <option value="manual"${r.mode === "manual" ? " selected" : ""}>manual</option>
+    </select></label>
+    <div class="role-chain-label">${t("ui.roleChain")} ${helpIcon("roleChain")}</div>
+    <div class="role-chain-list">${checks}</div>
+  </div>`;
+}
+
+function renderProviders() {
+  if (!providersDraft) return;
+  const list = $("profilesList");
+  if (!list) return;
+  list.innerHTML = providersDraft.profiles.length
+    ? providersDraft.profiles.map(renderProfileRow).join("")
+    : `<div class="muted small">${t("ui.noProfiles")}</div>`;
+  $("roleAEdit").innerHTML = renderRoleEditor("a");
+  $("roleBEdit").innerHTML = renderRoleEditor("b");
+}
+
+function syncProvidersFromDOM() {
+  if (!providersDraft) return;
+  document.querySelectorAll("#profilesList .profile-row").forEach((row) => {
+    const p = providersDraft.profiles.find((x) => x.id === row.dataset.id);
+    if (!p) return;
+    const q = (sel) => row.querySelector(sel);
+    if (q(".p-label")) p.label = q(".p-label").value;
+    if (q(".p-provider")) p.provider = q(".p-provider").value;
+    if (q(".p-model")) p.model = q(".p-model").value;
+    if (q(".p-account")) p.account = q(".p-account").value;
+    if (q(".p-baseurl")) p.baseUrl = q(".p-baseurl").value;
+    if (q(".p-credref")) p.credentialRef = q(".p-credref").value;
+  });
+  for (const slot of ["a", "b"]) {
+    const card = document.querySelector(`.role-card[data-slot="${slot}"]`);
+    if (!card) continue;
+    const r = providersDraft.roles[slot];
+    if (card.querySelector(".role-label")) r.label = card.querySelector(".role-label").value;
+    if (card.querySelector(".role-mode")) r.mode = card.querySelector(".role-mode").value;
+    r.profileIds = [...card.querySelectorAll(".role-chain:checked")].map((c) => c.dataset.id);
+  }
+}
+
+function addProfileDraft() {
+  syncProvidersFromDOM();
+  const apiMode = (currentState.providers && currentState.providers.mode) === "api";
+  const provider = apiMode ? "ollama" : "cli-codex";
+  const p = { id: `p${Date.now().toString(36)}`, label: "", provider, model: "" };
+  if (isCliProviderId(provider)) p.account = "acc1";
+  providersDraft.profiles.push(p);
+  renderProviders();
+}
+
+function removeProfileDraft(id) {
+  syncProvidersFromDOM();
+  providersDraft.profiles = providersDraft.profiles.filter((p) => p.id !== id);
+  for (const slot of ["a", "b"]) {
+    const r = providersDraft.roles[slot];
+    r.profileIds = (r.profileIds || []).filter((x) => x !== id);
+  }
+  renderProviders();
+}
+
+function showProvidersMsg(text, isError) {
+  const el = $("providersMsg");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `providers-msg ${isError ? "err" : "ok"}`;
+  clearTimeout(showProvidersMsg._t);
+  showProvidersMsg._t = setTimeout(() => { el.textContent = ""; el.className = "providers-msg"; }, 4000);
+}
+
+async function applyProviders() {
+  syncProvidersFromDOM();
+  const ids = providersDraft.profiles.map((p) => p.id);
+  if (new Set(ids).size !== ids.length) { showProvidersMsg("duplicate profile ids", true); return; }
+  // No profiles ⇒ clear explicit config (revert to the default Codex/Claude
+  // behavior) rather than persisting an empty override that would break rounds.
+  const body = providersDraft.profiles.length
+    ? { profiles: providersDraft.profiles, roles: providersDraft.roles }
+    : { profiles: null, roles: null };
+  try {
+    const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showProvidersMsg(j.error || `error ${res.status}`, true);
+      return;
+    }
+    showProvidersMsg(t("ui.providersSaved"), false);
+  } catch (e) {
+    showProvidersMsg(e.message, true);
+  }
 }
 
 function escapeHtml(value) {
@@ -1865,6 +2106,17 @@ function bindUi() {
       api("POST", "/api/settings", { allowFilesystemScan: scan.checked });
     });
   }
+
+  // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.
+  $("addProfileBtn")?.addEventListener("click", addProfileDraft);
+  $("applyProvidersBtn")?.addEventListener("click", applyProviders);
+  $("profilesList")?.addEventListener("click", (event) => {
+    const rm = event.target.closest(".p-remove");
+    if (rm) removeProfileDraft(rm.closest(".profile-row").dataset.id);
+  });
+  $("profilesList")?.addEventListener("change", (event) => {
+    if (event.target.classList.contains("p-provider")) { syncProvidersFromDOM(); renderProviders(); }
+  });
 
   // Tooltip on dynamically-added KB help icons uses data-tooltip-text directly
   document.addEventListener("mouseover", (event) => {

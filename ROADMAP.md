@@ -199,13 +199,38 @@ Gate-экран: чек-лист зелёных галок («все critarian m
   `.gitignore`, `PROVIDERS_MODE` (default `full`). Тест `test/providers.test.js` (мок-сервер
   `/v1/chat/completions`: нестрим, стрим, отсутствие ключа, keyless-ollama, user-abort,
   timeout, пресеты) — всё зелёное. Сервер чисто стартует с загрузчиком (regression OK).
-  **Ещё НЕ сделано:** профили (CRUD/UI), роли A/B, интеграция в `runRound`, CLI-as-provider,
-  переосмысление панели токенов, gating UI по `PROVIDERS_MODE`.
+  **Ещё НЕ сделано (на момент step 1):** профили (CRUD/UI), роли A/B, интеграция в `runRound`.
+- **[DONE 2026-05-30] Профили + роли (модель + раннер + проводка + UI).**
+  - **2a** `lib/profiles.js` — схема профиль/роль. Два фиксированных слота с историческими
+    ключами `codex` (роль A) / `claude` (роль B) → `questions.js`/KB-атрибуция/терминалы НЕ
+    трогаются; настраиваются подпись и цепочка профилей слота. `effectiveConfig` резолвит явные
+    (`settings.profiles`+`settings.roles`) ИЛИ legacy-поля в одну форму → старые чаты работают.
+    Мультиаккаунт acc1/acc2 обобщён в цепочку с failover; `legacyChain` воспроизводит текущий
+    выбор аккаунта + одношаговый auto-failover. CRUD+валидация. `lib/roles.js` — `runProfile`
+    (диспетчер CLI/сеть; CLI заблокирован в `api`) + `runRole` (цепочка: auto=failover,
+    manual=первый; не фейловерит на user-abort; verify-override только по запросу вызывающего).
+  - **2b** `runRound` больше не хардкодит Codex/Claude: резолвит два слота через
+    `profiles.effectiveConfig` и гоняет каждый через `roles.runRole` (failover внутри цепочки,
+    `onFailover` логирует и чистит терминал). `VERIFY_AGENTS` — единый источник в `lib/profiles`.
+    Trace «Round backends». Валидация профилей в `/api/settings`; `providers:{mode,presets,types,
+    credentials}` в `publicState`.
+  - **2c** UI «Профили и роли» (`public/`): сворачиваемая `<details>`-панель в Настройках —
+    CRUD профилей (провайдер из пресетов/типов, модель, для CLI аккаунт, для сети baseUrl+
+    credentialRef+статус ключа) и редакторы ролей A/B (подпись, режим, цепочка чекбоксами).
+    Gating по режиму: в `full` старые Codex/Claude-контролы первичны + панель дополнительна; в
+    `api` старые CLI-контролы скрыты. Bilingual RU/EN + tooltips. Правка в локальном draft (SSE
+    не затирает), Apply → `/api/settings`; пустой набор → сброс к legacy. Бейдж режима full/api.
+  - **Проверено:** `test/round.integration.test.js` — реальный `runRound` в `PROVIDERS_MODE=api`
+    гоняет оба слота через мок-бэкенд по HTTP (без подписок/CLI); `test/roles.test.js` — деривация/
+    failover/verify/CRUD; boot-смоук full-режима (панель отдаётся, `/api/state.providers` корректен).
+  - **Ещё НЕ сделано:** CLI-as-provider живьём не прогонялся (только мок); переосмысление панели
+    токенов для API-ключей (spend vs остаток %); живой прогон реального API-провайдера/Ollama —
+    за пользователем.
 
 ### Задачи
 - ~~Интерфейс провайдера + реализации `openai-compatible` и `ollama`.~~ **DONE** (см. Прогресс).
-- Профили (CRUD в настройках) + роли A/B со списком failover → заменить хардкод Codex/Claude.
-- Хранение ключей — env / настройки, НЕ в репозитории. **(механизм готов: `credentialRef`+`.env`)**
+- ~~Профили (CRUD в настройках) + роли A/B со списком failover → заменить хардкод Codex/Claude.~~ **DONE**.
+- ~~Хранение ключей — env / настройки, НЕ в репозитории.~~ **DONE** (`credentialRef`+`.env`).
 - **Мониторинг токенов**: «остаток %» — это про подписку/OAuth (usage-cache/rollout). Для
   API-ключей остатка нет → показывать расход (spend) или прятать; панель статистики переосмыслить.
 - **Публичная сборка без OAuth/switcher**: убрать из репозитория OAuth/подписочный путь
