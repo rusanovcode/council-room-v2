@@ -17,6 +17,7 @@ const switcher = require("./lib/switcher");
 const stats = require("./lib/stats");
 const profiles = require("./lib/profiles");
 const roles = require("./lib/roles");
+const providers = require("./lib/providers");
 
 const ROOT = __dirname;
 const ROOMS_DIR = path.join(ROOT, "rooms");
@@ -141,6 +142,16 @@ function ensureQuestionsMigrated(dir, subtaskId) {
   knowledge.replaceSection(dir, "open_questions", []);
 }
 
+// Provider-layer info for the settings UI: build mode, preset catalog, provider
+// types, and per-profile credential presence (whether the env key is set — the
+// key itself is never exposed). Keyed by profile id.
+function providersInfo() {
+  const cfg = (state.run && state.run.settings && state.run.settings.profiles) || state.settings.profiles || [];
+  const credentials = {};
+  for (const p of cfg) if (p && p.id) credentials[p.id] = providers.credentialPresent(p);
+  return { mode: providers.mode(), presets: providers.presets(), types: providers.providerTypes(), credentials };
+}
+
 function publicState() {
   if (!state.run) {
     return {
@@ -152,6 +163,7 @@ function publicState() {
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
       settings: state.settings,
       switcher: { ...switcherStatus, statsVersion },
+      providers: providersInfo(),
       workdir: WORKDIR,
       port: PORT,
       cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -179,6 +191,7 @@ function publicState() {
     runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
     settings: state.settings,
     switcher: { ...switcherStatus, statsVersion },
+    providers: providersInfo(),
     workdir: WORKDIR,
     port: PORT,
     cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -1091,6 +1104,13 @@ async function router(req, res) {
       // Allowing filesystem scan lifts strict scope (the two express opposite
       // intents). One-way only: toggling strict scope leaves scan untouched.
       if (body.allowFilesystemScan === true) body.strictScope = false;
+      // Phase 5: validate provider profiles before persisting them.
+      if (Array.isArray(body.profiles)) {
+        for (const p of body.profiles) {
+          const err = profiles.validateProfile(p);
+          if (err) return sendJson(res, 400, { error: `Invalid profile "${p && p.id || "?"}": ${err}` });
+        }
+      }
       state.settings = { ...state.settings, ...body };
       if (state.run) {
         state.run.settings = { ...state.run.settings, ...body };
