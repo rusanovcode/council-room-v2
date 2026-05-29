@@ -97,11 +97,12 @@ Council Room v2/
 - round/autopilot: `/api/round`, `/api/autopilot/start|stop`
 - switcher: `/api/switcher/login|refresh|stats|subscription`
 - providers: `/api/providers/usage/reset` ([Phase 5] сброс кумулятивного расхода по API-профилям; `{profileId}` или пусто = все)
+- providers: `/api/providers/key` ([Phase 5] прямой ввод API-ключа из UI: `{credentialRef, value}` → пишет/заменяет строку `credentialRef=value` в `ROOT/.env` (gitignored) через `env.setEnvVar` и сразу кладёт в `process.env`. Ключ **НЕ** попадает в `state.json` и **НЕ** возвращается в ответе; ответ = `{ok, credentials}` (только флаги keyPresent). Валидирует имя переменной `^[A-Za-z_][A-Za-z0-9_]*$`. Альтернатива ручному редактированию `.env`.)
 - `/api/settings`
 - Статика: `?v=__V__` → подставляется `BUILD_ID` (время старта сервера) → кэш всегда свежий; `Cache-Control: no-store`.
 
 Состояние/настройки: `state.settings` (глобально, синхронизируется из run при активации через `applyRunSettings`) и `state.run.settings` (per-chat в state.json). Включение `allowFilesystemScan` авто-снимает `strictScope` (в одну сторону).
-[Phase 5] Настройки могут содержать `profiles:[{id,label,provider,model,effort,account?,baseUrl?,credentialRef?}]` и `roles:{a,b}` (явная конфигурация спорщиков). Если заданы — переопределяют legacy codex/claude-поля (`profiles.effectiveConfig`). `/api/settings` валидирует `body.profiles`. `publicState().providers = {mode, presets, types, credentials{profileId→keyPresent}}` для UI. `PROVIDERS_MODE` (env): `full` (CLI+switcher+OAuth) / `api` (только API-ключи + Ollama, CLI off).
+[Phase 5] Настройки могут содержать `profiles:[{id,label,provider,model,effort,account?,baseUrl?,credentialRef?}]` и `roles:{a,b}` (явная конфигурация спорщиков). Если заданы — переопределяют legacy codex/claude-поля (`profiles.effectiveConfig`). `/api/settings` валидирует `body.profiles`. Ключи задаются именем env-переменной (`credentialRef`) — значение в `.env`/окружении, не в `state.json`; ключ можно либо вписать в `.env` руками, либо ввести прямо в UI (поле «API-ключ (прямой ввод)» → `POST /api/providers/key` пишет его в `.env`). `publicState().providers = {mode, presets, types, credentials{profileId→keyPresent}}` для UI. `PROVIDERS_MODE` (env): `full` (CLI+switcher+OAuth) / `api` (только API-ключи + Ollama, CLI off).
 localStorage клиента (глобальные UI-префы): `uiLang`, `scale`, `coachPos`, `terminalsCollapsed`, `panels` (раскрывашки), `statsTab`, `autoResolve`, `coachPinned`.
 
 ---
