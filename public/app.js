@@ -1350,13 +1350,16 @@ function openLoginModal(tool, account, authorized, isApi) {
 let statsData = null;
 let statsPeriod = "today";
 let statsTab = localStorage.getItem("council-room-v2.statsTab") || "limits";
+let statsLoading = false;
 
 async function loadStats() {
+  statsLoading = true;
   try {
     statsData = await api("GET", `/api/switcher/stats?period=${statsPeriod}`);
   } catch {
     statsData = null;
   }
+  statsLoading = false;
   renderStatsPanel();
 }
 
@@ -1491,6 +1494,10 @@ function renderSwitcher() {
   // Detailed-stats expander — sits below the bar and opens downward.
   $("switcherStats").classList.toggle("hidden", !panelOpen.switcherStats);
   $("toggleSwitcherStats").textContent = panelOpen.switcherStats ? "▴" : "▾";
+  // Panel persisted open across a reload → fetch stats once (the toggle handler
+  // only fires on click). Guarded so SSE re-renders don't refetch or rebuild the
+  // panel mid-interaction (e.g. typing a subscription date).
+  if (panelOpen.switcherStats && statsData === null && !statsLoading) loadStats();
 }
 
 function renderSettings() {
