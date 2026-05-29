@@ -10,6 +10,7 @@ const questions = require("./lib/questions");
 const prompt = require("./lib/prompt");
 const cli = require("./lib/cli");
 const switcher = require("./lib/switcher");
+const stats = require("./lib/stats");
 
 const ROOT = __dirname;
 const ROOMS_DIR = path.join(ROOT, "rooms");
@@ -38,6 +39,7 @@ let state = {
     codexAccount: 1,
     claudeMode: "auto",
     claudeAccount: 1,
+    subscriptions: {}, // { "claude:acc1": { start, end } } — manual, no API source
   },
 };
 
@@ -54,6 +56,14 @@ const VERIFY_AGENTS = { codexModel: "gpt-5.5", codexEffort: "xhigh", claudeModel
 // Shared across manual round and autopilot so the Stop button can cancel either.
 let activeAbort = null;
 let activeChildren = new Set();
+
+// Cached switch-module status (gateway is async, publicState is sync). Refreshed
+// on a timer + after switcher actions; falls back to file detection if gateway down.
+let switcherStatus = switcher.detect();
+let statsCache = {};
+async function refreshSwitcher() {
+  try { switcherStatus = await switcher.status(); } catch { switcherStatus = switcher.detect(); }
+}
 
 const sseClients = new Set();
 
@@ -121,7 +131,7 @@ function publicState() {
       autopilot: state.autopilot,
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
       settings: state.settings,
-      switcher: switcher.detect(),
+      switcher: switcherStatus,
       workdir: WORKDIR,
       port: PORT,
       cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -148,7 +158,7 @@ function publicState() {
     autopilot: state.autopilot,
     runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
     settings: state.settings,
-    switcher: switcher.detect(),
+    switcher: switcherStatus,
     workdir: WORKDIR,
     port: PORT,
     cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -892,6 +902,55 @@ async function router(req, res) {
       return sendJson(res, result.ok ? 200 : 500, result);
     }
 
+    if (method === "GET" && pathname === "/api/switcher/stats") {
+      const period = ["today", "week", "all"].includes(parsed.query.period) ? parsed.query.period : "today";
+      const key = `stats:${period}`;
+      const now = Date.now();
+      if (!statsCache[key] || now - statsCache[key].at > 60000) {
+        const dirs = switcher.claudePaths();
+        statsCache[key] = {
+          at: now,
+          data: {
+            period,
+            claude: {
+              acc1: stats.accountStats(dirs.acc1, period),
+              acc2: stats.accountStats(dirs.acc2, period),
+            },
+          },
+        };
+      }
+      return sendJson(res, 200, statsCache[key].data);
+    }
+
+    if (method === "POST" && pathname === "/api/switcher/subscription") {
+      const body = await readBody(req);
+      if (!body.key) return sendJson(res, 400, { error: "key required" });
+      const subs = { ...(state.settings.subscriptions || {}) };
+      subs[body.key] = { start: String(body.start || ""), end: String(body.end || "") };
+      state.settings.subscriptions = subs;
+      if (state.run) { state.run.settings = { ...state.run.settings, subscriptions: subs }; saveRun(state.run); }
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/switcher/refresh") {
+      // Fire a tiny prompt per Claude account so its .usage-cache.json repopulates,
+      // then re-poll the gateway. Codex has no usage source, so we skip it.
+      (async () => {
+        await Promise.all([1, 2].map((acc) =>
+          cli.runClaude("What is 1+3? Reply with just the number.", {
+            workdir: WORKDIR,
+            isolated: true,
+            accountEnv: switcher.envForAccount("claude", acc),
+          }).catch(() => {})
+        ));
+        statsCache = {}; // force recompute after fresh requests
+        await refreshSwitcher();
+        broadcast();
+      })();
+      return sendJson(res, 202, { accepted: true });
+    }
+
     if (method === "POST" && pathname === "/api/settings") {
       const body = await readBody(req);
       state.settings = { ...state.settings, ...body };
@@ -922,6 +981,10 @@ function selectLastRunOnStartup() {
 }
 
 selectLastRunOnStartup();
+
+// Poll the switch-module gateway so the UI reflects profiles/active/tokens live.
+refreshSwitcher().then(broadcast);
+setInterval(() => { refreshSwitcher().then(broadcast); }, 15000).unref();
 
 const server = http.createServer(router);
 server.on("error", (err) => {

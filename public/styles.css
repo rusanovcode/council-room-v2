@@ -299,12 +299,14 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   line-height: 1;
 }
 .switcher-expand:hover { color: var(--accent); }
-/* Account buttons — grid sized in JS (4→2 cols, else up to 3); grows upward as rows add */
+/* Account buttons — one row per service (Codex / Claude); API adds a 3rd in the row */
 .switcher-accounts {
   margin-left: auto;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 3px;
 }
+.acct-row { display: flex; gap: 3px; justify-content: flex-end; }
 .acct-btn {
   font-family: var(--mono);
   font-size: 10px;
@@ -324,6 +326,8 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .acct-btn.tok-red { border-color: var(--red); color: var(--red); }
 .acct-btn.tok-unknown { border-color: var(--border); color: var(--muted); }
 .acct-btn.unauthorized { border-style: dashed; opacity: 0.6; }
+.acct-btn.active { box-shadow: inset 0 0 0 1px currentColor; font-weight: 800; }
+.acct-btn.active::after { content: " ●"; font-size: 7px; vertical-align: middle; }
 .acct-btn:hover { background: var(--border); }
 
 /* Detailed-stats panel — expands upward, content added later */
@@ -335,6 +339,26 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   color: var(--muted);
 }
 .switcher-stats.hidden { display: none; }
+.stats-tabs { display: flex; gap: 2px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+.stats-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.stats-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.stats-body { display: flex; flex-direction: column; gap: 8px; }
+.stats-acc { background: var(--panel-2); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.5; }
+.stats-acc b { color: var(--accent); }
+.stats-periods { display: flex; gap: 3px; margin-bottom: 4px; }
+.stats-period { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 2px 7px; border-radius: 3px; cursor: pointer; }
+.stats-period.active { color: var(--text); border-color: var(--accent); }
+.sub-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 3px 0; font-size: 11px; color: var(--muted); }
+.sub-row input { width: auto; flex: 0 0 auto; font-size: 11px; padding: 2px 4px; }
+.stats-warn { color: var(--amber); font-weight: 600; }
 
 /* Per-agent account/mode controls */
 .account-row {

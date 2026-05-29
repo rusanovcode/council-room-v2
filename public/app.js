@@ -139,6 +139,28 @@ const STRINGS = {
     "ui.switcherConnected": "модуль свитч подключён",
     "ui.switcherOffline": "модуль свитч не подключён",
     "ui.switcherStats": "Подробная статистика",
+    "ui.refreshTokens": "Обновить остаток токенов (мини-запрос к Claude-аккаунтам)",
+    "ui.confirmRefresh": "Обновить остаток токенов?\n\nБудет отправлен крошечный запрос («What is 1+3?») к каждому Claude-аккаунту, чтобы обновить кэш использования. Тратит немного подписки.",
+    "ui.apiTitle": "{tool}: API-ключ",
+    "ui.apiSteps": "Это профиль с API-ключом, а не OAuth-аккаунт.|Ключ задаётся в ai-switcher (profiles / api-keys), не через это окно.|Вход через терминал тут не нужен.",
+    "ui.tabLimits": "Лимиты",
+    "ui.tabSpend": "Расход",
+    "ui.tabSub": "Подписка",
+    "ui.hourlyReset": "Часовой сброс",
+    "ui.weeklyReset": "Недельный сброс",
+    "ui.windowStart": "Начало окна",
+    "ui.used": "использовано",
+    "ui.now": "сейчас",
+    "ui.noData": "нет данных",
+    "ui.periodToday": "сегодня",
+    "ui.periodWeek": "неделя",
+    "ui.periodAll": "всё",
+    "ui.spendIn": "вход",
+    "ui.spendOut": "выход",
+    "ui.sessions": "запросов",
+    "ui.subStart": "начало",
+    "ui.subEnd": "конец",
+    "ui.daysLeft": "осталось дней: {n}",
     "ui.openLogin": "Открыть окно входа",
     "ui.relogin": "Перелогиниться",
     "ui.loginAlready": "✓ Этот аккаунт уже авторизован. Повторный вход обычно не нужен — только если проблемы со входом или сменил аккаунт.",
@@ -291,6 +313,28 @@ const STRINGS = {
     "ui.switcherConnected": "switch module connected",
     "ui.switcherOffline": "switch module not connected",
     "ui.switcherStats": "Detailed stats",
+    "ui.refreshTokens": "Refresh remaining tokens (tiny request to Claude accounts)",
+    "ui.confirmRefresh": "Refresh remaining tokens?\n\nA tiny request («What is 1+3?») is sent to each Claude account to update the usage cache. Spends a little subscription.",
+    "ui.apiTitle": "{tool}: API key",
+    "ui.apiSteps": "This is an API-key profile, not an OAuth account.|The key is configured in ai-switcher (profiles / api-keys), not here.|No terminal login is needed.",
+    "ui.tabLimits": "Limits",
+    "ui.tabSpend": "Spending",
+    "ui.tabSub": "Subscription",
+    "ui.hourlyReset": "Hourly reset",
+    "ui.weeklyReset": "Weekly reset",
+    "ui.windowStart": "Window start",
+    "ui.used": "used",
+    "ui.now": "now",
+    "ui.noData": "no data",
+    "ui.periodToday": "today",
+    "ui.periodWeek": "week",
+    "ui.periodAll": "all",
+    "ui.spendIn": "in",
+    "ui.spendOut": "out",
+    "ui.sessions": "requests",
+    "ui.subStart": "start",
+    "ui.subEnd": "end",
+    "ui.daysLeft": "days left: {n}",
     "ui.openLogin": "Open login window",
     "ui.relogin": "Re-login",
     "ui.loginAlready": "✓ This account is already authorized. Re-login is usually unnecessary — only if you have sign-in trouble or switched accounts.",
@@ -1203,25 +1247,121 @@ function renderQuestionsBlock(block, tools, help, label) {
 }
 
 let pendingLogin = null;
-function openLoginModal(tool, account, authorized) {
-  pendingLogin = { tool, account };
-  const cmd = tool === "codex" ? "codex login" : (tool === "claude" ? "claude /login" : "—");
-  $("loginModalTitle").textContent = (authorized ? "✓ " : "") + t("ui.loginTitle", { tool, account });
-
-  const note = $("loginModalNote");
-  note.classList.toggle("hidden", !authorized);
-  if (authorized) note.textContent = t("ui.loginAlready");
-
+function openLoginModal(tool, account, authorized, isApi) {
   const stepsEl = $("loginModalSteps");
   stepsEl.innerHTML = "";
+  const note = $("loginModalNote");
+  const confirmBtn = $("confirmLoginBtn");
+
+  if (isApi) {
+    // API-key profile — configured in ai-switcher, not via a terminal OAuth login.
+    pendingLogin = null;
+    $("loginModalTitle").textContent = t("ui.apiTitle", { tool });
+    note.classList.add("hidden");
+    for (const step of t("ui.apiSteps", { tool }).split("|")) {
+      const li = document.createElement("li");
+      li.textContent = step;
+      stepsEl.appendChild(li);
+    }
+    confirmBtn.style.display = "none"; // nothing to spawn
+    $("loginModal").classList.remove("hidden");
+    return;
+  }
+
+  confirmBtn.style.display = "";
+  pendingLogin = { tool, account };
+  const cmd = tool === "codex" ? "codex login" : "claude /login";
+  $("loginModalTitle").textContent = (authorized ? "✓ " : "") + t("ui.loginTitle", { tool, account });
+  note.classList.toggle("hidden", !authorized);
+  if (authorized) note.textContent = t("ui.loginAlready");
   for (const step of t("ui.loginSteps", { tool, account, cmd }).split("|")) {
     const li = document.createElement("li");
     li.textContent = step;
     stepsEl.appendChild(li);
   }
   // Already signed in → re-login is optional, not the implied default.
-  $("confirmLoginBtn").textContent = authorized ? t("ui.relogin") : t("ui.openLogin");
+  confirmBtn.textContent = authorized ? t("ui.relogin") : t("ui.openLogin");
   $("loginModal").classList.remove("hidden");
+}
+
+// ---- Switcher detailed-stats panel (tabbed, CodeBurn-style) ----------------
+let statsData = null;
+let statsPeriod = "today";
+let statsTab = "limits";
+
+async function loadStats() {
+  try {
+    statsData = await api("GET", `/api/switcher/stats?period=${statsPeriod}`);
+  } catch {
+    statsData = null;
+  }
+  renderStatsPanel();
+}
+
+function fmtCountdown(iso) {
+  if (!iso) return "—";
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return t("ui.now");
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return h > 0 ? `${h}ч ${m}м` : `${m}м`;
+}
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch { return iso; }
+}
+
+function renderStatsPanel() {
+  const panel = $("switcherStats");
+  if (!panel || panel.classList.contains("hidden")) return;
+  const tabs = [["limits", t("ui.tabLimits")], ["spend", t("ui.tabSpend")], ["sub", t("ui.tabSub")]];
+  const tabBar = tabs.map(([id, label]) => `<button class="stats-tab${statsTab === id ? " active" : ""}" data-tab="${id}">${escapeHtml(label)}</button>`).join("");
+  let body = "";
+  const accs = [["acc1", "Cl1"], ["acc2", "Cl2"]];
+
+  if (statsTab === "limits") {
+    body = accs.map(([id, label]) => {
+      const w = statsData?.claude?.[id]?.windows;
+      if (!w) return `<div class="stats-acc"><b>${label}</b> <span class="muted">${escapeHtml(t("ui.noData"))}</span></div>`;
+      const fh = w.fiveHour, sd = w.sevenDay;
+      return `<div class="stats-acc"><b>${label}</b>
+        <div>${escapeHtml(t("ui.hourlyReset"))}: <b>${fh ? fmtCountdown(fh.resetsAt) : "—"}</b> ${fh ? `(${escapeHtml(t("ui.used"))} ${fh.utilization}%)` : ""}</div>
+        <div>${escapeHtml(t("ui.weeklyReset"))}: <b>${sd ? fmtDateTime(sd.resetsAt) : "—"}</b> ${sd ? `(${escapeHtml(t("ui.used"))} ${sd.utilization}%)` : ""}</div>
+        <div class="muted small">${escapeHtml(t("ui.windowStart"))}: ${fh ? fmtDateTime(fh.startsAt) : "—"}</div></div>`;
+    }).join("");
+  } else if (statsTab === "spend") {
+    const periods = [["today", t("ui.periodToday")], ["week", t("ui.periodWeek")], ["all", t("ui.periodAll")]];
+    body = `<div class="stats-periods">${periods.map(([p, l]) => `<button class="stats-period${statsPeriod === p ? " active" : ""}" data-period="${p}">${escapeHtml(l)}</button>`).join("")}</div>`;
+    body += accs.map(([id, label]) => {
+      const s = statsData?.claude?.[id]?.spending;
+      if (!s) return `<div class="stats-acc"><b>${label}</b> <span class="muted">${escapeHtml(t("ui.noData"))}</span></div>`;
+      return `<div class="stats-acc"><b>${label}</b>
+        <div>${escapeHtml(t("ui.spendIn"))}: ${s.inputK}K · ${escapeHtml(t("ui.spendOut"))}: ${s.outputK}K</div>
+        <div class="muted small">cache R ${s.cacheReadK}K / W ${s.cacheWriteK}K · ${escapeHtml(t("ui.sessions"))}: ${s.sessions}</div></div>`;
+    }).join("");
+  } else if (statsTab === "sub") {
+    const subs = currentState?.settings?.subscriptions || {};
+    body = accs.map(([id, label]) => {
+      const key = `claude:${id}`;
+      const sub = subs[key] || {};
+      const dl = sub.end ? Math.ceil((new Date(sub.end).getTime() - Date.now()) / 86400000) : null;
+      return `<div class="stats-acc"><b>${label}</b>
+        <label class="sub-row">${escapeHtml(t("ui.subStart"))} <input type="date" data-subkey="${key}" data-field="start" value="${escapeHtml(sub.start || "")}"></label>
+        <label class="sub-row">${escapeHtml(t("ui.subEnd"))} <input type="date" data-subkey="${key}" data-field="end" value="${escapeHtml(sub.end || "")}"></label>
+        <div class="${dl !== null && dl <= 7 ? "stats-warn" : ""}">${dl === null ? "" : escapeHtml(t("ui.daysLeft", { n: dl }))}</div></div>`;
+    }).join("");
+  }
+
+  panel.innerHTML = `<div class="stats-tabs">${tabBar}</div><div class="stats-body">${body}</div>`;
+  panel.querySelectorAll(".stats-tab").forEach((b) => b.addEventListener("click", () => { statsTab = b.dataset.tab; renderStatsPanel(); }));
+  panel.querySelectorAll(".stats-period").forEach((b) => b.addEventListener("click", () => { statsPeriod = b.dataset.period; loadStats(); }));
+  panel.querySelectorAll("input[data-subkey]").forEach((inp) => inp.addEventListener("change", () => {
+    const key = inp.dataset.subkey;
+    const cur = (currentState?.settings?.subscriptions || {})[key] || {};
+    const start = inp.dataset.field === "start" ? inp.value : (cur.start || "");
+    const end = inp.dataset.field === "end" ? inp.value : (cur.end || "");
+    api("POST", "/api/switcher/subscription", { key, start, end });
+  }));
 }
 
 function tokenClass(pct) {
@@ -1245,23 +1385,28 @@ function renderSwitcher() {
   const box = $("switcherAccounts");
   box.innerHTML = "";
   const accounts = sw.accounts || {};
-  const labels = { codex: "Cx", claude: "Cl", api: "API" };
-  // Only show accounts that exist; collect first so we can size the grid.
-  const shown = [];
-  for (const tool of ["codex", "claude", "api"]) {
-    for (const a of (accounts[tool] || []).filter((x) => x.available)) shown.push({ tool, ...a });
-  }
-  // Layout: 4 → 2 per row; otherwise up to 3 per row, remainder wraps below.
-  const cols = shown.length === 4 ? 2 : Math.min(Math.max(shown.length, 1), 3);
-  box.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  for (const a of shown) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `acct-btn ${tokenClass(a.tokensPct)}${a.authorized ? "" : " unauthorized"}`;
-    btn.textContent = a.tool === "api" ? "API" : `${labels[a.tool]}${a.account}`;
-    btn.dataset.tooltipText = t("tip.acctBtn", { tool: a.tool, account: a.account, pct: a.tokensPct == null ? "—" : `${a.tokensPct}%` });
-    btn.addEventListener("click", () => openLoginModal(a.tool, a.account, a.authorized));
-    box.appendChild(btn);
+  // One row per service (Codex / Claude) → 2 buttons per row normally, 3 when an
+  // API profile is present. Hide an API profile until its key is actually set.
+  for (const tool of ["codex", "claude"]) {
+    const profs = (accounts[tool] || []).filter((p) => {
+      const isApi = p.id === "apikey" || p.mode === "api";
+      return isApi ? p.authorized : true;
+    });
+    if (!profs.length) continue;
+    const row = document.createElement("div");
+    row.className = "acct-row";
+    for (const a of profs) {
+      const isApi = a.id === "apikey" || a.mode === "api";
+      const accountNum = a.account || (a.id === "acc1" ? 1 : a.id === "acc2" ? 2 : null);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `acct-btn ${tokenClass(a.tokensPct)}${a.authorized ? "" : " unauthorized"}${a.active ? " active" : ""}`;
+      btn.textContent = isApi ? "API" : `${tool === "codex" ? "Cx" : "Cl"}${accountNum || ""}`;
+      btn.dataset.tooltipText = t("tip.acctBtn", { tool, account: isApi ? "API" : accountNum, pct: a.tokensPct == null ? "—" : `${a.tokensPct}%` });
+      btn.addEventListener("click", () => openLoginModal(tool, isApi ? "apikey" : accountNum, a.authorized, isApi));
+      row.appendChild(btn);
+    }
+    box.appendChild(row);
   }
 
   // Detailed-stats expander (content added later).
@@ -1375,7 +1520,14 @@ function bindUi() {
   $("toggleSubtaskArchive").addEventListener("click", () => { panelOpen.subtaskArchive = !panelOpen.subtaskArchive; render(); });
   $("toggleSubtaskTrash").addEventListener("click", () => { panelOpen.subtaskTrash = !panelOpen.subtaskTrash; render(); });
   $("emptyTrash").addEventListener("click", () => { if (confirm(t("ui.confirmEmptyTrash"))) api("POST", "/api/subtasks/trash/empty", {}); });
-  $("toggleSwitcherStats").addEventListener("click", () => { panelOpen.switcherStats = !panelOpen.switcherStats; render(); });
+  $("toggleSwitcherStats").addEventListener("click", () => {
+    panelOpen.switcherStats = !panelOpen.switcherStats;
+    render();
+    if (panelOpen.switcherStats) loadStats();
+  });
+  $("refreshSwitcher").addEventListener("click", () => {
+    if (confirm(t("ui.confirmRefresh"))) api("POST", "/api/switcher/refresh", {});
+  });
   $("cancelLogin").addEventListener("click", () => $("loginModal").classList.add("hidden"));
   $("confirmLoginBtn").addEventListener("click", () => {
     $("loginModal").classList.add("hidden");
