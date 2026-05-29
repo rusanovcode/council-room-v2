@@ -215,16 +215,24 @@ const STRINGS = {
     "ui.profileAccount": "Аккаунт",
     "ui.profileBaseUrl": "Base URL",
     "ui.profileCredRef": "Env-переменная ключа",
+    "ui.profileApiKey": "API-ключ (прямой ввод)",
     "ui.profileLabel": "Подпись",
     "ui.keySet": "ключ задан",
     "ui.keyMissing": "нет ключа",
+    "ui.keyKeepPlaceholder": "ключ задан — оставь пустым, чтобы не менять",
+    "ui.providersKeySaved": "Ключ(и) сохранены в .env ✓",
+    "ui.keyNeedsRef": "Введён ключ, но не задано имя Env-переменной у профиля «{p}». Заполни поле «Env-переменная ключа».",
     "ui.remove": "Удалить",
     "ui.roleMode": "Режим",
     "ui.roleChain": "Бэкенды (failover по порядку)",
     "ui.apiModeNote": "Режим API: подписочные CLI (Codex/Claude) отключены. Настрой роли через профили ниже.",
     "tip.providersPanel": "Единый слой провайдеров (Фаза 5). Профиль — это именованный бэкенд: API-провайдер (по ключу из .env), локальная Ollama или (в full-сборке) подписочный CLI. Роль A управляет слотом Codex, роль B — слотом Claude; каждая роль указывает на цепочку профилей (первый + failover). Если роли заданы здесь — они переопределяют простые контролы Codex/Claude выше.|||Роль A: [deepseek-chat]. Роль B: [ollama-llama3 → deepseek-chat] (auto) — на ошибке llama3 переключится на deepseek.",
-    "tip.profileCredRef": "Имя переменной окружения, где лежит API-ключ (например DEEPSEEK_API_KEY). Сам ключ хранится в .env (он в .gitignore) или в окружении — НЕ в репозитории и не в state.json.|||DEEPSEEK_API_KEY → в .env строка DEEPSEEK_API_KEY=sk-...",
-    "tip.roleChain": "Упорядоченная цепочка профилей. Режим auto: на ошибке/лимите первого пробуется следующий (failover). Режим manual: только первый, без переключения. Порядок = порядок профилей в списке выше.|||auto + [A, B]: A упал → пробуем B. manual + [A, B]: только A.",
+    "tip.profileLabel": "Человекочитаемое имя профиля — только для отображения (в списке цепочки роли и в логах раунда). Ни на что в запросе не влияет. Если оставить пустым, показывается технический id (например p_mprga7ou).|||«DeepSeek основной», «Ollama локальная».",
+    "tip.profileModel": "Идентификатор модели у провайдера — точная строка, которую он ждёт в поле model запроса. Бери из документации провайдера. Для CLI можно оставить «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (то, что показывает `ollama list`).",
+    "tip.profileBaseUrl": "Корень API провайдера, заканчивается на /v1 (адаптер сам допишет /chat/completions). Для пресета подставляется автоматически — меняй только для своего/прокси-эндпоинта или саморазмещённой Ollama.|||https://api.deepseek.com/v1 · http://localhost:11434/v1 (Ollama).",
+    "tip.profileCredRef": "Имя переменной окружения, где лежит API-ключ (например DEEPSEEK_API_KEY). Сам ключ хранится в .env (он в .gitignore) или в окружении — НЕ в репозитории и не в state.json. Можно либо вписать ключ напрямую в поле ниже, либо самому добавить строку в .env.|||DEEPSEEK_API_KEY → в .env строка DEEPSEEK_API_KEY=sk-...",
+    "tip.profileApiKey": "Можно вставить API-ключ прямо здесь — по «Применить» он сохранится в файл .env (он в .gitignore) под именем из «Env-переменная ключа», а НЕ в state.json. Поле всегда пустое (ключ не показывается); оставь пустым, чтобы не менять уже сохранённый.|||Вставь sk-... → в .env появится DEEPSEEK_API_KEY=sk-...",
+    "tip.roleChain": "Список профилей-бэкендов этой роли. Галочка = включить профиль в цепочку. Режим auto: на ошибке/лимите первого по списку пробуется следующий отмеченный (failover). Режим manual: используется только первый отмеченный. Имя в строке — это «Подпись» профиля (или его id, если подпись пуста).|||auto + отмечены [DeepSeek, Ollama]: DeepSeek упал → пробуем Ollama. manual: только DeepSeek.",
   },
   en: {
     "ui.newChat": "+ New chat",
@@ -437,16 +445,24 @@ const STRINGS = {
     "ui.profileAccount": "Account",
     "ui.profileBaseUrl": "Base URL",
     "ui.profileCredRef": "API key env var",
+    "ui.profileApiKey": "API key (enter directly)",
     "ui.profileLabel": "Label",
     "ui.keySet": "key set",
     "ui.keyMissing": "key missing",
+    "ui.keyKeepPlaceholder": "key set — leave empty to keep it",
+    "ui.providersKeySaved": "Key(s) saved to .env ✓",
+    "ui.keyNeedsRef": "A key was entered but profile «{p}» has no env var name. Fill the «API key env var» field.",
     "ui.remove": "Remove",
     "ui.roleMode": "Mode",
     "ui.roleChain": "Backends (failover in order)",
     "ui.apiModeNote": "API mode: subscription CLIs (Codex/Claude) are disabled. Configure roles via the profiles below.",
     "tip.providersPanel": "Unified provider layer (Phase 5). A profile is a named backend: an API provider (key from .env), local Ollama, or (full build) a subscription CLI. Role A drives the Codex slot, role B the Claude slot; each role points at a profile chain (primary + failover). Roles defined here override the simple Codex/Claude controls above.|||Role A: [deepseek-chat]. Role B: [ollama-llama3 → deepseek-chat] (auto) — on a llama3 error it fails over to deepseek.",
-    "tip.profileCredRef": "Name of the environment variable holding the API key (e.g. DEEPSEEK_API_KEY). The key itself lives in .env (gitignored) or the environment — NEVER in the repo or state.json.|||DEEPSEEK_API_KEY → a line DEEPSEEK_API_KEY=sk-... in .env",
-    "tip.roleChain": "Ordered profile chain. auto mode: on an error/limit of the first, the next is tried (failover). manual mode: first only, no switching. Order = the profile order in the list above.|||auto + [A, B]: A fails → try B. manual + [A, B]: A only.",
+    "tip.profileLabel": "Human-readable name for the profile — display only (in the role's chain list and round logs). It has no effect on the request. If left empty, the technical id is shown (e.g. p_mprga7ou).|||«DeepSeek main», «Ollama local».",
+    "tip.profileModel": "The provider's model id — the exact string it expects in the request's model field. Take it from the provider's docs. For CLI you can leave «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (whatever `ollama list` shows).",
+    "tip.profileBaseUrl": "The provider's API root, ending in /v1 (the adapter appends /chat/completions). Auto-filled for a preset — change it only for a custom/proxy endpoint or a self-hosted Ollama.|||https://api.deepseek.com/v1 · http://localhost:11434/v1 (Ollama).",
+    "tip.profileCredRef": "Name of the environment variable holding the API key (e.g. DEEPSEEK_API_KEY). The key itself lives in .env (gitignored) or the environment — NEVER in the repo or state.json. You can either type the key directly in the field below, or add the line to .env yourself.|||DEEPSEEK_API_KEY → a line DEEPSEEK_API_KEY=sk-... in .env",
+    "tip.profileApiKey": "You can paste the API key right here — on «Apply» it is saved to the .env file (gitignored) under the «API key env var» name, NOT to state.json. The field is always blank (the key is never shown); leave it empty to keep the already-saved key.|||Paste sk-... → .env gets DEEPSEEK_API_KEY=sk-...",
+    "tip.roleChain": "The list of backend profiles for this role. A checkbox = include that profile in the chain. auto mode: on an error/limit of the first checked one, the next checked is tried (failover). manual mode: only the first checked is used. The name on each line is the profile's «Label» (or its id when the label is empty).|||auto + checked [DeepSeek, Ollama]: DeepSeek fails → try Ollama. manual: DeepSeek only.",
   },
 };
 
@@ -1762,21 +1778,23 @@ function renderProfileRow(p) {
   const keyBadge = needsKey
     ? `<span class="key-badge ${creds[p.id] ? "ok" : "miss"}">${creds[p.id] ? t("ui.keySet") : t("ui.keyMissing")}</span>`
     : "";
-  let fields = `<label class="p-field"><span>${t("ui.profileModel")}</span><input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="${cli ? "auto" : "model"}"></label>`;
+  let fields = `<label class="p-field"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span><input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="${cli ? "auto" : "model"}"></label>`;
   if (cli) {
     fields += `<label class="p-field"><span>${t("ui.profileAccount")}</span><select class="p-account">
       <option value="acc1"${p.account === "acc1" ? " selected" : ""}>acc1</option>
       <option value="acc2"${p.account === "acc2" ? " selected" : ""}>acc2</option>
     </select></label>`;
   } else {
-    fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
+    fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
     if (p.provider !== "ollama") {
       fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
+      fields += `<label class="p-field"><span>${t("ui.profileApiKey")} ${helpIcon("profileApiKey")}</span><input type="password" class="p-apikey" value="" autocomplete="off" placeholder="${creds[p.id] ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}"></label>`;
     }
   }
   return `<div class="profile-row" data-id="${escapeHtml(p.id)}">
     <div class="profile-head">
       <input class="p-label" value="${escapeHtml(p.label || "")}" placeholder="${t("ui.profileLabel")}">
+      ${helpIcon("profileLabel")}
       <select class="p-provider">${provSel}</select>
       ${keyBadge}
       <button type="button" class="p-remove" title="${t("ui.remove")}">×</button>
@@ -1794,7 +1812,7 @@ function renderRoleEditor(slot) {
   }).join("") || `<span class="muted small">—</span>`;
   return `<div class="role-card" data-slot="${slot}">
     <div class="role-title">${title}</div>
-    <label class="p-field"><span>${t("ui.profileLabel")}</span><input class="role-label" value="${escapeHtml(r.label || "")}"></label>
+    <label class="p-field"><span>${t("ui.profileLabel")} ${helpIcon("profileLabel")}</span><input class="role-label" value="${escapeHtml(r.label || "")}"></label>
     <label class="p-field"><span>${t("ui.roleMode")}</span><select class="role-mode">
       <option value="auto"${r.mode === "auto" ? " selected" : ""}>auto</option>
       <option value="manual"${r.mode === "manual" ? " selected" : ""}>manual</option>
@@ -1871,6 +1889,29 @@ async function applyProviders() {
   syncProvidersFromDOM();
   const ids = providersDraft.profiles.map((p) => p.id);
   if (new Set(ids).size !== ids.length) { showProvidersMsg("duplicate profile ids", true); return; }
+
+  // Direct API-key entry: any non-empty .p-apikey field is persisted to .env
+  // (gitignored) under that profile's credentialRef — never into the profiles
+  // body / state.json. Keys read straight from the DOM (not stored in the draft).
+  const keyWrites = [];
+  for (const row of document.querySelectorAll("#profilesList .profile-row")) {
+    const inp = row.querySelector(".p-apikey");
+    if (!inp || !inp.value.trim()) continue;
+    const p = providersDraft.profiles.find((x) => x.id === row.dataset.id);
+    if (!p) continue;
+    const ref = (p.credentialRef || "").trim();
+    if (!ref) { showProvidersMsg(t("ui.keyNeedsRef", { p: p.label || p.id }), true); return; }
+    keyWrites.push({ credentialRef: ref, value: inp.value.trim() });
+  }
+  for (const w of keyWrites) {
+    try {
+      const r = await fetch("/api/providers/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(w) });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); showProvidersMsg(j.error || `key error ${r.status}`, true); return; }
+      const j = await r.json().catch(() => ({}));
+      if (j.credentials && currentState.providers) currentState.providers.credentials = j.credentials;
+    } catch (e) { showProvidersMsg(e.message, true); return; }
+  }
+
   // No profiles ⇒ clear explicit config (revert to the default Codex/Claude
   // behavior) rather than persisting an empty override that would break rounds.
   const body = providersDraft.profiles.length
@@ -1883,7 +1924,8 @@ async function applyProviders() {
       showProvidersMsg(j.error || `error ${res.status}`, true);
       return;
     }
-    showProvidersMsg(t("ui.providersSaved"), false);
+    showProvidersMsg(keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"), false);
+    renderProviders(); // refresh key badges + clear the direct-key inputs
   } catch (e) {
     showProvidersMsg(e.message, true);
   }

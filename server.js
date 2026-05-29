@@ -1,5 +1,6 @@
 // Load .env before any module reads process.env (timeouts, ports, API keys).
-require("./lib/env").loadEnv(__dirname);
+const env = require("./lib/env");
+env.loadEnv(__dirname);
 
 const http = require("node:http");
 const fs = require("node:fs");
@@ -1009,6 +1010,25 @@ async function router(req, res) {
       // Provider spend is cumulative (no per-period source), so attach it fresh
       // rather than caching it with the windowed Claude/Codex stats.
       return sendJson(res, 200, { ...statsCache[key].data, providers: usage.summary(ROOMS_DIR) });
+    }
+
+    if (method === "POST" && pathname === "/api/providers/key") {
+      // Direct API-key entry: persist the typed key to .env (gitignored) under
+      // the given env var name and load it live. The key NEVER touches state.json
+      // or the response body — profiles only ever store the credentialRef name.
+      const body = await readBody(req);
+      const ref = String((body && body.credentialRef) || "").trim();
+      const value = String((body && body.value) || "");
+      if (!ref) return sendJson(res, 400, { error: "credentialRef required" });
+      if (!value) return sendJson(res, 400, { error: "value required" });
+      try {
+        env.setEnvVar(ROOT, ref, value);
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+      broadcast();
+      // Echo back which profiles now have their key present (no key values).
+      return sendJson(res, 200, { ok: true, credentials: publicState().providers.credentials });
     }
 
     if (method === "POST" && pathname === "/api/providers/usage/reset") {

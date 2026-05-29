@@ -119,6 +119,22 @@ function run() {
         try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
         console.log("PASS usage store accumulate/summary/reset");
 
+        // --- env.setEnvVar: write/replace a .env line + live process.env ---
+        const envmod = require(path.resolve(__dirname, "../lib/env.js"));
+        const etmp = path.join(os.tmpdir(), `cr2-env-${process.pid}-${Date.now()}`);
+        fs.mkdirSync(etmp, { recursive: true });
+        envmod.setEnvVar(etmp, "CR2_SELFTEST_KEY", "sk-first");
+        assert.strictEqual(process.env.CR2_SELFTEST_KEY, "sk-first", "process.env set live");
+        assert.ok(fs.readFileSync(path.join(etmp, ".env"), "utf8").includes("CR2_SELFTEST_KEY=sk-first"), "key written to .env");
+        envmod.setEnvVar(etmp, "CR2_SELFTEST_KEY", "sk-second");
+        const envBody = fs.readFileSync(path.join(etmp, ".env"), "utf8");
+        assert.ok(envBody.includes("CR2_SELFTEST_KEY=sk-second"), "key replaced");
+        assert.ok(!envBody.includes("sk-first"), "old value gone (replaced, not appended)");
+        assert.throws(() => envmod.setEnvVar(etmp, "1bad name", "x"), /invalid env var name/, "rejects bad var name");
+        try { fs.rmSync(etmp, { recursive: true, force: true }); } catch {}
+        delete process.env.CR2_SELFTEST_KEY;
+        console.log("PASS env.setEnvVar write/replace/validate");
+
         console.log("\nALL PROVIDER SELF-TESTS PASSED");
         server.close(() => resolve());
       } catch (err) {
