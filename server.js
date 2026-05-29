@@ -151,7 +151,9 @@ function providersInfo() {
   const cfg = (state.run && state.run.settings && state.run.settings.profiles) || state.settings.profiles || [];
   const credentials = {};
   for (const p of cfg) if (p && p.id) credentials[p.id] = providers.credentialPresent(p);
-  return { mode: providers.mode(), presets: providers.presets(), types: providers.providerTypes(), credentials };
+  // Per-profile cumulative token spend (API keys have no remaining %, only spend)
+  // so the connected-agent chips can show how much each backend has used.
+  return { mode: providers.mode(), presets: providers.presets(), types: providers.providerTypes(), credentials, usage: usage.summary(ROOMS_DIR) };
 }
 
 function publicState() {

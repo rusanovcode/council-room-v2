@@ -144,6 +144,10 @@ const STRINGS = {
     "tip.subtaskTrash": "Корзина подзадач. По «×» подзадача уходит сюда (восстановимо). Клик — read-only просмотр; ↩ — вернуть в стек; «Очистить» — удалить безвозвратно.|||создал лишнюю подзадачу, нажал × → в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть весь мусор.",
     "ui.switcherConnected": "модуль свитч подключён",
     "ui.switcherOffline": "модуль свитч не подключён",
+    "ui.agentsLabel": "подключено:",
+    "ui.agentReady": "готов",
+    "ui.agentNoKey": "нет ключа",
+    "tip.agentChip": "{prov} · {model} — {status}. Бэкенд из «Профили и роли». Зелёная точка — готов к работе (ключ задан / Ollama / CLI); серая — ключ не задан.",
     "ui.toggleStatement": "Развернуть / свернуть текст постановки подзадачи",
     "ui.checkUpdates": "Обновления",
     "ui.checkUpdatesTitle": "Проверить обновления на GitHub",
@@ -375,6 +379,10 @@ const STRINGS = {
     "tip.subtaskTrash": "Subtask trash. The «×» sends a subtask here (recoverable). Click for a read-only preview; ↩ restores to the stack; «Empty» deletes permanently.|||made an extra subtask, hit × → in trash. Changed your mind — ↩ restored it. Or «Empty» to wipe the junk.",
     "ui.switcherConnected": "switch module connected",
     "ui.switcherOffline": "switch module not connected",
+    "ui.agentsLabel": "connected:",
+    "ui.agentReady": "ready",
+    "ui.agentNoKey": "no key",
+    "tip.agentChip": "{prov} · {model} — {status}. Backend from «Profiles & roles». Green dot — ready (key set / Ollama / CLI); grey — no key.",
     "ui.toggleStatement": "Expand / collapse the subtask statement",
     "ui.checkUpdates": "Updates",
     "ui.checkUpdatesTitle": "Check for updates on GitHub",
@@ -1614,23 +1622,100 @@ function visibleAccounts(tool) {
   });
 }
 
+// Phase 5: the configured provider profiles ("Profiles & roles"), surfaced as
+// connected-backend chips next to the switcher status. Reads the live panel
+// draft when present (so chips preview as you add/edit profiles) and falls back
+// to the saved settings. Each entry = one model/API key the round can route to.
+function connectedAgents() {
+  const list = (providersDraft && providersDraft.profiles)
+    || (currentState.settings && currentState.settings.profiles)
+    || [];
+  const creds = (currentState.providers && currentState.providers.credentials) || {};
+  const usage = (currentState.providers && currentState.providers.usage) || {};
+  return list.map((p) => {
+    let prov, ready;
+    if (isCliProviderId(p.provider)) {
+      prov = p.provider === "cli-codex" ? "Codex CLI" : "Claude CLI";
+      ready = true; // subscription CLI — covered by the account buttons too
+    } else if (p.provider === "ollama") {
+      prov = "Ollama";
+      ready = true; // keyless local model
+    } else {
+      const preset = presetById(p.provider);
+      prov = preset ? preset.label : (p.provider || "API");
+      ready = Boolean(creds[p.id]);
+    }
+    const model = p.model || (isCliProviderId(p.provider) ? "auto" : "—");
+    const u = usage[p.id];
+    const spentK = u && u.totalTokens ? u.totalTokens / 1000 : 0;
+    // Colour bucket reused from the account buttons. API keys have no remaining
+    // %, so availability drives it: ready (key set / Ollama / CLI) → green,
+    // otherwise grey "no key". (A future remaining-% source can bucket here.)
+    const tok = ready ? "tok-green" : "tok-unknown";
+    return { id: p.id, name: p.label || prov, prov, model, ready, spentK, tok };
+  });
+}
+
+function fmtSpentK(k) {
+  if (!k) return "";
+  return ` · Σ${k >= 10 ? Math.round(k) : k.toFixed(1)}K`;
+}
+
+// Render the connected-agent chips, styled like the switch-module account
+// buttons (same pill + token-colour classes) so the public build looks identical.
+function renderConnectedAgents() {
+  const box = $("switcherAgents");
+  if (!box) return;
+  box.innerHTML = "";
+  const agents = connectedAgents();
+  if (!agents.length) return;
+  const row = document.createElement("div");
+  row.className = "acct-row";
+  for (const a of agents) {
+    const chip = document.createElement("span");
+    chip.className = `acct-btn agent-chip ${a.tok}${a.ready ? "" : " unauthorized"}`;
+    const spent = fmtSpentK(a.spentK);
+    chip.innerHTML = `${escapeHtml(a.name)}${spent ? `<span class="agent-spend">${escapeHtml(spent)}</span>` : ""}`;
+    chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: a.ready ? t("ui.agentReady") : t("ui.agentNoKey") })
+      + (a.spentK ? ` · ~${a.spentK.toFixed(1)}K tok` : "");
+    row.appendChild(chip);
+  }
+  box.appendChild(row);
+}
+
 function renderSwitcher() {
   const el = $("switcherStatus");
   if (!el) return;
   const sw = currentState.switcher || {};
   const connected = Boolean(sw.connected);
-  el.classList.toggle("connected", connected);
-  $("switcherStatusText").textContent = connected ? t("ui.switcherConnected") : t("ui.switcherOffline");
+  const apiBuild = ((currentState.providers && currentState.providers.mode) || "full") === "api";
+  const agents = connectedAgents();
 
-  // 4 account buttons (2 codex, 2 claude); colour = remaining-token bucket.
-  // Click → authorize that account (opens a login terminal in its env).
+  // Local (full) build: the switch module is ALWAYS shown (mandatory) — its
+  // status text + login account buttons + refresh. The connected-agent chips
+  // sit alongside as a complement. Public (api) build: there is no switch
+  // module — hide its status/refresh/account buttons; the chips are the whole
+  // display (same pill style + token colours).
+  const leftEl = el.querySelector(".switcher-left");
+  const refreshEl = $("refreshSwitcher");
+  if (leftEl) leftEl.style.display = apiBuild ? "none" : "";
+  if (refreshEl) refreshEl.style.display = apiBuild ? "none" : "";
+
+  if (apiBuild) {
+    el.classList.toggle("connected", agents.some((a) => a.ready));
+  } else {
+    el.classList.toggle("connected", connected);
+    $("switcherStatusText").textContent = connected ? t("ui.switcherConnected") : t("ui.switcherOffline");
+  }
+
+  renderConnectedAgents();
+
+  // Switch-module account buttons (login/failover) — full build only. Colour =
+  // remaining-token bucket; click → authorize that account.
   const box = $("switcherAccounts");
   box.innerHTML = "";
-  const accounts = sw.accounts || {};
-  // One row per service (Codex / Claude) → 2 buttons per row normally, 3 when an
-  // API profile is present. Hide an API profile until its key is actually set.
   const toolName = { codex: "Codex", claude: "Claude" };
-  for (const tool of ["codex", "claude"]) {
+  if (!apiBuild) for (const tool of ["codex", "claude"]) {
     // Show acc1 always; the 2nd account / API only when the switcher is connected.
     const profs = visibleAccounts(tool);
     if (!profs.length) continue;
@@ -1838,6 +1923,7 @@ function renderProviders() {
     : `<div class="muted small">${t("ui.noProfiles")}</div>`;
   $("roleAEdit").innerHTML = renderRoleEditor("a");
   $("roleBEdit").innerHTML = renderRoleEditor("b");
+  renderConnectedAgents(); // keep the connected-agent chips in sync with panel edits
 }
 
 function syncProvidersFromDOM() {
@@ -2200,7 +2286,11 @@ function bindUi() {
     if (rm) removeProfileDraft(rm.closest(".profile-row").dataset.id);
   });
   $("profilesList")?.addEventListener("change", (event) => {
+    // Provider change swaps which fields are shown → full panel re-render.
+    // Any other field change (label/model/...) just syncs the draft and
+    // refreshes the connected-agent chips (no re-render, so focus is kept).
     if (event.target.classList.contains("p-provider")) { syncProvidersFromDOM(); renderProviders(); }
+    else { syncProvidersFromDOM(); renderConnectedAgents(); }
   });
 
   // Tooltip on dynamically-added KB help icons uses data-tooltip-text directly

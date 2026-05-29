@@ -383,6 +383,11 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .acct-btn.active { box-shadow: inset 0 0 0 1px currentColor; font-weight: 800; }
 .acct-btn.active::after { content: " ●"; font-size: 7px; vertical-align: middle; }
 .acct-btn:hover { background: var(--border); }
+/* Phase 5: connected-agent chips (Profiles & roles), same pill style as the
+   account buttons. Public build shows only these; full build shows them too. */
+.switcher-agents { display: flex; flex-direction: column; gap: 3px; }
+.agent-chip { cursor: help; }
+.agent-chip .agent-spend { opacity: 0.7; font-weight: 600; margin-left: 2px; }
 
 /* Detailed-stats panel — expands upward, content added later */
 .switcher-stats {
@@ -1151,9 +1156,9 @@ button.square {
   border-radius: 6px;
   background: var(--panel);
 }
-/* Pinned to the top of the right column: sticks to the column's scroll top so
-   it stays reachable while KB / Settings scroll underneath. */
-.col.right > .providers-panel {
+/* "Profiles & roles" pinned to the top of the right column: sticks to the
+   column's scroll top so it stays reachable while Settings / KB scroll under. */
+.col.right > #providersDetails {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -1162,10 +1167,12 @@ button.square {
   border-width: 0 0 1px;
   background: var(--panel);
 }
-.col.right > .providers-panel[open] .providers-body {
+.col.right > #providersDetails[open] .providers-body {
   max-height: 60vh;
   overflow-y: auto;
 }
+/* Settings reuses the collapsible providers-panel look but is NOT sticky. */
+.col.right > #settingsDetails { margin: 0 0 8px; }
 .providers-panel > summary {
   cursor: pointer;
   padding: 8px 10px;

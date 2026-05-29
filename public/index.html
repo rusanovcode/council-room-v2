@@ -157,6 +157,7 @@
               <button id="refreshSwitcher" class="switcher-expand" type="button" data-i18n-title="ui.refreshTokens">↻</button>
               <button id="toggleSwitcherStats" class="switcher-expand" type="button" data-i18n-title="ui.switcherStats">▾</button>
               <span id="switcherAccounts" class="switcher-accounts"></span>
+              <span id="switcherAgents" class="switcher-agents"></span>
             </div>
           </div>
         </footer>
@@ -188,8 +189,12 @@
           </div>
         </details>
 
-        <section class="block">
-          <h2><span data-i18n="ui.settings">Настройки</span> <span class="help" data-tooltip-key="t.agentSettings">?</span></h2>
+        <details id="settingsDetails" class="providers-panel" open>
+          <summary>
+            <span data-i18n="ui.settings">Настройки</span>
+            <span class="help" data-tooltip-key="t.agentSettings">?</span>
+          </summary>
+          <div class="providers-body">
           <label class="toggle-row danger-toggle">
             <input id="allowFilesystemScan" type="checkbox" />
             <span data-i18n="ui.allowScan">Разрешить агентам сканировать файлы</span>
@@ -276,7 +281,8 @@
             </select>
           </div>
           </div><!-- /#legacyAgents -->
-        </section>
+          </div><!-- /.providers-body -->
+        </details>
 
         <header class="col-head kb-head">
           <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
