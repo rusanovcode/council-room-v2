@@ -1151,6 +1151,21 @@ button.square {
   border-radius: 6px;
   background: var(--panel);
 }
+/* Pinned to the top of the right column: sticks to the column's scroll top so
+   it stays reachable while KB / Settings scroll underneath. */
+.col.right > .providers-panel {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 0 8px;
+  border-radius: 0;
+  border-width: 0 0 1px;
+  background: var(--panel);
+}
+.col.right > .providers-panel[open] .providers-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
 .providers-panel > summary {
   cursor: pointer;
   padding: 8px 10px;
@@ -1186,6 +1201,22 @@ button.square {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+/* "+ Профиль": looping iridescent RGB sweep. */
+#addProfileBtn {
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  background: linear-gradient(90deg, #ff0040, #ff8a00, #ffee00, #00e676, #00b8ff, #7a5cff, #ff00c8, #ff0040);
+  background-size: 400% 100%;
+  animation: rgbSweep 6s linear infinite;
+}
+#addProfileBtn:hover { filter: brightness(1.12) saturate(1.15); }
+@keyframes rgbSweep {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 400% 50%; }
+}
+@media (prefers-reduced-motion: reduce) { #addProfileBtn { animation: none; } }
 .profile-row {
   border: 1px solid var(--border);
   border-radius: 5px;

@@ -163,6 +163,30 @@
       </section>
 
       <aside class="col right">
+        <!-- Phase 5: configurable provider profiles + debate roles. Pinned to the
+             top of the right column so it stays reachable while the column scrolls. -->
+        <details id="providersDetails" class="providers-panel">
+          <summary>
+            <span data-i18n="ui.providersPanel">Профили и роли</span>
+            <span class="help" data-tooltip-key="t.providersPanel">?</span>
+            <span id="buildModeBadge" class="mode-badge"></span>
+          </summary>
+          <div class="providers-body">
+            <div class="providers-subhead">
+              <span data-i18n="ui.profiles">Профили</span>
+              <button id="addProfileBtn" type="button" class="small" data-i18n="ui.addProfile">+ Профиль</button>
+            </div>
+            <div id="profilesList"></div>
+            <div class="roles-edit">
+              <div id="roleAEdit" class="role-edit"></div>
+              <div id="roleBEdit" class="role-edit"></div>
+            </div>
+            <div class="providers-actions">
+              <button id="applyProvidersBtn" type="button" class="primary small" data-i18n="ui.applyProviders">Применить</button>
+              <span id="providersMsg" class="providers-msg"></span>
+            </div>
+          </div>
+        </details>
         <header class="col-head kb-head">
           <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
           <span id="kbUpdated" class="muted small"></span>
@@ -258,30 +282,6 @@
             </select>
           </div>
           </div><!-- /#legacyAgents -->
-
-          <!-- Phase 5: configurable provider profiles + debate roles -->
-          <details id="providersDetails" class="providers-panel">
-            <summary>
-              <span data-i18n="ui.providersPanel">Профили и роли</span>
-              <span class="help" data-tooltip-key="t.providersPanel">?</span>
-              <span id="buildModeBadge" class="mode-badge"></span>
-            </summary>
-            <div class="providers-body">
-              <div class="providers-subhead">
-                <span data-i18n="ui.profiles">Профили</span>
-                <button id="addProfileBtn" type="button" class="small" data-i18n="ui.addProfile">+ Профиль</button>
-              </div>
-              <div id="profilesList"></div>
-              <div class="roles-edit">
-                <div id="roleAEdit" class="role-edit"></div>
-                <div id="roleBEdit" class="role-edit"></div>
-              </div>
-              <div class="providers-actions">
-                <button id="applyProvidersBtn" type="button" class="primary small" data-i18n="ui.applyProviders">Применить</button>
-                <span id="providersMsg" class="providers-msg"></span>
-              </div>
-            </div>
-          </details>
         </section>
       </aside>
     </main>
