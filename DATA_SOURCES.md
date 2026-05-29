@@ -21,8 +21,12 @@ Council Room v2/
 │   ├── prompt.js             buildDebatePrompt, parseAgentTail, STATIC_SYSTEM, NO_SCAN_GUARD, STRICT_SCOPE_RULE
 │   ├── cli.js                runCodex/runClaude (spawn, AbortSignal, killTree, accountEnv), spawnLogin
 │   ├── switcher.js           модуль свитч: gateway-клиент (7700) + файловый фолбэк; envForAccount; claude/codexPaths; токен-% (claude usage-cache+oauth/usage fetch, codex rollout rate_limits)
+│   ├── providers.js          [Phase 5] слой провайдеров: runProfile(profile,prompt,opts)→{ok,text,aborted,result}; openai-compatible + ollama; пресеты; credentialRef→env; mode() = PROVIDERS_MODE full|api
+│   ├── env.js                [Phase 5] zero-dep загрузчик .env (не перетирает реальное окружение); зовётся в server.js до прочих require
 │   └── stats.js              окна claude usage-cache + расход из session-JSONL (для раскрывашки)
 ├── public/                   index.html, app.js (i18n RU/EN, render*, coach), styles.css
+├── test/providers.test.js    [Phase 5] самотест адаптера на локальном мок-сервере (node test/providers.test.js)
+├── .env.example              [Phase 5] шаблон env (ключи провайдеров + PROVIDERS_MODE); реальный .env gitignored
 ├── Council Room v2.bat/.command/.sh   лаунчеры (освобождают порт перед стартом)
 ├── HANDOFF.md  ROADMAP.md  DATA_SOURCES.md (этот)
 └── rooms/<runId>/            данные чата (gitignored)

@@ -6,6 +6,7 @@
   "main": "server.js",
   "license": "MIT",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test/providers.test.js"
   }
 }

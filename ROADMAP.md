@@ -179,10 +179,33 @@ Gate-экран: чек-лист зелёных галок («все critarian m
 3. **Роли «спорщиков» A/B** — каждая указывает на профиль (или список профилей с failover).
    Сейчас раунд жёстко зашит на Codex+Claude (`runCodexOn`/`runClaudeOn` в `server.js`) — обобщить.
 
+### Решения по дизайну (согласованы 2026-05-30)
+- **Разделение public/local — флаг сборки в одном репо.** `PROVIDERS_MODE=full|api`
+  (env, default `full`). `full` — текущая приватная сборка (CLI Codex/Claude + switcher +
+  OAuth). `api` — публичная (только API-ключи + Ollama). Ничего физически не удаляем,
+  локальная версия продолжает работать. (Отвергли отдельную ветку и физическое удаление.)
+- **Старт фазы — слой провайдеров (адаптеры).** Сначала фундамент `runProfile`, потом
+  профили/роли поверх него. CLI Codex/Claude обернём как ещё один тип провайдера (full).
+- **Ключи — env + `.env` (gitignored).** Профиль хранит `credentialRef` (имя env-переменной),
+  сам ключ — в `.env`/окружении, НЕ в репозитории и НЕ в `state.json`.
+
+### Прогресс
+- **[DONE 2026-05-30] Слой провайдеров.** `lib/providers.js` — контракт
+  `runProfile(profile, prompt, opts) → {ok, text, aborted, result}` (сигнатура как у
+  `runCodex`/`runClaude`); реализации `openai-compatible` (стрим+нестрим, abort vs timeout,
+  ошибки) и `ollama`; пресеты openai/deepseek/groq/openrouter/mistral/together/ollama;
+  `credentialRef`→`process.env`. `lib/env.js` — zero-dep загрузчик `.env` (не перетирает
+  реальное окружение), подключён в `server.js` до прочих require. `.env.example`, `.env` в
+  `.gitignore`, `PROVIDERS_MODE` (default `full`). Тест `test/providers.test.js` (мок-сервер
+  `/v1/chat/completions`: нестрим, стрим, отсутствие ключа, keyless-ollama, user-abort,
+  timeout, пресеты) — всё зелёное. Сервер чисто стартует с загрузчиком (regression OK).
+  **Ещё НЕ сделано:** профили (CRUD/UI), роли A/B, интеграция в `runRound`, CLI-as-provider,
+  переосмысление панели токенов, gating UI по `PROVIDERS_MODE`.
+
 ### Задачи
-- Интерфейс провайдера + реализации `openai-compatible` и `ollama`.
+- ~~Интерфейс провайдера + реализации `openai-compatible` и `ollama`.~~ **DONE** (см. Прогресс).
 - Профили (CRUD в настройках) + роли A/B со списком failover → заменить хардкод Codex/Claude.
-- Хранение ключей — env / настройки, НЕ в репозитории.
+- Хранение ключей — env / настройки, НЕ в репозитории. **(механизм готов: `credentialRef`+`.env`)**
 - **Мониторинг токенов**: «остаток %» — это про подписку/OAuth (usage-cache/rollout). Для
   API-ключей остатка нет → показывать расход (spend) или прятать; панель статистики переосмыслить.
 - **Публичная сборка без OAuth/switcher**: убрать из репозитория OAuth/подписочный путь

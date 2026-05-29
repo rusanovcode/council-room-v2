@@ -1,3 +1,6 @@
+// Load .env before any module reads process.env (timeouts, ports, API keys).
+require("./lib/env").loadEnv(__dirname);
+
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
