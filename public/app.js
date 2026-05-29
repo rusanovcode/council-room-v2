@@ -145,9 +145,10 @@ const STRINGS = {
     "ui.switcherConnected": "модуль свитч подключён",
     "ui.switcherOffline": "модуль свитч не подключён",
     "ui.agentsLabel": "подключено:",
-    "ui.agentReady": "готов",
+    "ui.agentReady": "проверен, рабочий",
+    "ui.agentUnverified": "ключ задан, но не проверен",
     "ui.agentNoKey": "нет ключа",
-    "tip.agentChip": "{prov} · {model} — {status}. Бэкенд из «Профили и роли». Зелёная точка — готов к работе (ключ задан / Ollama / CLI); серая — ключ не задан.",
+    "tip.agentChip": "{prov} · {model} — {status}. Бэкенд из «Профили и роли». Цвет: зелёный — ключ прошёл живой тест (или Ollama/CLI); жёлтый — ключ задан, но не проверен; серый — ключа нет.",
     "ui.toggleStatement": "Развернуть / свернуть текст постановки подзадачи",
     "ui.checkUpdates": "Обновления",
     "ui.checkUpdatesTitle": "Проверить обновления на GitHub",
@@ -387,9 +388,10 @@ const STRINGS = {
     "ui.switcherConnected": "switch module connected",
     "ui.switcherOffline": "switch module not connected",
     "ui.agentsLabel": "connected:",
-    "ui.agentReady": "ready",
+    "ui.agentReady": "verified, working",
+    "ui.agentUnverified": "key set but unverified",
     "ui.agentNoKey": "no key",
-    "tip.agentChip": "{prov} · {model} — {status}. Backend from «Profiles & roles». Green dot — ready (key set / Ollama / CLI); grey — no key.",
+    "tip.agentChip": "{prov} · {model} — {status}. Backend from «Profiles & roles». Colour: green — key passed a live test (or Ollama/CLI); amber — key set but unverified; grey — no key.",
     "ui.toggleStatement": "Expand / collapse the subtask statement",
     "ui.checkUpdates": "Updates",
     "ui.checkUpdatesTitle": "Check for updates on GitHub",
@@ -1645,28 +1647,31 @@ function connectedAgents() {
     || (currentState.settings && currentState.settings.profiles)
     || [];
   const creds = (currentState.providers && currentState.providers.credentials) || {};
+  const validated = (currentState.providers && currentState.providers.validated) || {};
   const usage = (currentState.providers && currentState.providers.usage) || {};
   return list.map((p) => {
-    let prov, ready;
+    let prov, present, ok;
     if (isCliProviderId(p.provider)) {
       prov = p.provider === "cli-codex" ? "Codex CLI" : "Claude CLI";
-      ready = true; // subscription CLI — covered by the account buttons too
+      present = true; ok = true; // subscription CLI — covered by the account buttons too
     } else if (p.provider === "ollama") {
       prov = "Ollama";
-      ready = true; // keyless local model
+      present = true; ok = true; // keyless local model
     } else {
       const preset = presetById(p.provider);
       prov = preset ? preset.label : (p.provider || "API");
-      ready = Boolean(creds[p.id]);
+      present = Boolean(creds[p.id]);
+      ok = Boolean(validated[p.id]); // green only when the key passed a live test
     }
     const model = p.model || (isCliProviderId(p.provider) ? "auto" : "—");
     const u = usage[p.id];
     const spentK = u && u.totalTokens ? u.totalTokens / 1000 : 0;
-    // Colour bucket reused from the account buttons. API keys have no remaining
-    // %, so availability drives it: ready (key set / Ollama / CLI) → green,
-    // otherwise grey "no key". (A future remaining-% source can bucket here.)
-    const tok = ready ? "tok-green" : "tok-unknown";
-    return { id: p.id, name: p.label || prov, prov, model, ready, spentK, tok };
+    // Same colour scheme as the API-key field check: verified → green, key
+    // present but unverified → amber, no key → grey. Mirrors the account-button
+    // token buckets so the public build looks identical.
+    const tok = ok ? "tok-green" : (present ? "tok-yellow" : "tok-unknown");
+    const status = ok ? "ok" : (present ? "unverified" : "nokey");
+    return { id: p.id, name: p.label || prov, prov, model, present, ok, status, spentK, tok };
   });
 }
 
@@ -1687,10 +1692,13 @@ function renderConnectedAgents() {
   row.className = "acct-row";
   for (const a of agents) {
     const chip = document.createElement("span");
-    chip.className = `acct-btn agent-chip ${a.tok}${a.ready ? "" : " unauthorized"}`;
+    // Dashed "unauthorized" only when there's no key at all; an unverified key
+    // is still solid (amber) since it might work.
+    chip.className = `acct-btn agent-chip ${a.tok}${a.present ? "" : " unauthorized"}`;
     const spent = fmtSpentK(a.spentK);
     chip.innerHTML = `${escapeHtml(a.name)}${spent ? `<span class="agent-spend">${escapeHtml(spent)}</span>` : ""}`;
-    chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: a.ready ? t("ui.agentReady") : t("ui.agentNoKey") })
+    const statusText = a.status === "ok" ? t("ui.agentReady") : (a.status === "unverified" ? t("ui.agentUnverified") : t("ui.agentNoKey"));
+    chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: statusText })
       + (a.spentK ? ` · ~${a.spentK.toFixed(1)}K tok` : "");
     row.appendChild(chip);
   }

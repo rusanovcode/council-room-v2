@@ -20,6 +20,7 @@ const profiles = require("./lib/profiles");
 const roles = require("./lib/roles");
 const providers = require("./lib/providers");
 const usage = require("./lib/usage");
+const validatedStore = require("./lib/validated");
 
 const ROOT = __dirname;
 const ROOMS_DIR = path.join(ROOT, "rooms");
@@ -71,9 +72,11 @@ let activeChildren = new Set();
 // on a timer + after switcher actions; falls back to file detection if gateway down.
 let switcherStatus = switcher.detect();
 let statsCache = {};
-// credentialRefs whose key passed a live test request this session. Drives the
-// green "verified" check on the API-key field — presence alone isn't enough.
-const validatedRefs = new Set();
+// credentialRefs whose key passed a live test request. Drives the green
+// "verified" check on the API-key field (and the green agent chip) — presence
+// alone isn't enough. Persisted across restarts (rooms/.validated-keys.json),
+// pinned to the key value's fingerprint so a changed key auto-invalidates.
+const validatedRefs = validatedStore.validatedSet(ROOMS_DIR, (ref) => process.env[ref]);
 // Bumped whenever the token-usage sources are force-refreshed (the ↻ button), so
 // the client knows to re-fetch the stats panel (Limits tab) once it lands.
 let statsVersion = 0;
@@ -1039,6 +1042,7 @@ async function router(req, res) {
         return sendJson(res, 400, { error: e.message });
       }
       validatedRefs.delete(ref); // new key is unproven until a live test passes
+      validatedStore.clearValidated(ROOMS_DIR, ref);
       broadcast();
       // Echo back which profiles now have their key present (no key values).
       return sendJson(res, 200, { ok: true, credentials: publicState().providers.credentials });
@@ -1062,7 +1066,10 @@ async function router(req, res) {
       const profile = { provider, baseUrl: body.baseUrl, credentialRef, model };
       const r = await providers.runProfile(profile, "What is 1+3? Reply with just the number.", { timeoutMs: 25000 })
         .catch((e) => ({ ok: false, text: e && e.message ? e.message : "error" }));
-      if (credentialRef) { if (r.ok) validatedRefs.add(credentialRef); else validatedRefs.delete(credentialRef); }
+      if (credentialRef) {
+        if (r.ok) { validatedRefs.add(credentialRef); validatedStore.markValidated(ROOMS_DIR, credentialRef, process.env[credentialRef]); }
+        else { validatedRefs.delete(credentialRef); validatedStore.clearValidated(ROOMS_DIR, credentialRef); }
+      }
       broadcast();
       const info = publicState().providers;
       return sendJson(res, 200, {

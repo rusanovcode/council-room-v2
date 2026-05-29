@@ -135,6 +135,24 @@ function run() {
         delete process.env.CR2_SELFTEST_KEY;
         console.log("PASS env.setEnvVar write/replace/validate");
 
+        // --- validated-keys store: persist + fingerprint-pinned invalidation ---
+        const validated = require(path.resolve(__dirname, "../lib/validated.js"));
+        const vtmp = path.join(os.tmpdir(), `cr2-val-${process.pid}-${Date.now()}`);
+        validated.markValidated(vtmp, "DEEPSEEK_API_KEY", "sk-aaa");
+        validated.markValidated(vtmp, "OPENAI_API_KEY", "sk-bbb");
+        // env still matches → both verified.
+        let set = validated.validatedSet(vtmp, (r) => ({ DEEPSEEK_API_KEY: "sk-aaa", OPENAI_API_KEY: "sk-bbb" }[r]));
+        assert.ok(set.has("DEEPSEEK_API_KEY") && set.has("OPENAI_API_KEY"), "both verified when values unchanged");
+        // DEEPSEEK key changed → its fingerprint no longer matches → dropped.
+        set = validated.validatedSet(vtmp, (r) => ({ DEEPSEEK_API_KEY: "sk-CHANGED", OPENAI_API_KEY: "sk-bbb" }[r]));
+        assert.ok(!set.has("DEEPSEEK_API_KEY"), "changed key auto-invalidated");
+        assert.ok(set.has("OPENAI_API_KEY"), "unchanged key stays verified");
+        validated.clearValidated(vtmp, "OPENAI_API_KEY");
+        set = validated.validatedSet(vtmp, () => "sk-bbb");
+        assert.ok(!set.has("OPENAI_API_KEY"), "clearValidated removes the ref");
+        try { fs.rmSync(vtmp, { recursive: true, force: true }); } catch {}
+        console.log("PASS validated-keys persist + fingerprint invalidation");
+
         console.log("\nALL PROVIDER SELF-TESTS PASSED");
         server.close(() => resolve());
       } catch (err) {
