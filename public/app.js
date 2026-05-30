@@ -224,6 +224,9 @@ const STRINGS = {
     "ui.regModelSaved": "Модель сохранена",
     "ui.providerLog": "Журнал событий",
     "ui.providerLogClear": "Очистить",
+    "ui.providerLogEmpty": "Журнал пуст",
+    "ui.regModelRetest": "Проверить доступность модели",
+    "ui.regModelTesting": "Проверяю…",
     "ui.addProfile": "+ Профиль",
     "ui.applyProviders": "Применить",
     "ui.providersSaved": "Сохранено ✓",
@@ -541,6 +544,9 @@ const STRINGS = {
     "ui.regModelSaved": "Model saved",
     "ui.providerLog": "Event log",
     "ui.providerLogClear": "Clear",
+    "ui.providerLogEmpty": "Log is empty",
+    "ui.regModelRetest": "Check model availability",
+    "ui.regModelTesting": "Testing…",
     "ui.addProfile": "+ Profile",
     "ui.applyProviders": "Apply",
     "ui.providersSaved": "Saved ✓",
@@ -2340,8 +2346,11 @@ function renderProviders() {
 
 // ---- Registered models panel ------------------------------------------
 // A global, user-friendly view of all saved profiles. Persists across chats.
-// Shows: label | provider name | model dropdown | effort | speed (if supported).
+// Shows: ↻ | label | provider name | model dropdown | effort | speed (if supported).
 // Changes auto-save via POST /api/settings (no Apply button).
+
+// Per-profile test status: { ok: bool, testing: bool }
+const rmStatus = {};
 
 function regModelProviderLabel(provider) {
   if (provider === "cli-codex") return "Codex CLI";
@@ -2393,7 +2402,15 @@ function renderRegisteredModelRow(p) {
     speedField = `<td class="rm-cell"><span class="rm-col-head">${escapeHtml(t("ui.regModelSpeed"))}</span><select class="rm-speed">${opts}</select></td>`;
   }
 
-  return `<tr class="rm-row" data-id="${escapeHtml(p.id)}">
+  const st = rmStatus[p.id] || {};
+  const rowCls = st.testing ? " rm-testing" : (st.ok === true ? " rm-ok" : (st.ok === false ? " rm-fail" : ""));
+  const btnIcon = st.testing ? "⟳" : "↻";
+  const btnTitle = st.testing ? t("ui.regModelTesting") : t("ui.regModelRetest");
+
+  return `<tr class="rm-row${rowCls}" data-id="${escapeHtml(p.id)}">
+    <td class="rm-cell rm-cell-retest">
+      <button class="rm-retest ghost" type="button" title="${escapeHtml(btnTitle)}"${st.testing ? " disabled" : ""}>${btnIcon}</button>
+    </td>
     <td class="rm-cell rm-cell-label">
       <span class="rm-col-head">${escapeHtml(t("ui.regModelLabel"))}</span>
       <input class="rm-label" value="${escapeHtml(p.label || "")}" placeholder="${escapeHtml(provLabel)}">
@@ -2425,24 +2442,26 @@ function renderRegisteredModels() {
     ? `<table class="rm-table"><tbody>${profs.map(renderRegisteredModelRow).join("")}</tbody></table>`
     : `<div class="muted small">${escapeHtml(t("ui.regModelNoProfiles"))}</div>`;
 
-  // Persistent event log (newest first).
+  // Persistent event log — collapsible, newest first.
   const logEntries = provLogLoad();
   let logHtml = "";
-  if (logEntries.length) {
-    const items = [...logEntries].reverse().map((e) => {
-      const dt = new Date(e.at);
-      const dateStr = dt.toLocaleDateString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
-      const timeStr = dt.toLocaleTimeString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const msg = escapeHtml(UI_LANG === "ru" ? (e.ru || e.en || "") : (e.en || e.ru || ""));
-      return `<div class="plog-entry"><span class="plog-dt">${dateStr} ${timeStr}</span><span class="plog-msg">${msg}</span></div>`;
-    }).join("");
-    logHtml = `<div class="plog-wrap">
-      <div class="plog-head">
-        <span class="rm-col-head" style="margin:0">${escapeHtml(t("ui.providerLog"))}</span>
+  {
+    const items = logEntries.length
+      ? [...logEntries].reverse().map((e) => {
+          const dt = new Date(e.at);
+          const dateStr = dt.toLocaleDateString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
+          const timeStr = dt.toLocaleTimeString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          const msg = escapeHtml(UI_LANG === "ru" ? (e.ru || e.en || "") : (e.en || e.ru || ""));
+          return `<div class="plog-entry"><span class="plog-dt"><span class="plog-date">${dateStr}</span><span class="plog-time">${timeStr}</span></span><span class="plog-msg">${msg}</span></div>`;
+        }).join("")
+      : `<div class="muted small" style="padding:4px 0">${escapeHtml(t("ui.providerLogEmpty"))}</div>`;
+    logHtml = `<details class="plog-details">
+      <summary class="plog-summary">
+        <span>${escapeHtml(t("ui.providerLog"))}</span>
         <button class="plog-clear ghost small" type="button">${escapeHtml(t("ui.providerLogClear"))}</button>
-      </div>
+      </summary>
       <div class="plog-box">${items}</div>
-    </div>`;
+    </details>`;
   }
 
   list.innerHTML = tableHtml + logHtml;
@@ -2495,11 +2514,54 @@ function bindRegisteredModels() {
       if (Object.keys(fields).length) saveRegisteredModelRow(row.dataset.id, fields);
     }
   }, true);
-  // Clear log button.
-  document.querySelector("#registeredModelsList .plog-clear")?.addEventListener("click", () => {
+  // Clear log button (inside <details>, stop event from toggling it).
+  document.querySelector("#registeredModelsList .plog-clear")?.addEventListener("click", (e) => {
+    e.preventDefault(); e.stopPropagation();
     provLogSave([]);
     renderRegisteredModels();
   });
+  // Retest buttons.
+  document.querySelector("#registeredModelsList .rm-table")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".rm-retest");
+    if (!btn) return;
+    const id = btn.closest(".rm-row")?.dataset.id;
+    if (id) retestRegisteredModel(id);
+  });
+}
+
+async function retestRegisteredModel(id) {
+  const profs = (currentState.settings && currentState.settings.profiles) || [];
+  const p = profs.find((x) => x.id === id);
+  if (!p || !p.model) return;
+  rmStatus[id] = { testing: true };
+  renderRegisteredModels();
+  try {
+    const r = await fetch("/api/providers/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: p.provider, baseUrl: p.baseUrl, credentialRef: p.credentialRef, model: p.model }),
+    });
+    const j = await r.json().catch(() => ({}));
+    rmStatus[id] = { ok: Boolean(j.ok) };
+    const lbl = p.label || p.model || id;
+    if (j.ok) {
+      provLogAdd(
+        `✓ ${lbl} (${p.provider} / ${p.model}) — доступна`,
+        `✓ ${lbl} (${p.provider} / ${p.model}) — available`
+      );
+    } else {
+      provLogAdd(
+        `✗ ${lbl} (${p.provider} / ${p.model}) — недоступна: ${j.error || "ошибка"}`,
+        `✗ ${lbl} (${p.provider} / ${p.model}) — unavailable: ${j.error || "error"}`
+      );
+    }
+  } catch (e) {
+    rmStatus[id] = { ok: false };
+    provLogAdd(
+      `✗ ${p.label || p.model || id} — ошибка: ${e.message}`,
+      `✗ ${p.label || p.model || id} — error: ${e.message}`
+    );
+  }
+  renderRegisteredModels();
 }
 
 function syncProvidersFromDOM() {
