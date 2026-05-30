@@ -21,7 +21,7 @@ const STRINGS = {
     "ui.runRound": "▶ Запустить раунд",
     "ui.guidancePlaceholder": "Направление на следующий раунд (опц.)",
     "ui.knowledgeBase": "База знаний",
-    "ui.settings": "Настройки",
+    "ui.settings": "Настройки модуль свитчера",
     "ui.agentLanguage": "Язык агентов",
     "ui.allowScan": "Разрешить агентам сканировать файлы",
     "ui.confirmAllowScan": "Разрешить агентам читать файлы проекта?\n\nПо умолчанию агенты в изолированном режиме и не видят твой код. Включай только когда явно нужно сравнение с реальным проектом.",
@@ -260,6 +260,8 @@ const STRINGS = {
     "ui.agentRemove": "Убрать агента",
     "ui.agentSaved": "Агенты сохранены ✓",
     "ui.agentNoBackends": "Нет доступных бэкендов. Зарегистрируй/авторизуй агента в «Регистрация агентов».",
+    "ui.noRegisteredAgents": "Агенты не зарегистрированы",
+    "tip.noRegisteredAgents": "Нет зарегистрированных бэкендов. Добавь профиль в панели «Регистрация агентов» (правая колонка).",
     "ui.agentMin2": "Нужно минимум 2 агента, чтобы запустить раунд.",
     "ui.agentMax": "Максимум 5 агентов.",
     "ui.agentNoneYet": "Агенты не выбраны",
@@ -309,7 +311,7 @@ const STRINGS = {
     "ui.runRound": "▶ Run round",
     "ui.guidancePlaceholder": "Steer the next round (optional)",
     "ui.knowledgeBase": "Knowledge Base",
-    "ui.settings": "Settings",
+    "ui.settings": "Switcher module settings",
     "ui.agentLanguage": "Agent language",
     "ui.allowScan": "Allow agents to scan files",
     "ui.confirmAllowScan": "Allow agents to read project files?\n\nBy default agents run in isolated mode and do not see your code. Enable only when you explicitly want a comparison with the real project.",
@@ -548,6 +550,8 @@ const STRINGS = {
     "ui.agentRemove": "Remove agent",
     "ui.agentSaved": "Agents saved ✓",
     "ui.agentNoBackends": "No available backends. Register/authorize one in «Agent registration».",
+    "ui.noRegisteredAgents": "No agents registered",
+    "tip.noRegisteredAgents": "No backends registered yet. Add a profile in the «Agent registration» panel (right column).",
     "ui.agentMin2": "At least 2 agents are required to run a round.",
     "ui.agentMax": "Maximum 5 agents.",
     "ui.agentNoneYet": "No agents selected",
@@ -1865,22 +1869,47 @@ function fmtSpentK(k) {
 
 // Render the connected-agent chips, styled like the switch-module account
 // buttons (same pill + token-colour classes) so the public build looks identical.
+// Click on a chip → opens #providersDetails and scrolls to that profile row.
 function renderConnectedAgents() {
   const box = $("switcherAgents");
   if (!box) return;
   box.innerHTML = "";
   const agents = connectedAgents();
-  if (!agents.length) return;
+  if (!agents.length) {
+    const ph = document.createElement("span");
+    ph.className = "agent-no-reg nav-highlight";
+    ph.textContent = t("ui.noRegisteredAgents");
+    ph.dataset.tooltipText = t("tip.noRegisteredAgents");
+    ph.addEventListener("click", () => openProfilesPanel(null));
+    box.appendChild(ph);
+    return;
+  }
   for (const a of agents) {
     const chip = document.createElement("span");
     chip.className = `acct-btn agent-chip ${a.tok}${a.present ? "" : " unauthorized"}`;
+    chip.dataset.profileId = a.id;
     const spent = fmtSpentK(a.spentK);
     chip.innerHTML = `${escapeHtml(a.name)}${spent ? `<span class="agent-spend">${escapeHtml(spent)}</span>` : ""}`;
     const statusText = a.status === "ok" ? t("ui.agentReady") : (a.status === "unverified" ? t("ui.agentUnverified") : t("ui.agentNoKey"));
     chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: statusText })
       + (a.spentK ? ` · ~${a.spentK.toFixed(1)}K tok` : "");
+    chip.addEventListener("click", () => openProfilesPanel(a.id));
     box.appendChild(chip);
   }
+}
+
+// Open #providersDetails, and if profileId given scroll+flash that profile row.
+function openProfilesPanel(profileId) {
+  const panel = $("providersDetails");
+  if (!panel) return;
+  panel.open = true;
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (!profileId) return;
+  const row = panel.querySelector(`.profile-row[data-id="${CSS.escape(profileId)}"]`);
+  if (!row) return;
+  row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  row.classList.add("profile-row-flash");
+  setTimeout(() => row.classList.remove("profile-row-flash"), 1200);
 }
 
 function renderSwitcher() {
@@ -2017,11 +2046,10 @@ function blankRoles() {
 
 function initProvidersDraft() {
   const s = currentState.settings || {};
-  if (Array.isArray(s.profiles) && s.profiles.length && s.roles && s.roles.a && s.roles.b) {
-    providersDraft = JSON.parse(JSON.stringify({ profiles: s.profiles, roles: s.roles }));
-  } else {
-    providersDraft = { profiles: [], roles: blankRoles() };
-  }
+  providersDraft = {
+    profiles: Array.isArray(s.profiles) ? JSON.parse(JSON.stringify(s.profiles)) : [],
+    roles: (s.roles && s.roles.a && s.roles.b) ? JSON.parse(JSON.stringify(s.roles)) : blankRoles(),
+  };
 }
 
 function renderProvidersInit() {
