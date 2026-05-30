@@ -1340,6 +1340,14 @@ button.square {
 .rm-col-head { display: block; color: var(--muted); font-size: 10px; margin-bottom: 2px; }
 .rm-prov-badge { display: inline-block; font-size: 10px; color: var(--accent); font-weight: 600; background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; white-space: nowrap; }
 .rm-table input, .rm-table select { width: 100%; font-size: 11px; padding: 2px 4px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 3px; }
+/* Provider event log */
+.plog-wrap { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 6px; }
+.plog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.plog-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: var(--mono); }
+.plog-table tr { border-bottom: 1px solid var(--border); }
+.plog-table tr:last-child { border-bottom: none; }
+.plog-dt { white-space: nowrap; color: var(--muted); padding: 2px 6px 2px 0; vertical-align: top; width: 130px; }
+.plog-msg { color: var(--text); padding: 2px 0; line-height: 1.4; word-break: break-word; }
 .ollama-status { font-size: 11px; padding: 4px 6px; border-radius: 4px; margin-bottom: 6px; line-height: 1.4; }
 .ollama-status:empty { display: none; }
 .ollama-status.checking { color: var(--muted); }

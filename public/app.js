@@ -221,6 +221,8 @@ const STRINGS = {
     "ui.regModelSpeed": "Скорость",
     "ui.regModelNoProfiles": "Нет зарегистрированных моделей. Добавь профиль в «Регистрация агентов».",
     "ui.regModelSaved": "Модель сохранена",
+    "ui.providerLog": "Журнал событий",
+    "ui.providerLogClear": "Очистить",
     "ui.addProfile": "+ Профиль",
     "ui.applyProviders": "Применить",
     "ui.providersSaved": "Сохранено ✓",
@@ -535,6 +537,8 @@ const STRINGS = {
     "ui.regModelSpeed": "Speed",
     "ui.regModelNoProfiles": "No registered models. Add a profile in «Agent registration».",
     "ui.regModelSaved": "Model saved",
+    "ui.providerLog": "Event log",
+    "ui.providerLogClear": "Clear",
     "ui.addProfile": "+ Profile",
     "ui.applyProviders": "Apply",
     "ui.providersSaved": "Saved ✓",
@@ -2114,6 +2118,25 @@ let providersDraft = null;
 let providersForRunId = undefined;
 // Ollama auto-detection result (null = not yet fetched).
 let ollamaDetect = null;
+
+// Persistent provider event log (stored in localStorage, survives reload).
+// Each entry: { at: ISO string, ru: string, en: string }
+const PROV_LOG_KEY = "council-room-v2.providerLog";
+const PROV_LOG_MAX = 100;
+
+function provLogLoad() {
+  try { return JSON.parse(localStorage.getItem(PROV_LOG_KEY) || "[]"); } catch { return []; }
+}
+function provLogSave(entries) {
+  try { localStorage.setItem(PROV_LOG_KEY, JSON.stringify(entries.slice(-PROV_LOG_MAX))); } catch {}
+}
+function provLogAdd(ru, en) {
+  const entries = provLogLoad();
+  entries.push({ at: new Date().toISOString(), ru, en });
+  provLogSave(entries);
+  renderRegisteredModels(); // refresh the log section
+}
+
 // baseUrl → string[] of model names fetched from Ollama /api/tags
 const ollamaModelsCache = {};
 
@@ -2124,6 +2147,20 @@ async function detectOllama() {
     ollamaDetect = await r.json().catch(() => ({ detected: false }));
     if (ollamaDetect.detected && Array.isArray(ollamaDetect.models)) {
       ollamaModelsCache[ollamaDetect.baseUrl] = ollamaDetect.models;
+      const n = ollamaDetect.models.length;
+      const suffix = n === 1 ? "" : "s";
+      const suffixRu = n === 1 ? "ь" : n >= 2 && n <= 4 ? "и" : "ей";
+      const names = ollamaDetect.models.slice(0, 5).join(", ");
+      const more = n > 5 ? ` +${n - 5}` : "";
+      provLogAdd(
+        `Ollama обнаружена на порту ${ollamaDetect.port} · ${n} модел${suffixRu}: ${names}${more}`,
+        `Ollama detected on port ${ollamaDetect.port} · ${n} model${suffix}: ${names}${more}`
+      );
+    } else if (ollamaDetect && !ollamaDetect.detected) {
+      provLogAdd(
+        `Ollama не обнаружена (порт ${ollamaDetect.port || 11434})`,
+        `Ollama not detected (port ${ollamaDetect.port || 11434})`
+      );
     }
   } catch { ollamaDetect = { detected: false }; }
   return ollamaDetect;
@@ -2277,7 +2314,10 @@ function ollamaBanner() {
 function renderProviders() {
   if (!providersDraft) return;
   const banner = $("ollamaBanner");
-  if (banner) banner.innerHTML = ollamaBanner();
+  if (banner) {
+    const hasOllamaProfile = providersDraft.profiles.some((p) => p.provider === "ollama");
+    banner.innerHTML = hasOllamaProfile ? ollamaBanner() : "";
+  }
   const list = $("profilesList");
   if (!list) return;
   list.innerHTML = providersDraft.profiles.length
@@ -2363,10 +2403,6 @@ function renderRegisteredModels() {
   const list = $("registeredModelsList");
   if (!list) return;
   const profs = (currentState.settings && currentState.settings.profiles) || [];
-  if (!profs.length) {
-    list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.regModelNoProfiles"))}</div>`;
-    return;
-  }
   // Fetch Ollama models for any Ollama profiles if not yet cached.
   for (const p of profs) {
     if (p.provider === "ollama") {
@@ -2374,7 +2410,31 @@ function renderRegisteredModels() {
       if (!ollamaModelsCache[key]) fetchOllamaModels(key).then(() => renderRegisteredModels());
     }
   }
-  list.innerHTML = `<table class="rm-table"><tbody>${profs.map(renderRegisteredModelRow).join("")}</tbody></table>`;
+  const tableHtml = profs.length
+    ? `<table class="rm-table"><tbody>${profs.map(renderRegisteredModelRow).join("")}</tbody></table>`
+    : `<div class="muted small">${escapeHtml(t("ui.regModelNoProfiles"))}</div>`;
+
+  // Persistent event log (newest first).
+  const logEntries = provLogLoad();
+  let logHtml = "";
+  if (logEntries.length) {
+    const rows = [...logEntries].reverse().map((e) => {
+      const dt = new Date(e.at);
+      const dateStr = dt.toLocaleDateString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
+      const timeStr = dt.toLocaleTimeString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const msg = escapeHtml(UI_LANG === "ru" ? (e.ru || e.en || "") : (e.en || e.ru || ""));
+      return `<tr><td class="plog-dt">${dateStr} ${timeStr}</td><td class="plog-msg">${msg}</td></tr>`;
+    }).join("");
+    logHtml = `<div class="plog-wrap">
+      <div class="plog-head">
+        <span class="rm-col-head" style="margin:0">${escapeHtml(t("ui.providerLog"))}</span>
+        <button class="plog-clear ghost small" type="button">${escapeHtml(t("ui.providerLogClear"))}</button>
+      </div>
+      <table class="plog-table"><tbody>${rows}</tbody></table>
+    </div>`;
+  }
+
+  list.innerHTML = tableHtml + logHtml;
   bindRegisteredModels();
 }
 
@@ -2424,6 +2484,11 @@ function bindRegisteredModels() {
       if (Object.keys(fields).length) saveRegisteredModelRow(row.dataset.id, fields);
     }
   }, true);
+  // Clear log button.
+  document.querySelector("#registeredModelsList .plog-clear")?.addEventListener("click", () => {
+    provLogSave([]);
+    renderRegisteredModels();
+  });
 }
 
 function syncProvidersFromDOM() {
@@ -2586,8 +2651,26 @@ async function applyProviders() {
     if (ollamaProfiles.length) {
       const names = (ollamaProfiles._testedModels || []).join(", ");
       successMsg = t("ui.ollamaConnectedModels", { models: names });
+      // Log each registered Ollama profile.
+      for (const p of ollamaProfiles) {
+        const lbl = p.label ? `«${p.label}»` : `«${p.model}»`;
+        provLogAdd(
+          `Агент зарегистрирован: ${lbl} (Ollama / ${p.model})`,
+          `Agent registered: ${lbl} (Ollama / ${p.model})`
+        );
+      }
     } else {
       successMsg = keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved");
+      // Log non-Ollama profile registrations.
+      for (const p of providersDraft.profiles) {
+        if (!isCliProviderId(p.provider) && p.provider !== "ollama") {
+          const lbl = p.label ? `«${p.label}»` : `«${p.id}»`;
+          provLogAdd(
+            `Агент зарегистрирован: ${lbl} (${p.provider} / ${p.model || "—"})`,
+            `Agent registered: ${lbl} (${p.provider} / ${p.model || "—"})`
+          );
+        }
+      }
     }
     showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
     renderProviders(); // refresh key badges + clear the direct-key inputs
