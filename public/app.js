@@ -2415,24 +2415,29 @@ function renderOneAgentEditor(p) {
   if (cli) {
     const models = CLI_MODELS[b.provider] || [];
     const weak = weakModelFor(b.provider);
-    modelField = `<select class="ag-model${hl && b.model === weak ? " hl-default" : ""}">${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
+    const hlModel = hl && (b.model === weak || b.model === "");
+    const emptyModelOpt = b.model === "" ? `<option value="" selected>—</option>` : "";
+    modelField = `<select class="ag-model${hlModel ? " hl-default" : ""}">${emptyModelOpt}${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
   } else {
     modelField = `<input class="ag-model${hl && !b.model ? " hl-default" : ""}" value="${escapeHtml(b.model || "")}" placeholder="model">`;
   }
   let effortField = "";
   if (cli) {
     const efforts = CLI_EFFORTS[b.provider] || [];
-    const cur = b.effort || "auto";
+    const cur = b.effort || "";
+    const hlEffort = hl && (cur === "low" || cur === "auto" || cur === "");
+    const emptyEffortOpt = cur === "" ? `<option value="" selected>—</option>` : "";
     effortField = `<label class="p-field"><span>${t("ui.agentEffort")} ${helpIcon("agentEffort2")}</span>`
-      + `<select class="ag-effort${hl && (cur === "low" || cur === "auto") ? " hl-default" : ""}">${efforts.map((e) => `<option value="${e}"${e === cur ? " selected" : ""}>${e}</option>`).join("")}</select></label>`;
+      + `<select class="ag-effort${hlEffort ? " hl-default" : ""}">${emptyEffortOpt}${efforts.map((e) => `<option value="${e}"${e === cur ? " selected" : ""}>${e}</option>`).join("")}</select></label>`;
   }
+  const canApply = cli ? (b.model !== "" && b.effort !== "") : b.model !== "";
   return `<div class="agent-edit-card" data-key="${escapeHtml(p.key)}">
     <div class="agent-edit-name">${escapeHtml(p.label || p.key)}</div>
     <label class="p-field"><span>${t("ui.agentBackend")} ${helpIcon("agentBackend")}</span><select class="ag-backend">${backendOpts}</select></label>
     <label class="p-field"><span>${t("ui.agentModel")} ${helpIcon("agentModel2")}</span>${modelField}</label>
     ${effortField}
     <div class="agent-edit-actions">
-      <button class="primary small ag-apply${hl ? " nav-highlight" : ""}" type="button">${t("ui.agentApply")}</button>
+      <button class="primary small ag-apply${hl ? " nav-highlight" : ""}" type="button"${canApply ? "" : " disabled"}>${t("ui.agentApply")}</button>
       <button class="ghost small ag-remove" type="button">${t("ui.agentRemove")}</button>
     </div>
   </div>`;
@@ -2506,7 +2511,10 @@ function addAgentManual() {
   if (list.length >= 5) { showAddAgentMsg(t("ui.agentMax"), true); return; }
   const used = new Set(list.map((p) => `${p.backend?.provider}|${p.backend?.account || ""}`));
   const entry = cat.find((c) => !used.has(`${c.provider}|${c.account || ""}`)) || cat[0];
-  participantsDraft = rekeyAgents([...list, makeAgentFromCatalog(entry, list.length)]);
+  const newAgent = makeAgentFromCatalog(entry, list.length);
+  newAgent.backend.model = "";
+  newAgent.backend.effort = "";
+  participantsDraft = rekeyAgents([...list, newAgent]);
   selectedAgentKey = participantsDraft[participantsDraft.length - 1].key;
   closeAddAgentModal();
   renderAgentChips();
