@@ -157,13 +157,15 @@
             </label>
             <span id="busyIndicator" class="muted small"></span>
             <div id="switcherStatus" class="switcher-status">
-              <span class="switcher-left" data-tooltip-key="t.switcher">
-                <span class="switcher-dot"></span>
-                <span id="switcherStatusText">—</span>
+              <span class="switcher-module-box">
+                <span class="switcher-left" data-tooltip-key="t.switcher">
+                  <span class="switcher-dot"></span>
+                  <span id="switcherStatusText">—</span>
+                </span>
+                <button id="refreshSwitcher" class="switcher-expand" type="button" data-i18n-title="ui.refreshTokens">↻</button>
+                <button id="toggleSwitcherStats" class="switcher-expand" type="button" data-i18n-title="ui.switcherStats">▾</button>
+                <span id="switcherAccounts" class="switcher-accounts"></span>
               </span>
-              <button id="refreshSwitcher" class="switcher-expand" type="button" data-i18n-title="ui.refreshTokens">↻</button>
-              <button id="toggleSwitcherStats" class="switcher-expand" type="button" data-i18n-title="ui.switcherStats">▾</button>
-              <span id="switcherAccounts" class="switcher-accounts"></span>
               <span id="switcherAgents" class="switcher-agents"></span>
             </div>
           </div>
