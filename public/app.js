@@ -35,6 +35,13 @@ const STRINGS = {
     "ui.title": "Постановка подзадачи",
     "ui.mode": "Режим",
     "ui.cancel": "Отмена",
+    "ui.feedbackTitle": "Обратная связь",
+    "ui.feedbackBug": "Баг",
+    "ui.feedbackFeature": "Пожелание",
+    "ui.feedbackOther": "Другое",
+    "ui.feedbackSend": "Отправить письмо",
+    "ui.feedbackPlaceholder": "Опиши проблему или пожелание…",
+    "tip.feedback": "Отправить баг-репорт или пожелание по улучшению разработчику.",
     "ui.open": "Открыть",
     "ui.save": "Сохранить",
     "ui.editIcon": "Редактировать (доступно пока нет раундов)",
@@ -355,6 +362,13 @@ const STRINGS = {
     "ui.title": "Subtask statement",
     "ui.mode": "Mode",
     "ui.cancel": "Cancel",
+    "ui.feedbackTitle": "Feedback",
+    "ui.feedbackBug": "Bug",
+    "ui.feedbackFeature": "Feature request",
+    "ui.feedbackOther": "Other",
+    "ui.feedbackSend": "Send email",
+    "ui.feedbackPlaceholder": "Describe the issue or your wish…",
+    "tip.feedback": "Send a bug report or feature request to the developer.",
     "ui.open": "Open",
     "ui.save": "Save",
     "ui.editIcon": "Edit (available until first round)",
@@ -3163,6 +3177,23 @@ async function applyUpdate() {
 function bindUi() {
   $("fontUp").addEventListener("click", () => bumpScale(SCALE_STEP));
   $("fontDown").addEventListener("click", () => bumpScale(-SCALE_STEP));
+
+  $("feedbackBtn").addEventListener("click", () => {
+    $("feedbackText").value = "";
+    $("feedbackModal").classList.remove("hidden");
+    $("feedbackText").focus();
+  });
+  $("feedbackCancel").addEventListener("click", () => $("feedbackModal").classList.add("hidden"));
+  $("feedbackSend").addEventListener("click", () => {
+    const type = document.querySelector("input[name=feedbackType]:checked")?.value || "other";
+    const text = $("feedbackText").value.trim();
+    if (!text) { $("feedbackText").focus(); return; }
+    const typeLabels = { bug: "Баг / Bug", feature: "Пожелание / Feature request", other: "Другое / Other" };
+    const subject = encodeURIComponent(`Council Room v2 — ${typeLabels[type] || type}`);
+    const body = encodeURIComponent(text);
+    window.location.href = `mailto:bbomidor@gmail.com?subject=${subject}&body=${body}`;
+    $("feedbackModal").classList.add("hidden");
+  });
 
   $("checkUpdates").addEventListener("click", openUpdateModal);
   $("updateCancel").addEventListener("click", () => $("updateModal").classList.add("hidden"));
