@@ -1257,6 +1257,15 @@ button.square {
 .mode-badge.api { color: var(--amber); border-color: var(--amber); }
 .mode-badge.full { color: var(--green); border-color: var(--green); }
 .providers-body { padding: 8px 10px 10px; }
+/* Full-width add profile button */
+.add-profile-wide { width: 100%; margin-bottom: 8px; justify-content: center; }
+/* Hamster surprise */
+.profile-hamster { font-size: 28px; display: block; text-align: center; margin: 4px 0 6px; }
+.profile-hamster.hidden { display: none; }
+@keyframes hamsterPop { 0%{transform:scale(0) rotate(-20deg);opacity:0} 50%{transform:scale(1.4) rotate(10deg);opacity:1} 80%{transform:scale(1) rotate(-5deg)} 100%{transform:scale(1) rotate(0);opacity:0} }
+.hamster-pop { animation: hamsterPop 1.8s ease forwards; }
+/* Registration hint text */
+.reg-hint { padding: 6px 0; text-align: center; }
 .providers-subhead {
   display: flex;
   align-items: center;

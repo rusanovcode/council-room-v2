@@ -230,7 +230,15 @@ const STRINGS = {
     "ui.regModelModel": "Модель",
     "ui.regModelEffort": "Сила",
     "ui.regModelSpeed": "Скорость",
-    "ui.noNewProfiles": "Нет новых профилей. Нажми «+ Профиль» чтобы добавить.",
+    "ui.noNewProfiles": [
+      "Нет новых профилей? Нажми «+ Профиль» чтобы добавить.",
+      "Нажми на «+ Профиль», сладенький.",
+      "Нажимай «+ Профиль», кожанный!!! :)",
+      "При нажатии на «+ Профиль» появится хомячек! 🐹",
+      "Одна кнопка, бесконечные возможности. Нажми «+ Профиль».",
+      "Агентов нет? Всё решается одной кнопкой! 👇",
+      "Пустовато тут… «+ Профиль» ждёт тебя!",
+    ],
     "ui.regModelNoProfiles": "Нет зарегистрированных моделей. Добавь профиль в «Регистрация агентов».",
     "ui.regModelSaved": "Модель сохранена",
     "ui.providerLog": "Журнал событий",
@@ -561,7 +569,15 @@ const STRINGS = {
     "ui.regModelModel": "Model",
     "ui.regModelEffort": "Effort",
     "ui.regModelSpeed": "Speed",
-    "ui.noNewProfiles": "No new profiles. Click «+ Profile» to add one.",
+    "ui.noNewProfiles": [
+      "No new profiles? Click «+ Profile» to add one.",
+      "Click «+ Profile», sweetie.",
+      "Hit «+ Profile», you leather-clad legend!!! :)",
+      "Click «+ Profile» and a hamster appears! 🐹",
+      "One button, endless possibilities. Click «+ Profile».",
+      "Empty in here… «+ Profile» is waiting for you!",
+      "Agents? None. Fix that with «+ Profile» 👇",
+    ],
     "ui.regModelNoProfiles": "No registered models. Add a profile in «Agent registration».",
     "ui.regModelSaved": "Model saved",
     "ui.providerLog": "Event log",
@@ -685,7 +701,9 @@ function bumpScale(delta) {
 }
 const t = (key, vars = {}) => {
   const dict = STRINGS[UI_LANG] || STRINGS.ru;
-  let value = dict[key] || STRINGS.ru[key] || key;
+  let value = dict[key] ?? STRINGS.ru[key] ?? key;
+  // Arrays = random rotation (e.g. fun "no profiles" messages).
+  if (Array.isArray(value)) value = value[Math.floor(Math.random() * value.length)];
   for (const [k, v] of Object.entries(vars)) value = value.replace(`{${k}}`, v);
   return value;
 };
@@ -2348,20 +2366,22 @@ function ollamaBanner() {
 
 function renderProviders() {
   if (!providersDraft) return;
+  // Ollama banner: only when there are UNSAVED Ollama profiles (not already-saved).
+  const savedIds = new Set(((currentState.settings && currentState.settings.profiles) || []).map((p) => p.id));
+  const newProfiles = providersDraft.profiles.filter((p) => !savedIds.has(p.id));
   const banner = $("ollamaBanner");
   if (banner) {
-    const hasOllamaProfile = providersDraft.profiles.some((p) => p.provider === "ollama");
-    banner.innerHTML = hasOllamaProfile ? ollamaBanner() : "";
+    const hasNewOllama = newProfiles.some((p) => p.provider === "ollama");
+    banner.innerHTML = hasNewOllama ? ollamaBanner() : "";
   }
   const list = $("profilesList");
   if (!list) return;
-  // Show only profiles not yet saved (new, unsaved additions).
-  // Already-saved profiles are displayed in "Зарегистрированные модели" panel.
-  const savedIds = new Set(((currentState.settings && currentState.settings.profiles) || []).map((p) => p.id));
-  const newProfiles = providersDraft.profiles.filter((p) => !savedIds.has(p.id));
   list.innerHTML = newProfiles.length
     ? newProfiles.map(renderProfileRow).join("")
-    : `<div class="muted small">${t("ui.noNewProfiles")}</div>`;
+    : `<div class="reg-hint muted small">${escapeHtml(t("ui.noNewProfiles"))}</div>`;
+  // "Применить" hidden until at least one new profile exists.
+  const applyBtn = $("applyProvidersBtn");
+  if (applyBtn) applyBtn.style.display = newProfiles.length ? "" : "none";
   renderConnectedAgents();
   renderRegisteredModels();
 }
@@ -3466,7 +3486,16 @@ function bindUi() {
   });
 
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.
-  $("addProfileBtn")?.addEventListener("click", addProfileDraft);
+  $("addProfileBtn")?.addEventListener("click", () => {
+    addProfileDraft();
+    // Surprise hamster 🐹
+    const h = $("profileHamster");
+    if (h) {
+      h.classList.remove("hidden");
+      h.classList.add("hamster-pop");
+      setTimeout(() => { h.classList.add("hidden"); h.classList.remove("hamster-pop"); }, 1800);
+    }
+  });
   $("applyProvidersBtn")?.addEventListener("click", applyProviders);
   $("profilesList")?.addEventListener("click", (event) => {
     const rm = event.target.closest(".p-remove");
