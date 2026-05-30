@@ -2465,7 +2465,7 @@ function bindAgentEditor() {
   q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; p._confirmed = false; });
   q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); });
   q(".ag-apply")?.addEventListener("click", async () => {
-    (participantsDraft || []).forEach((p) => { p._confirmed = true; });
+    p._confirmed = true; // only confirm the agent currently open in the editor
     await applyParticipants();
     renderAgentChips();
     renderAgentEditor();
