@@ -9,6 +9,7 @@
   --accent-2: #4b8bd6;
   --green: #4ec38a;
   --amber: #d99b3b;
+  --orange: #ff8c3b;
   --red: #e75c5c;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -186,6 +187,20 @@ html, body {
 }
 .delete-run:hover { color: var(--red); }
 .archive-run:hover, .restore-run:hover { color: var(--accent); }
+.run-list li .run-actions { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+.trash-run {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.trash-run:hover { color: var(--red); }
+.run-list li.active .archive-run,
+.run-list li.active .trash-run { color: rgba(255, 255, 255, 0.7); }
+.run-list li.active .trash-run:hover { color: #ffcccc; }
 
 /* h2 action button group (archive/trash/+ next to a section title) */
 .block h2 .h2-actions { display: inline-flex; align-items: center; gap: 2px; }
@@ -1140,25 +1155,25 @@ button.square {
 .coach-highlight {
   position: relative;
   animation: coachPulse 1.4s ease-in-out 3;
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--orange);
   outline-offset: 2px;
   border-radius: 4px;
 }
 @keyframes coachPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 157, 255, 0.6); }
-  50% { box-shadow: 0 0 0 8px rgba(91, 157, 255, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 140, 59, 0.6); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 140, 59, 0); }
 }
 /* Navigator highlight: a persistent (not one-shot) glow on the control the
    current onboarding step points at. Clears automatically when the step is done. */
 .nav-highlight {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--orange);
   outline-offset: 2px;
   border-radius: 4px;
   animation: navGlow 1.6s ease-in-out infinite;
 }
 @keyframes navGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 157, 255, 0.0); }
-  50% { box-shadow: 0 0 0 5px rgba(91, 157, 255, 0.28); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 140, 59, 0.0); }
+  50% { box-shadow: 0 0 0 5px rgba(255, 140, 59, 0.30); }
 }
 
 /* ---- Phase 5: provider profiles + roles panel ---- */
@@ -1320,7 +1335,16 @@ button.square {
   text-align: center;
   padding: 3px 8px;
 }
-.agent-chips { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+/* Chips fill column-first into a fixed 2 rows: agents 1–2 form the first column,
+   3–4 the second, 5 starts the third. */
+.agent-chips {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-columns: max-content;
+  gap: 4px;
+  align-items: center;
+}
 .agent-chip-sel {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 6px;
@@ -1330,16 +1354,15 @@ button.square {
 }
 .agent-chip-sel:hover { border-color: var(--accent); }
 .agent-chip-sel.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.agent-chip-sel .ac-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92px; }
-.agent-chip-sel .ac-model { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62px; }
+.agent-chip-sel .ac-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 .agent-chip-sel .ac-remove {
   border: none; background: transparent; color: var(--muted);
   cursor: pointer; font-size: 13px; line-height: 1; padding: 0 1px;
 }
 .agent-chip-sel .ac-remove:hover { color: var(--red); }
 @keyframes agentPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 157, 255, 0); }
-  50% { box-shadow: 0 0 0 2px rgba(91, 157, 255, 0.4); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 140, 59, 0); }
+  50% { box-shadow: 0 0 0 2px rgba(255, 140, 59, 0.5); }
 }
 .agent-chip-sel.pulse:not(.selected) { animation: agentPulse 1.8s ease-in-out infinite; }
 
@@ -1356,8 +1379,8 @@ button.square {
 }
 .token-warn.lvl3 { color: var(--amber); border-color: var(--amber); }
 .token-warn.lvl4, .token-warn.lvl5 { color: var(--red); border-color: var(--red); }
-/* Amber outline marks a still-default (cheap) field the navigator suggests changing. */
-.hl-default { border-color: var(--amber) !important; box-shadow: 0 0 0 1px var(--amber) inset; }
+/* Orange outline marks a still-default (cheap) field the navigator suggests changing. */
+.hl-default { border-color: var(--orange) !important; box-shadow: 0 0 0 1px var(--orange) inset; }
 
 .add-agent-choices { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .add-agent-choices button {

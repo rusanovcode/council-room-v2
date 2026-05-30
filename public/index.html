@@ -24,12 +24,20 @@
             <span data-i18n="ui.chats">Чаты</span>
             <span class="h2-actions">
               <button id="toggleChatArchive" class="ghost small" type="button" data-tooltip-key="t.chatArchive">🗄</button>
+              <button id="toggleChatTrash" class="ghost small" type="button" data-tooltip-key="t.chatTrash">🗑</button>
             </span>
           </h2>
           <ul id="runList" class="run-list"></ul>
           <div id="chatArchive" class="bin-panel hidden">
             <div class="bin-panel-head"><span data-i18n="ui.archived">Архив</span></div>
             <ul id="archivedRunList" class="run-list"></ul>
+          </div>
+          <div id="chatTrash" class="bin-panel hidden">
+            <div class="bin-panel-head">
+              <span data-i18n="ui.trash">Корзина</span>
+              <button id="emptyChatTrash" class="ghost small" type="button" data-i18n="ui.emptyTrash">Очистить</button>
+            </div>
+            <ul id="trashedRunList" class="run-list"></ul>
           </div>
         </section>
 

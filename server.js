@@ -124,6 +124,7 @@ function defaultRun(topic) {
     createdAt: store.now(),
     rounds: 0,
     archived: false,
+    trashed: false,
     settings: { ...inheritable },
   };
 }
@@ -186,7 +187,7 @@ function publicState() {
       status: state.status,
       run: null,
       autopilot: state.autopilot,
-      runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
+      runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
       settings: state.settings,
       switcher: { ...switcherStatus, statsVersion },
       providers: providersInfo(),
@@ -215,7 +216,7 @@ function publicState() {
       messages,
     },
     autopilot: state.autopilot,
-    runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived) })),
+    runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
     settings: state.settings,
     switcher: { ...switcherStatus, statsVersion },
     providers: providersInfo(),
@@ -773,15 +774,30 @@ async function router(req, res) {
       return sendJson(res, 200, publicState());
     }
 
-    if (method === "POST" && (pathname === "/api/runs/archive" || pathname === "/api/runs/restore")) {
+    if (method === "POST" && (pathname === "/api/runs/archive" || pathname === "/api/runs/trash" || pathname === "/api/runs/restore")) {
       const body = await readBody(req);
       const run = loadRun(body.runId);
-      run.archived = pathname.endsWith("/archive");
+      // archive ⇄ trash ⇄ active are mutually exclusive bins; restore clears both.
+      if (pathname.endsWith("/archive")) { run.archived = true; run.trashed = false; }
+      else if (pathname.endsWith("/trash")) { run.archived = false; run.trashed = true; }
+      else { run.archived = false; run.trashed = false; }
       saveRun(run);
-      // Archiving the active chat clears the view; restore just flips the flag.
-      if (run.archived && state.run && state.run.id === run.id) {
+      // Archiving/trashing the active chat clears the view; restore just flips the flags.
+      if ((run.archived || run.trashed) && state.run && state.run.id === run.id) {
         state.run = null;
         state.activeRunId = null;
+      }
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/runs/trash/empty") {
+      let removed = 0;
+      for (const r of listRuns()) {
+        if (!r.trashed) continue;
+        const dir = runDir(r.id);
+        if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); removed++; }
+        if (state.run && state.run.id === r.id) { state.run = null; state.activeRunId = null; }
       }
       broadcast();
       return sendJson(res, 200, publicState());

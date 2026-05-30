@@ -139,7 +139,9 @@ const STRINGS = {
     "ui.previewBanner": "Просмотр (только чтение): {title}",
     "ui.closePreview": "Закрыть просмотр",
     "ui.confirmEmptyTrash": "Очистить корзину подзадач? Удалённые безвозвратно исчезнут.",
-    "tip.chatArchive": "Архив чатов. По «×» чат уходит в архив (не удаляется). Тут можно его восстановить обратно в «Чаты».|||закрыл рабочий чат «Phase 1» → он в архиве; через неделю вернулся, нажал ↩ — снова в списке.",
+    "ui.confirmEmptyChatTrash": "Очистить корзину чатов? Удалённые чаты исчезнут безвозвратно вместе со всей историей.",
+    "tip.chatArchive": "Архив чатов. По «🗄» чат уходит в архив (не удаляется). Тут можно его восстановить (↩) обратно в «Чаты» или отправить в корзину (×).|||закрыл рабочий чат «Phase 1» → он в архиве; через неделю вернулся, нажал ↩ — снова в списке.",
+    "tip.chatTrash": "Корзина чатов. По «×» чат уходит сюда (восстановимо). ↩ — вернуть в «Чаты»; «Очистить» — удалить безвозвратно вместе со всей историей.|||удалил ненужный чат → он в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть навсегда.",
     "tip.subtaskArchive": "Архив подзадач. Кнопка «в архив» (🗄) на подзадаче убирает её из стека, но сохраняет. Клик по архивной — read-only просмотр в центре; ↩ — вернуть в стек.|||закрытую подзадачу «выбор БД» отправил в архив, чтобы не мешала. Позже кликнул — перечитал решение.",
     "tip.subtaskTrash": "Корзина подзадач. По «×» подзадача уходит сюда (восстановимо). Клик — read-only просмотр; ↩ — вернуть в стек; «Очистить» — удалить безвозвратно.|||создал лишнюю подзадачу, нажал × → в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть весь мусор.",
     "ui.switcherConnected": "модуль свитч подключён",
@@ -430,7 +432,9 @@ const STRINGS = {
     "ui.previewBanner": "Preview (read-only): {title}",
     "ui.closePreview": "Close preview",
     "ui.confirmEmptyTrash": "Empty the subtask trash? Deleted items are gone for good.",
-    "tip.chatArchive": "Chat archive. The «×» moves a chat to the archive (not deleted). Restore it back to «Chats» from here.|||closed the «Phase 1» chat → it's archived; a week later you click ↩ and it's back in the list.",
+    "ui.confirmEmptyChatTrash": "Empty the chat trash? Trashed chats disappear permanently along with all their history.",
+    "tip.chatArchive": "Chat archive. The «🗄» moves a chat to the archive (not deleted). Restore it (↩) back to «Chats» or send it onward to the trash (×) from here.|||closed the «Phase 1» chat → it's archived; a week later you click ↩ and it's back in the list.",
+    "tip.chatTrash": "Chat trash. The «×» sends a chat here (recoverable). ↩ returns it to «Chats»; «Empty» deletes it permanently along with all history.|||trashed an unneeded chat → it's in the trash. Changed your mind — ↩ restored it. Or «Empty» to wipe it for good.",
     "tip.subtaskArchive": "Subtask archive. The «🗄» button moves a subtask out of the stack but keeps it. Click an archived one for a read-only preview; ↩ returns it to the stack.|||archived the resolved «pick DB» subtask to keep it out of the way; later clicked it to re-read the decision.",
     "tip.subtaskTrash": "Subtask trash. The «×» sends a subtask here (recoverable). Click for a read-only preview; ↩ restores to the stack; «Empty» deletes permanently.|||made an extra subtask, hit × → in trash. Changed your mind — ↩ restored it. Or «Empty» to wipe the junk.",
     "ui.switcherConnected": "switch module connected",
@@ -878,7 +882,7 @@ let subtaskStatementExpanded = false; // subtask-statement field: collapsed (2 l
 let coachPinned = localStorage.getItem("council-room-v2.coachPinned") === "true";
 const PANELS_KEY = "council-room-v2.panels";
 const panelOpen = (() => {
-  const def = { chatArchive: false, subtaskArchive: false, subtaskTrash: false, switcherStats: false };
+  const def = { chatArchive: false, chatTrash: false, subtaskArchive: false, subtaskTrash: false, switcherStats: false };
   try { return { ...def, ...JSON.parse(localStorage.getItem(PANELS_KEY) || "{}") }; } catch { return def; }
 })();
 function savePanelOpen() { try { localStorage.setItem(PANELS_KEY, JSON.stringify(panelOpen)); } catch {} }
@@ -1175,46 +1179,65 @@ function triggerCoachTarget(target) {
 
 function renderRuns() {
   const allRuns = currentState.runs || [];
-  const active = allRuns.filter((r) => !r.archived);
-  const archived = allRuns.filter((r) => r.archived);
+  const active = allRuns.filter((r) => !r.archived && !r.trashed);
+  const archived = allRuns.filter((r) => r.archived && !r.trashed);
+  const trashed = allRuns.filter((r) => r.trashed);
 
   const list = $("runList");
   list.innerHTML = "";
   for (const run of active) {
     const li = document.createElement("li");
     if (run.id === currentState.activeRunId) li.classList.add("active");
-    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><button class="archive-run" title="${escapeHtml(t("ui.toArchive"))}">🗄</button>`;
+    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><span class="run-actions">`
+      + `<button class="archive-run" title="${escapeHtml(t("ui.toArchive"))}">🗄</button>`
+      + `<button class="trash-run" title="${escapeHtml(t("ui.toTrash"))}">×</button></span>`;
     li.addEventListener("click", (event) => {
-      if (event.target.classList.contains("archive-run")) {
-        api("POST", "/api/runs/archive", { runId: run.id });
-        return;
-      }
+      if (event.target.classList.contains("archive-run")) { api("POST", "/api/runs/archive", { runId: run.id }); return; }
+      if (event.target.classList.contains("trash-run")) { api("POST", "/api/runs/trash", { runId: run.id }); return; }
       api("POST", "/api/runs/switch", { runId: run.id });
     });
     list.appendChild(li);
   }
 
-  // Chat archive panel
+  // Chat archive panel — restore back to active, or send onward to the trash.
   $("toggleChatArchive").textContent = `🗄${archived.length ? " " + archived.length : ""}`;
   $("chatArchive").classList.toggle("hidden", !panelOpen.chatArchive);
-  const aList = $("archivedRunList");
-  aList.innerHTML = "";
-  if (!archived.length) {
+  fillRunBin($("archivedRunList"), archived, { trash: true });
+
+  // Chat trash panel — restore back to active; "Очистить" wipes it permanently.
+  $("toggleChatTrash").textContent = `🗑${trashed.length ? " " + trashed.length : ""}`;
+  $("chatTrash").classList.toggle("hidden", !panelOpen.chatTrash);
+  fillRunBin($("trashedRunList"), trashed, { trash: false });
+}
+
+// Render a chat bin list (archive or trash). Every row can be restored; archive
+// rows additionally offer a "× → trash" action (withTrash).
+function fillRunBin(listEl, runs, { trash: withTrash }) {
+  listEl.innerHTML = "";
+  if (!runs.length) {
     const empty = document.createElement("li");
     empty.className = "muted small";
     empty.style.cursor = "default";
     empty.textContent = t("ui.archiveEmpty");
-    aList.appendChild(empty);
+    listEl.appendChild(empty);
+    return;
   }
-  for (const run of archived) {
+  for (const run of runs) {
     const li = document.createElement("li");
     li.classList.add("archived-row");
-    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><button class="restore-run" title="${escapeHtml(t("ui.restore"))}">↩</button>`;
+    let actions = `<button class="restore-run" title="${escapeHtml(t("ui.restore"))}">↩</button>`;
+    if (withTrash) actions += `<button class="trash-run" title="${escapeHtml(t("ui.toTrash"))}">×</button>`;
+    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><span class="run-actions">${actions}</span>`;
     li.querySelector(".restore-run").addEventListener("click", (event) => {
       event.stopPropagation();
       api("POST", "/api/runs/restore", { runId: run.id });
     });
-    aList.appendChild(li);
+    const trashBtn = li.querySelector(".trash-run");
+    if (trashBtn) trashBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      api("POST", "/api/runs/trash", { runId: run.id });
+    });
+    listEl.appendChild(li);
   }
 }
 
@@ -2338,13 +2361,11 @@ function renderAgentChips() {
   const rounds = currentState.run?.activeSubtask?.rounds || 0;
   box.innerHTML = "";
   for (const p of list) {
-    const b = p.backend || {};
     const chip = document.createElement("span");
     chip.className = `agent-chip-sel${p.key === selectedAgentKey ? " selected" : ""}${rounds === 0 ? " pulse" : ""}`;
     chip.dataset.key = p.key;
     chip.dataset.tooltipText = t("ui.agentChipHint");
     chip.innerHTML = `<span class="ac-label">${escapeHtml(p.label || p.key)}</span>`
-      + `<span class="ac-model">${escapeHtml(b.model || b.provider || "")}</span>`
       + `<button class="ac-remove" type="button" title="${escapeHtml(t("ui.agentRemove"))}">×</button>`;
     box.appendChild(chip);
   }
@@ -2638,6 +2659,8 @@ function bindUi() {
   });
 
   $("toggleChatArchive").addEventListener("click", () => { panelOpen.chatArchive = !panelOpen.chatArchive; savePanelOpen(); render(); });
+  $("toggleChatTrash").addEventListener("click", () => { panelOpen.chatTrash = !panelOpen.chatTrash; savePanelOpen(); render(); });
+  $("emptyChatTrash").addEventListener("click", () => { if (confirm(t("ui.confirmEmptyChatTrash"))) api("POST", "/api/runs/trash/empty", {}); });
   $("toggleSubtaskArchive").addEventListener("click", () => { panelOpen.subtaskArchive = !panelOpen.subtaskArchive; savePanelOpen(); render(); });
   $("toggleSubtaskTrash").addEventListener("click", () => { panelOpen.subtaskTrash = !panelOpen.subtaskTrash; savePanelOpen(); render(); });
   $("emptyTrash").addEventListener("click", () => { if (confirm(t("ui.confirmEmptyTrash"))) api("POST", "/api/subtasks/trash/empty", {}); });
