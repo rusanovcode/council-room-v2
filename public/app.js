@@ -3508,9 +3508,9 @@ function bindUi() {
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.
   $("addProfileBtn")?.addEventListener("click", () => {
     addProfileDraft();
-    // Surprise hamster 🐹
+    // Surprise hamster 🐹 — appears ~30% of the time
     const h = $("profileHamster");
-    if (h) {
+    if (h && Math.random() < 0.3) {
       h.classList.remove("hidden");
       h.classList.add("hamster-pop");
       setTimeout(() => { h.classList.add("hidden"); h.classList.remove("hamster-pop"); }, 1800);

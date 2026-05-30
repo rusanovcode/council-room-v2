@@ -31,6 +31,8 @@ const WORKDIR = process.env.COUNCIL_ROOM_V2_WORKDIR || path.dirname(ROOT);
 
 fs.mkdirSync(ROOMS_DIR, { recursive: true });
 
+const GLOBAL_SETTINGS_PATH = path.join(ROOMS_DIR, "global-settings.json");
+
 let state = {
   activeRunId: null,
   busy: false,
@@ -1444,6 +1446,9 @@ async function router(req, res) {
         state.run.settings = { ...state.run.settings, ...body };
         saveRun(state.run);
       }
+      if ("profiles" in body) {
+        store.writeJson(GLOBAL_SETTINGS_PATH, { profiles: state.settings.profiles || [] });
+      }
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -1532,6 +1537,12 @@ function selectLastRunOnStartup() {
 
 // Intentionally NOT called — clean start screen on every server start (see above).
 void selectLastRunOnStartup;
+
+// Load globally-persisted profiles (saved independently of any run).
+{
+  const gs = store.readJson(GLOBAL_SETTINGS_PATH) || {};
+  if (Array.isArray(gs.profiles)) state.settings.profiles = gs.profiles;
+}
 
 // Poll the switch-module gateway so the UI reflects profiles/active/tokens live.
 refreshSwitcher().then(broadcast);
