@@ -213,6 +213,14 @@ const STRINGS = {
     "coach.autopilot.action": "⏹ Остановить autopilot",
     "ui.providersPanel": "Регистрация агентов",
     "ui.profiles": "Профили",
+    "ui.registeredModels": "Зарегистрированные модели",
+    "ui.regModelLabel": "Подпись",
+    "ui.regModelAgent": "Агент",
+    "ui.regModelModel": "Модель",
+    "ui.regModelEffort": "Сила",
+    "ui.regModelSpeed": "Скорость",
+    "ui.regModelNoProfiles": "Нет зарегистрированных моделей. Добавь профиль в «Регистрация агентов».",
+    "ui.regModelSaved": "Модель сохранена",
     "ui.addProfile": "+ Профиль",
     "ui.applyProviders": "Применить",
     "ui.providersSaved": "Сохранено ✓",
@@ -249,6 +257,7 @@ const STRINGS = {
     "ui.keyUnverified": "Ключ задан, но не проверен (жёлтая галочка). Введи/перевведи ключ в поле — он протестируется автоматически.",
     "ui.remove": "Удалить",
     "tip.providersPanel": "Регистрация агентов: здесь регистрируешь и авторизуешь бэкенды. Профиль — это именованный бэкенд: API-провайдер (по ключу из .env), локальная Ollama или (в full-сборке) подписочный CLI. Зарегистрированные профили становятся доступны при выборе агентов обсуждения (кнопка «Добавить агента» в шапке чата).|||Зарегистрируй профиль «DeepSeek» с ключом DEEPSEEK_API_KEY → он появится в списке бэкендов, когда добавляешь агента в чат.",
+    "tip.registeredModels": "Глобальный список зарегистрированных моделей — доступен во всех чатах. Здесь можно быстро сменить модель или усилие без входа в «Регистрация агентов». Изменения сохраняются сразу.|||Сменил модель Ollama с llama3.2 на qwen2.5 — при следующем «Добавить агента» подберётся уже новая.",
     "tip.agentSettings": "Язык агентов и БЫСТРЫЙ выбор для двух стандартных спорщиков — модель/усилие/аккаунт Codex и Claude. Упрощённый путь «по умолчанию». Для подключения API-провайдеров/Ollama используй «Регистрация агентов» (в режиме API эти простые контролы скрыты).|||Хочешь быстро сменить модель Codex на gpt-5.4-mini — здесь. Хочешь добавить DeepSeek или Ollama — в «Регистрация агентов».",
     "tip.profileLabel": "Человекочитаемое имя профиля — только для отображения (в чипе агента и в логах раунда). Ни на что в запросе не влияет. Если оставить пустым, показывается технический id (например p_mprga7ou).|||«DeepSeek основной», «Ollama локальная».",
     "tip.profileModel": "Идентификатор модели у провайдера — точная строка, которую он ждёт в поле model запроса. Бери из документации провайдера. Для CLI можно оставить «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (то, что показывает `ollama list`).",
@@ -518,6 +527,14 @@ const STRINGS = {
     "coach.autopilot.action": "⏹ Stop autopilot",
     "ui.providersPanel": "Agent registration",
     "ui.profiles": "Profiles",
+    "ui.registeredModels": "Registered models",
+    "ui.regModelLabel": "Label",
+    "ui.regModelAgent": "Agent",
+    "ui.regModelModel": "Model",
+    "ui.regModelEffort": "Effort",
+    "ui.regModelSpeed": "Speed",
+    "ui.regModelNoProfiles": "No registered models. Add a profile in «Agent registration».",
+    "ui.regModelSaved": "Model saved",
     "ui.addProfile": "+ Profile",
     "ui.applyProviders": "Apply",
     "ui.providersSaved": "Saved ✓",
@@ -554,6 +571,7 @@ const STRINGS = {
     "ui.keyUnverified": "Key is set but unverified (amber check). Enter/re-enter the key in the field — it will be tested automatically.",
     "ui.remove": "Remove",
     "tip.providersPanel": "Agent registration: register and authorize backends here. A profile is a named backend: an API provider (key from .env), local Ollama, or (full build) a subscription CLI. Registered profiles become available when you pick debate agents (the \"Add agent\" button in the chat header).|||Register a \"DeepSeek\" profile with key DEEPSEEK_API_KEY → it shows up in the backend list when you add an agent to a chat.",
+    "tip.registeredModels": "Global list of registered models — available in all chats. Quickly change the model or effort without opening «Agent registration». Changes save immediately.|||Switched Ollama model from llama3.2 to qwen2.5 — the next «Add agent» will pick the new one.",
     "tip.agentSettings": "Agent language and a QUICK picker for the two standard debaters — Codex and Claude model/effort/account. Simple default path. To wire in API providers/Ollama use «Agent registration» (in API mode these simple controls are hidden).|||Want to quickly switch Codex to gpt-5.4-mini — do it here. Want to add DeepSeek or Ollama — use «Agent registration».",
     "tip.profileLabel": "Human-readable name for the profile — display only (in the agent chip and round logs). It has no effect on the request. If left empty, the technical id is shown (e.g. p_mprga7ou).|||«DeepSeek main», «Ollama local».",
     "tip.profileModel": "The provider's model id — the exact string it expects in the request's model field. Take it from the provider's docs. For CLI you can leave «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (whatever `ollama list` shows).",
@@ -884,6 +902,7 @@ function render() {
   renderDocuments();
   renderSettings();
   renderAgentsInit();
+  renderRegisteredModels();
   renderNextStep();
   renderPinnedHint();
   renderSwitcher();
@@ -2259,6 +2278,146 @@ function renderProviders() {
     ? providersDraft.profiles.map(renderProfileRow).join("")
     : `<div class="muted small">${t("ui.noProfiles")}</div>`;
   renderConnectedAgents();
+  renderRegisteredModels();
+}
+
+// ---- Registered models panel ------------------------------------------
+// A global, user-friendly view of all saved profiles. Persists across chats.
+// Shows: label | provider name | model dropdown | effort | speed (if supported).
+// Changes auto-save via POST /api/settings (no Apply button).
+
+function regModelProviderLabel(provider) {
+  if (provider === "cli-codex") return "Codex CLI";
+  if (provider === "cli-claude") return "Claude CLI";
+  if (provider === "ollama") return "Ollama";
+  const preset = ((currentState.providers && currentState.providers.presets) || []).find((p) => p.id === provider);
+  return preset ? preset.label : (provider || "API");
+}
+
+function renderRegisteredModelRow(p) {
+  const prov = p.provider || "";
+  const cli = isCliProviderId(prov);
+  const isOllama = prov === "ollama";
+  const provLabel = regModelProviderLabel(prov);
+
+  // Model dropdown or input.
+  let modelField;
+  if (cli) {
+    const models = CLI_MODELS[prov] || [];
+    const opts = models.map((m) => `<option value="${escapeHtml(m)}"${m === (p.model || "") ? " selected" : ""}>${escapeHtml(m)}</option>`).join("");
+    modelField = `<select class="rm-model">${opts}</select>`;
+  } else if (isOllama) {
+    const baseUrl = p.baseUrl || "http://localhost:11434/v1";
+    const models = ollamaModelsCache[baseUrl] || [];
+    if (models.length) {
+      const emptyOpt = models.includes(p.model || "") ? "" : `<option value="${escapeHtml(p.model || "")}" selected>${escapeHtml(p.model || "—")}</option>`;
+      const opts = models.map((m) => `<option value="${escapeHtml(m)}"${m === (p.model || "") ? " selected" : ""}>${escapeHtml(m)}</option>`).join("");
+      modelField = `<select class="rm-model">${emptyOpt}${opts}</select>`;
+    } else {
+      modelField = `<input class="rm-model" value="${escapeHtml(p.model || "")}" placeholder="llama3.2">`;
+    }
+  } else {
+    modelField = `<input class="rm-model" value="${escapeHtml(p.model || "")}" placeholder="model">`;
+  }
+
+  // Effort dropdown — CLI providers and Ollama (if effort makes sense).
+  const effortLevels = CLI_EFFORTS[prov] || (isOllama ? [] : []);
+  let effortField = "";
+  if (effortLevels.length) {
+    const opts = effortLevels.map((e) => `<option value="${e}"${e === (p.effort || "auto") ? " selected" : ""}>${e}</option>`).join("");
+    effortField = `<td class="rm-cell"><span class="rm-col-head">${escapeHtml(t("ui.regModelEffort"))}</span>${"<select class=\"rm-effort\">" + opts + "</select>"}</td>`;
+  }
+
+  // Speed — currently no provider defines distinct speed levels; field reserved.
+  const speedLevels = []; // extend when a provider needs it
+  let speedField = "";
+  if (speedLevels.length) {
+    const opts = speedLevels.map((s) => `<option value="${s}"${s === (p.speed || "") ? " selected" : ""}>${s}</option>`).join("");
+    speedField = `<td class="rm-cell"><span class="rm-col-head">${escapeHtml(t("ui.regModelSpeed"))}</span><select class="rm-speed">${opts}</select></td>`;
+  }
+
+  return `<tr class="rm-row" data-id="${escapeHtml(p.id)}">
+    <td class="rm-cell rm-cell-label">
+      <span class="rm-col-head">${escapeHtml(t("ui.regModelLabel"))}</span>
+      <input class="rm-label" value="${escapeHtml(p.label || "")}" placeholder="${escapeHtml(provLabel)}">
+    </td>
+    <td class="rm-cell rm-cell-agent">
+      <span class="rm-col-head">${escapeHtml(t("ui.regModelAgent"))}</span>
+      <span class="rm-prov-badge">${escapeHtml(provLabel)}</span>
+    </td>
+    <td class="rm-cell">
+      <span class="rm-col-head">${escapeHtml(t("ui.regModelModel"))}</span>
+      ${modelField}
+    </td>
+    ${effortField}${speedField}
+  </tr>`;
+}
+
+function renderRegisteredModels() {
+  const list = $("registeredModelsList");
+  if (!list) return;
+  const profs = (currentState.settings && currentState.settings.profiles) || [];
+  if (!profs.length) {
+    list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.regModelNoProfiles"))}</div>`;
+    return;
+  }
+  // Fetch Ollama models for any Ollama profiles if not yet cached.
+  for (const p of profs) {
+    if (p.provider === "ollama") {
+      const key = p.baseUrl || "http://localhost:11434/v1";
+      if (!ollamaModelsCache[key]) fetchOllamaModels(key).then(() => renderRegisteredModels());
+    }
+  }
+  list.innerHTML = `<table class="rm-table"><tbody>${profs.map(renderRegisteredModelRow).join("")}</tbody></table>`;
+  bindRegisteredModels();
+}
+
+async function saveRegisteredModelRow(id, fields) {
+  const profs = JSON.parse(JSON.stringify((currentState.settings && currentState.settings.profiles) || []));
+  const p = profs.find((x) => x.id === id);
+  if (!p) return;
+  if ("label" in fields) p.label = fields.label;
+  if ("model" in fields) p.model = fields.model;
+  if ("effort" in fields) p.effort = fields.effort;
+  if ("speed" in fields) p.speed = fields.speed;
+  try {
+    await fetch("/api/settings", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profiles: profs }),
+    });
+  } catch {}
+}
+
+function bindRegisteredModels() {
+  const table = document.querySelector("#registeredModelsList .rm-table");
+  if (!table) return;
+  table.addEventListener("change", (e) => {
+    const row = e.target.closest(".rm-row");
+    if (!row) return;
+    const id = row.dataset.id;
+    const q = (sel) => row.querySelector(sel);
+    const fields = {};
+    if (e.target.classList.contains("rm-label")) fields.label = e.target.value;
+    if (e.target.classList.contains("rm-model")) fields.model = e.target.value;
+    if (e.target.classList.contains("rm-effort")) fields.effort = e.target.value;
+    if (e.target.classList.contains("rm-speed")) fields.speed = e.target.value;
+    if (Object.keys(fields).length) saveRegisteredModelRow(id, fields);
+  });
+  table.addEventListener("input", (e) => {
+    if (e.target.classList.contains("rm-label") || e.target.classList.contains("rm-model")) {
+      // live update without save (save on blur/change)
+    }
+  });
+  table.addEventListener("blur", (e) => {
+    if (e.target.classList.contains("rm-label") || e.target.classList.contains("rm-model")) {
+      const row = e.target.closest(".rm-row");
+      if (!row) return;
+      const fields = {};
+      if (e.target.classList.contains("rm-label")) fields.label = e.target.value;
+      if (e.target.classList.contains("rm-model")) fields.model = e.target.value;
+      if (Object.keys(fields).length) saveRegisteredModelRow(row.dataset.id, fields);
+    }
+  }, true);
 }
 
 function syncProvidersFromDOM() {

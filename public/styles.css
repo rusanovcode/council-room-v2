@@ -1329,6 +1329,17 @@ button.square {
 .providers-msg { font-size: 12px; }
 .providers-msg.ok { color: var(--green); }
 .providers-msg.err { color: var(--red); }
+
+/* Registered models panel */
+.rm-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.rm-row { border-bottom: 1px solid var(--border); }
+.rm-row:last-child { border-bottom: none; }
+.rm-cell { padding: 5px 4px; vertical-align: top; }
+.rm-cell-label { width: 28%; }
+.rm-cell-agent { width: 18%; white-space: nowrap; }
+.rm-col-head { display: block; color: var(--muted); font-size: 10px; margin-bottom: 2px; }
+.rm-prov-badge { display: inline-block; font-size: 10px; color: var(--accent); font-weight: 600; background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; white-space: nowrap; }
+.rm-table input, .rm-table select { width: 100%; font-size: 11px; padding: 2px 4px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 3px; }
 .ollama-status { font-size: 11px; padding: 4px 6px; border-radius: 4px; margin-bottom: 6px; line-height: 1.4; }
 .ollama-status:empty { display: none; }
 .ollama-status.checking { color: var(--muted); }
