@@ -116,6 +116,11 @@ html, body {
 .feedback-type-row { display: flex; gap: 14px; margin-bottom: 10px; font-size: 13px; }
 .feedback-type-row label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 .feedback-textarea { width: 100%; min-height: 120px; resize: vertical; font-size: 13px; padding: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-family: inherit; box-sizing: border-box; margin-bottom: 10px; }
+.feedback-choose-label { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.feedback-clients { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.feedback-client-btn { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 13px; transition: border-color 0.15s; }
+.feedback-client-btn:hover { border-color: var(--accent); color: var(--accent); }
+.fc-icon { font-size: 16px; }
 
 .block {
   padding: 12px 14px;

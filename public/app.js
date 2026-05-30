@@ -40,6 +40,10 @@ const STRINGS = {
     "ui.feedbackFeature": "Пожелание",
     "ui.feedbackOther": "Другое",
     "ui.feedbackSend": "Отправить письмо",
+    "ui.feedbackNext": "Выбрать приложение →",
+    "ui.feedbackBack": "← Назад",
+    "ui.feedbackChooseClient": "Выбери почтовое приложение:",
+    "ui.feedbackDefaultApp": "Приложение по умолчанию",
     "ui.feedbackPlaceholder": "Опиши проблему или пожелание…",
     "tip.feedback": "Отправить баг-репорт или пожелание по улучшению разработчику.",
     "ui.open": "Открыть",
@@ -367,6 +371,10 @@ const STRINGS = {
     "ui.feedbackFeature": "Feature request",
     "ui.feedbackOther": "Other",
     "ui.feedbackSend": "Send email",
+    "ui.feedbackNext": "Choose app →",
+    "ui.feedbackBack": "← Back",
+    "ui.feedbackChooseClient": "Choose your email app:",
+    "ui.feedbackDefaultApp": "Default mail app",
     "ui.feedbackPlaceholder": "Describe the issue or your wish…",
     "tip.feedback": "Send a bug report or feature request to the developer.",
     "ui.open": "Open",
@@ -3178,20 +3186,46 @@ function bindUi() {
   $("fontUp").addEventListener("click", () => bumpScale(SCALE_STEP));
   $("fontDown").addEventListener("click", () => bumpScale(-SCALE_STEP));
 
+  const FEEDBACK_TO = "bbomidor@gmail.com";
+  const feedbackTypeLabels = { bug: "Баг / Bug", feature: "Пожелание / Feature request", other: "Другое / Other" };
+
+  function feedbackShowStep(n) {
+    $("feedbackStep1").classList.toggle("hidden", n !== 1);
+    $("feedbackStep2").classList.toggle("hidden", n !== 2);
+  }
+
   $("feedbackBtn").addEventListener("click", () => {
     $("feedbackText").value = "";
+    feedbackShowStep(1);
     $("feedbackModal").classList.remove("hidden");
     $("feedbackText").focus();
   });
   $("feedbackCancel").addEventListener("click", () => $("feedbackModal").classList.add("hidden"));
-  $("feedbackSend").addEventListener("click", () => {
+  $("feedbackNext").addEventListener("click", () => {
+    if (!$("feedbackText").value.trim()) { $("feedbackText").focus(); return; }
+    feedbackShowStep(2);
+  });
+  $("feedbackBack").addEventListener("click", () => feedbackShowStep(1));
+
+  $("feedbackModal").addEventListener("click", (e) => {
+    const btn = e.target.closest(".feedback-client-btn");
+    if (!btn) return;
+    const client = btn.dataset.client;
     const type = document.querySelector("input[name=feedbackType]:checked")?.value || "other";
     const text = $("feedbackText").value.trim();
-    if (!text) { $("feedbackText").focus(); return; }
-    const typeLabels = { bug: "Баг / Bug", feature: "Пожелание / Feature request", other: "Другое / Other" };
-    const subject = encodeURIComponent(`Council Room v2 — ${typeLabels[type] || type}`);
+    const subject = encodeURIComponent(`Council Room v2 — ${feedbackTypeLabels[type] || type}`);
     const body = encodeURIComponent(text);
-    window.location.href = `mailto:bbomidor@gmail.com?subject=${subject}&body=${body}`;
+    const to = encodeURIComponent(FEEDBACK_TO);
+    const urls = {
+      gmail:   `https://mail.google.com/mail/?view=cm&to=${to}&su=${subject}&body=${body}`,
+      outlook: `https://outlook.live.com/mail/0/deeplink/compose?to=${to}&subject=${subject}&body=${body}`,
+      yahoo:   `https://compose.mail.yahoo.com/?to=${FEEDBACK_TO}&subject=${subject}&body=${body}`,
+      yandex:  `https://mail.yandex.ru/compose?to=${FEEDBACK_TO}&subject=${subject}&body=${body}`,
+      mailto:  `mailto:${FEEDBACK_TO}?subject=${subject}&body=${body}`,
+    };
+    const url = urls[client] || urls.mailto;
+    if (client === "mailto") { window.location.href = url; }
+    else { window.open(url, "_blank", "noopener"); }
     $("feedbackModal").classList.add("hidden");
   });
 

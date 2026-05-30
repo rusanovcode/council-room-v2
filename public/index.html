@@ -449,15 +449,44 @@
     <div id="feedbackModal" class="modal hidden">
       <div class="modal-box">
         <h3 data-i18n="ui.feedbackTitle">Обратная связь</h3>
-        <div class="feedback-type-row">
-          <label><input type="radio" name="feedbackType" value="bug" checked> <span data-i18n="ui.feedbackBug">Баг</span></label>
-          <label><input type="radio" name="feedbackType" value="feature"> <span data-i18n="ui.feedbackFeature">Пожелание</span></label>
-          <label><input type="radio" name="feedbackType" value="other"> <span data-i18n="ui.feedbackOther">Другое</span></label>
+
+        <!-- Step 1: compose -->
+        <div id="feedbackStep1">
+          <div class="feedback-type-row">
+            <label><input type="radio" name="feedbackType" value="bug" checked> <span data-i18n="ui.feedbackBug">Баг</span></label>
+            <label><input type="radio" name="feedbackType" value="feature"> <span data-i18n="ui.feedbackFeature">Пожелание</span></label>
+            <label><input type="radio" name="feedbackType" value="other"> <span data-i18n="ui.feedbackOther">Другое</span></label>
+          </div>
+          <textarea id="feedbackText" class="feedback-textarea" rows="6" placeholder="Опиши проблему или пожелание…"></textarea>
+          <div class="modal-actions">
+            <button id="feedbackNext" class="primary" type="button" data-i18n="ui.feedbackNext">Выбрать приложение →</button>
+            <button id="feedbackCancel" class="ghost" type="button" data-i18n="ui.cancel">Отмена</button>
+          </div>
         </div>
-        <textarea id="feedbackText" class="feedback-textarea" rows="6" placeholder="Опиши проблему или пожелание…"></textarea>
-        <div class="modal-actions">
-          <button id="feedbackSend" class="primary" type="button" data-i18n="ui.feedbackSend">Отправить письмо</button>
-          <button id="feedbackCancel" class="ghost" type="button" data-i18n="ui.cancel">Отмена</button>
+
+        <!-- Step 2: choose email client -->
+        <div id="feedbackStep2" class="hidden">
+          <p class="feedback-choose-label" data-i18n="ui.feedbackChooseClient">Выбери почтовое приложение:</p>
+          <div class="feedback-clients">
+            <button class="feedback-client-btn" data-client="gmail" type="button">
+              <span class="fc-icon">✉</span><span>Gmail</span>
+            </button>
+            <button class="feedback-client-btn" data-client="outlook" type="button">
+              <span class="fc-icon">✉</span><span>Outlook</span>
+            </button>
+            <button class="feedback-client-btn" data-client="yahoo" type="button">
+              <span class="fc-icon">✉</span><span>Yahoo Mail</span>
+            </button>
+            <button class="feedback-client-btn" data-client="yandex" type="button">
+              <span class="fc-icon">✉</span><span>Яндекс Почта</span>
+            </button>
+            <button class="feedback-client-btn" data-client="mailto" type="button">
+              <span class="fc-icon">✉</span><span data-i18n="ui.feedbackDefaultApp">Приложение по умолчанию</span>
+            </button>
+          </div>
+          <div class="modal-actions" style="margin-top:10px">
+            <button id="feedbackBack" class="ghost" type="button" data-i18n="ui.feedbackBack">← Назад</button>
+          </div>
         </div>
       </div>
     </div>
