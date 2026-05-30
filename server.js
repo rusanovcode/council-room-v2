@@ -1078,6 +1078,31 @@ async function router(req, res) {
       return sendJson(res, 200, { ...statsCache[key].data, providers: usage.summary(ROOMS_DIR) });
     }
 
+    if (method === "GET" && pathname === "/api/ollama/models") {
+      // Proxy Ollama's model list to avoid CORS. baseUrl param mirrors the profile's
+      // baseUrl (e.g. http://localhost:11434/v1); we strip /v1 to reach /api/tags.
+      const rawBase = parsed.query.baseUrl || "http://localhost:11434/v1";
+      const tagsUrl = rawBase.replace(/\/v1\/?$/, "") + "/api/tags";
+      try {
+        const mod = tagsUrl.startsWith("https") ? require("node:https") : require("node:http");
+        const data = await new Promise((resolve, reject) => {
+          const req2 = mod.get(tagsUrl, { timeout: 5000 }, (r) => {
+            let body = "";
+            r.on("data", (c) => { body += c; });
+            r.on("end", () => { try { resolve(JSON.parse(body)); } catch { resolve(null); } });
+          });
+          req2.on("error", reject);
+          req2.on("timeout", () => { req2.destroy(); reject(new Error("timeout")); });
+        });
+        const models = (data && Array.isArray(data.models))
+          ? data.models.map((m) => m.name || m.model).filter(Boolean)
+          : [];
+        return sendJson(res, 200, { models });
+      } catch (e) {
+        return sendJson(res, 200, { models: [], error: e.message });
+      }
+    }
+
     if (method === "POST" && pathname === "/api/providers/key") {
       // Direct API-key entry: persist the typed key to .env (gitignored) under
       // the given env var name and load it live. The key NEVER touches state.json

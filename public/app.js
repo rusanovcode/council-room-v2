@@ -217,6 +217,8 @@ const STRINGS = {
     "ui.applyProviders": "Применить",
     "ui.providersSaved": "Сохранено ✓",
     "ui.profileModelRequired": "Укажи модель для «{label}» (например: llama3.2, gpt-4o-mini)",
+    "ui.ollamaSelectModel": "— выбери модель —",
+    "ui.ollamaNoModels": "Ollama не запущена?",
     "ui.noProfiles": "Профилей нет — раунд использует поведение по умолчанию (Codex/Claude).",
     "ui.profileProvider": "Провайдер",
     "ui.profileModel": "Модель",
@@ -508,6 +510,8 @@ const STRINGS = {
     "ui.applyProviders": "Apply",
     "ui.providersSaved": "Saved ✓",
     "ui.profileModelRequired": "Enter a model name for «{label}» (e.g. llama3.2, gpt-4o-mini)",
+    "ui.ollamaSelectModel": "— select model —",
+    "ui.ollamaNoModels": "Ollama not running?",
     "ui.noProfiles": "No profiles — the round uses the default Codex/Claude behavior.",
     "ui.profileProvider": "Provider",
     "ui.profileModel": "Model",
@@ -2034,6 +2038,19 @@ function renderSettings() {
 // chat changes or the UI language flips; otherwise it persists across renders.
 let providersDraft = null;
 let providersForRunId = undefined;
+// baseUrl → string[] of model names fetched from Ollama /api/tags
+const ollamaModelsCache = {};
+
+async function fetchOllamaModels(baseUrl) {
+  const key = baseUrl || "http://localhost:11434/v1";
+  if (ollamaModelsCache[key]) return ollamaModelsCache[key];
+  try {
+    const r = await fetch(`/api/ollama/models?baseUrl=${encodeURIComponent(key)}`);
+    const j = await r.json().catch(() => ({}));
+    ollamaModelsCache[key] = Array.isArray(j.models) ? j.models : [];
+  } catch { ollamaModelsCache[key] = []; }
+  return ollamaModelsCache[key];
+}
 let providersLang = null;
 
 function blankRoles() {
@@ -2058,10 +2075,20 @@ function renderProvidersInit() {
     initProvidersDraft();
     renderProviders();
   } else if (providersLang !== UI_LANG) {
-    syncProvidersFromDOM(); // preserve edits across a language flip
+    syncProvidersFromDOM();
     renderProviders();
   }
   providersLang = UI_LANG;
+  // Pre-fetch Ollama models for any already-registered Ollama profiles.
+  const profiles = (providersDraft && providersDraft.profiles) || [];
+  for (const p of profiles) {
+    if (p.provider === "ollama") {
+      const baseUrl = p.baseUrl || "http://localhost:11434/v1";
+      if (!ollamaModelsCache[baseUrl]) {
+        fetchOllamaModels(baseUrl).then(() => renderProviders());
+      }
+    }
+  }
 }
 
 function isCliProviderId(provider) { return provider === "cli-codex" || provider === "cli-claude"; }
@@ -2099,8 +2126,22 @@ function renderProfileRow(p) {
   const keyBadge = needsKey
     ? `<span class="key-badge ${creds[p.id] ? "ok" : "miss"}">${creds[p.id] ? t("ui.keySet") : t("ui.keyMissing")}</span>`
     : "";
-  const modelPlaceholder = cli ? "auto" : p.provider === "ollama" ? "llama3.2" : "model";
-  let fields = `<label class="p-field"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span><input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="${modelPlaceholder}"></label>`;
+  const isOllama = p.provider === "ollama";
+  const ollamaModels = isOllama ? (ollamaModelsCache[p.baseUrl || (preset && preset.baseUrl) || "http://localhost:11434/v1"] || null) : null;
+  let modelWidget;
+  if (cli) {
+    modelWidget = `<input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="auto">`;
+  } else if (isOllama && ollamaModels && ollamaModels.length) {
+    const opts = ollamaModels.map((m) => `<option value="${escapeHtml(m)}"${m === p.model ? " selected" : ""}>${escapeHtml(m)}</option>`).join("");
+    const emptyOpt = p.model && ollamaModels.includes(p.model) ? "" : `<option value="${escapeHtml(p.model || "")}" selected>${escapeHtml(p.model || t("ui.ollamaSelectModel"))}</option>`;
+    modelWidget = `<select class="p-model">${emptyOpt}${opts}</select>`;
+  } else if (isOllama) {
+    const hint = ollamaModels !== null ? ` (${t("ui.ollamaNoModels")})` : "";
+    modelWidget = `<input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="llama3.2${hint}">`;
+  } else {
+    modelWidget = `<input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="model">`;
+  }
+  let fields = `<label class="p-field"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span>${modelWidget}</label>`;
   if (cli) {
     fields += `<label class="p-field"><span>${t("ui.profileAccount")}</span><select class="p-account">
       <option value="acc1"${p.account === "acc1" ? " selected" : ""}>acc1</option>
@@ -2906,7 +2947,17 @@ function bindUi() {
     // Provider change swaps which fields are shown → full panel re-render.
     // Any other field change (label/model/...) just syncs the draft and
     // refreshes the connected-agent chips (no re-render, so focus is kept).
-    if (event.target.classList.contains("p-provider")) { syncProvidersFromDOM(); renderProviders(); }
+    if (event.target.classList.contains("p-provider")) {
+      syncProvidersFromDOM();
+      const id = event.target.closest(".profile-row")?.dataset.id;
+      const p = providersDraft && providersDraft.profiles.find((x) => x.id === id);
+      if (p && p.provider === "ollama") {
+        const baseUrl = p.baseUrl || "http://localhost:11434/v1";
+        fetchOllamaModels(baseUrl).then(() => renderProviders());
+      } else {
+        renderProviders();
+      }
+    }
     else if (event.target.classList.contains("p-apikey")) {
       // A key was just entered/changed → test it live; green ✓ only on success.
       syncProvidersFromDOM();
