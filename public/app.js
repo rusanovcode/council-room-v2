@@ -2264,6 +2264,7 @@ function initProvidersDraft() {
     profiles: Array.isArray(s.profiles) ? JSON.parse(JSON.stringify(s.profiles)) : [],
     roles: (s.roles && s.roles.a && s.roles.b) ? JSON.parse(JSON.stringify(s.roles)) : blankRoles(),
   };
+  providersDraft.profiles.push(makeBlankProfile());
 }
 
 function renderProvidersInit() {
@@ -2644,10 +2645,8 @@ function syncProvidersFromDOM() {
   // roles were already persisted so applyProviders re-sends them untouched.
 }
 
-function addProfileDraft() {
-  syncProvidersFromDOM();
+function makeBlankProfile() {
   const apiMode = (currentState.providers && currentState.providers.mode) === "api";
-  // Default to Ollama if it was auto-detected; otherwise CLI (full) or ollama (api).
   const useOllama = ollamaDetect && ollamaDetect.detected;
   const provider = (apiMode || useOllama) ? "ollama" : "cli-codex";
   const p = { id: `p${Date.now().toString(36)}`, label: "", provider, model: "" };
@@ -2656,7 +2655,12 @@ function addProfileDraft() {
   } else if (provider === "ollama" && useOllama) {
     p.baseUrl = ollamaDetect.baseUrl;
   }
-  providersDraft.profiles.push(p);
+  return p;
+}
+
+function addProfileDraft() {
+  syncProvidersFromDOM();
+  providersDraft.profiles.push(makeBlankProfile());
   renderProviders();
 }
 
@@ -2803,7 +2807,8 @@ async function applyProviders() {
       ? t("ui.ollamaConnectedModels", { models: (ollamaProfiles._testedModels || []).join(", ") })
       : (keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"));
     showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
-    renderProviders(); // refresh key badges + clear the direct-key inputs
+    providersDraft.profiles = [makeBlankProfile()]; // reset to one blank card
+    renderProviders();
   } catch (e) {
     showProvidersMsg(e.message, true);
   }
