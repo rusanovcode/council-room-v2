@@ -2070,9 +2070,15 @@ function presetById(id) {
 
 function providerOptions() {
   const info = currentState.providers || {};
-  const opts = (info.presets || []).map((p) => p.id);
-  opts.push("openai-compatible", "ollama");
-  if ((info.mode || "full") !== "api") opts.push("cli-codex", "cli-claude");
+  // Returns objects {id, label} so the dropdown shows readable names.
+  const opts = (info.presets || []).map((p) => ({ id: p.id, label: p.label || p.id }));
+  // "openai-compatible" is a raw type for custom endpoints not in the preset list.
+  // "ollama" is already a preset — don't add it again.
+  opts.push({ id: "openai-compatible", label: "OpenAI-compatible (custom)" });
+  if ((info.mode || "full") !== "api") {
+    opts.push({ id: "cli-codex", label: "Codex CLI" });
+    opts.push({ id: "cli-claude", label: "Claude CLI" });
+  }
   return opts;
 }
 
@@ -2082,7 +2088,7 @@ function helpIcon(tipKey) {
 }
 
 function renderProfileRow(p) {
-  const provSel = providerOptions().map((o) => `<option value="${o}"${o === p.provider ? " selected" : ""}>${o}</option>`).join("");
+  const provSel = providerOptions().map((o) => `<option value="${escapeHtml(o.id)}"${o.id === p.provider ? " selected" : ""}>${escapeHtml(o.label)}</option>`).join("");
   const cli = isCliProviderId(p.provider);
   const preset = presetById(p.provider);
   const creds = (currentState.providers && currentState.providers.credentials) || {};
@@ -2091,7 +2097,8 @@ function renderProfileRow(p) {
   const keyBadge = needsKey
     ? `<span class="key-badge ${creds[p.id] ? "ok" : "miss"}">${creds[p.id] ? t("ui.keySet") : t("ui.keyMissing")}</span>`
     : "";
-  let fields = `<label class="p-field"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span><input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="${cli ? "auto" : "model"}"></label>`;
+  const modelPlaceholder = cli ? "auto" : p.provider === "ollama" ? "llama3.2" : "model";
+  let fields = `<label class="p-field"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span><input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="${modelPlaceholder}"></label>`;
   if (cli) {
     fields += `<label class="p-field"><span>${t("ui.profileAccount")}</span><select class="p-account">
       <option value="acc1"${p.account === "acc1" ? " selected" : ""}>acc1</option>
