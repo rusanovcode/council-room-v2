@@ -2270,7 +2270,6 @@ async function applyProviders() {
 let participantsDraft = null;
 let participantsForRunId = undefined;
 let selectedAgentKey = null;
-let participantsApplied = false; // true after explicit Apply or when loading a chat with saved agents
 
 const CLI_MODELS = {
   "cli-codex": ["gpt-5.4-mini", "gpt-5.4", "gpt-5.5", "gpt-5.3-codex"],
@@ -2342,7 +2341,7 @@ function makeAgentFromCatalog(entry, idx) {
   if (entry.account) backend.account = entry.account;
   if (entry.baseUrl) backend.baseUrl = entry.baseUrl;
   if (entry.credentialRef) backend.credentialRef = entry.credentialRef;
-  return { key: `a${idx + 1}`, label: entry.label, mode: "manual", backend };
+  return { key: `a${idx + 1}`, label: entry.label, mode: "manual", backend, _confirmed: false };
 }
 
 function rekeyAgents(list) {
@@ -2351,7 +2350,9 @@ function rekeyAgents(list) {
 
 function initParticipantsDraft() {
   const s = currentState.settings || {};
-  participantsDraft = Array.isArray(s.participants) ? JSON.parse(JSON.stringify(s.participants)) : [];
+  participantsDraft = Array.isArray(s.participants)
+    ? JSON.parse(JSON.stringify(s.participants)).map((p) => ({ ...p, _confirmed: true }))
+    : [];
 }
 
 function renderAgentsInit() {
@@ -2361,7 +2362,6 @@ function renderAgentsInit() {
     initParticipantsDraft();
     selectedAgentKey = (participantsDraft[0] && participantsDraft[0].key) || null;
     // Chats with already-saved participants are considered confirmed; fresh chats are not.
-    participantsApplied = participantsDraft.length >= 2;
   }
   renderAgentChips();
   renderAgentEditor();
@@ -2375,7 +2375,7 @@ function renderAgentChips() {
   box.innerHTML = "";
   for (const p of list) {
     const chip = document.createElement("span");
-    chip.className = `agent-chip-sel${p.key === selectedAgentKey ? " selected" : ""}${rounds === 0 && !participantsApplied ? " pulse" : ""}`;
+    chip.className = `agent-chip-sel${p.key === selectedAgentKey ? " selected" : ""}${rounds === 0 && !p._confirmed ? " pulse" : ""}`;
     chip.dataset.key = p.key;
     chip.dataset.tooltipText = t("ui.agentChipHint");
     chip.innerHTML = `<span class="ac-label">${escapeHtml(p.label || p.key)}</span>`
@@ -2410,23 +2410,21 @@ function renderOneAgentEditor(p) {
     ? cat.map((c) => `<option value="${escapeHtml(c.id)}"${c.id === curId ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")
     : `<option value="">${escapeHtml(t("ui.agentNoBackends"))}</option>`;
   const cli = isCliProviderId(b.provider);
+  const hl = !p._confirmed; // highlight only unconfirmed participants
   let modelField;
   if (cli) {
     const models = CLI_MODELS[b.provider] || [];
     const weak = weakModelFor(b.provider);
-    const hlModel = !participantsApplied && b.model === weak;
-    modelField = `<select class="ag-model${hlModel ? " hl-default" : ""}">${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
+    modelField = `<select class="ag-model${hl && b.model === weak ? " hl-default" : ""}">${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
   } else {
-    const hlModel = !participantsApplied && !b.model;
-    modelField = `<input class="ag-model${hlModel ? " hl-default" : ""}" value="${escapeHtml(b.model || "")}" placeholder="model">`;
+    modelField = `<input class="ag-model${hl && !b.model ? " hl-default" : ""}" value="${escapeHtml(b.model || "")}" placeholder="model">`;
   }
   let effortField = "";
   if (cli) {
     const efforts = CLI_EFFORTS[b.provider] || [];
     const cur = b.effort || "auto";
-    const hlEffort = !participantsApplied && (cur === "low" || cur === "auto");
     effortField = `<label class="p-field"><span>${t("ui.agentEffort")} ${helpIcon("agentEffort2")}</span>`
-      + `<select class="ag-effort${hlEffort ? " hl-default" : ""}">${efforts.map((e) => `<option value="${e}"${e === cur ? " selected" : ""}>${e}</option>`).join("")}</select></label>`;
+      + `<select class="ag-effort${hl && (cur === "low" || cur === "auto") ? " hl-default" : ""}">${efforts.map((e) => `<option value="${e}"${e === cur ? " selected" : ""}>${e}</option>`).join("")}</select></label>`;
   }
   return `<div class="agent-edit-card" data-key="${escapeHtml(p.key)}">
     <div class="agent-edit-name">${escapeHtml(p.label || p.key)}</div>
@@ -2454,15 +2452,15 @@ function bindAgentEditor() {
     const fresh = makeAgentFromCatalog(entry, idx < 0 ? 0 : idx);
     p.backend = fresh.backend;
     p.label = fresh.label;
-    participantsApplied = false; // backend changed — needs re-apply
+    p._confirmed = false;
     renderAgentChips();
     renderAgentEditor();
   });
-  q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; participantsApplied = false; renderAgentChips(); renderAgentEditor(); });
-  q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; participantsApplied = false; });
-  q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; participantsApplied = false; renderAgentChips(); renderAgentEditor(); });
+  q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); });
+  q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; p._confirmed = false; });
+  q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); });
   q(".ag-apply")?.addEventListener("click", async () => {
-    participantsApplied = true;
+    (participantsDraft || []).forEach((p) => { p._confirmed = true; });
     await applyParticipants();
     renderAgentChips();
     renderAgentEditor();
@@ -2496,7 +2494,6 @@ function addAgentAuto() {
   while (picks.length < 2) picks.push(cat[picks.length % cat.length]); // single backend → duplicate
   participantsDraft = rekeyAgents(picks.slice(0, 2).map((c, i) => makeAgentFromCatalog(c, i)));
   selectedAgentKey = participantsDraft[0].key;
-  participantsApplied = false;
   closeAddAgentModal();
   applyParticipants();
 }
@@ -2511,7 +2508,6 @@ function addAgentManual() {
   const entry = cat.find((c) => !used.has(`${c.provider}|${c.account || ""}`)) || cat[0];
   participantsDraft = rekeyAgents([...list, makeAgentFromCatalog(entry, list.length)]);
   selectedAgentKey = participantsDraft[participantsDraft.length - 1].key;
-  participantsApplied = false;
   closeAddAgentModal();
   renderAgentChips();
   renderAgentEditor();
