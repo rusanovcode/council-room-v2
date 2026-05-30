@@ -2521,7 +2521,6 @@ function addAgentManual() {
 function removeAgent(key) {
   participantsDraft = rekeyAgents((participantsDraft || []).filter((p) => p.key !== key));
   if (selectedAgentKey === key) selectedAgentKey = (participantsDraft[0] && participantsDraft[0].key) || null;
-  participantsApplied = false;
   renderAgentChips();
   renderAgentEditor();
   applyParticipants();
