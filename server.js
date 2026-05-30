@@ -1184,6 +1184,10 @@ async function router(req, res) {
       if (apiKey && credentialRef) {
         try { env.setEnvVar(ROOT, credentialRef, apiKey); } catch (e) { return sendJson(res, 400, { error: e.message }); }
       }
+      const provLabel = provider === "ollama" ? "Ollama" : provider;
+      addMessage({ role: "system", name: "Council Room", kind: "process",
+        text: `Agent test: ${provLabel} / ${model} — connecting…`,
+        textRu: `Тест агента: ${provLabel} / ${model} — проверяю подключение…` });
       const profile = { provider, baseUrl: body.baseUrl, credentialRef, model };
       const r = await providers.runProfile(profile, "What is 1+3? Reply with just the number.", { timeoutMs: 25000 })
         .catch((e) => ({ ok: false, text: e && e.message ? e.message : "error" }));
@@ -1191,12 +1195,23 @@ async function router(req, res) {
         if (r.ok) { validatedRefs.add(credentialRef); validatedStore.markValidated(ROOMS_DIR, credentialRef, process.env[credentialRef]); }
         else { validatedRefs.delete(credentialRef); validatedStore.clearValidated(ROOMS_DIR, credentialRef); }
       }
+      const errText = String(r.text || "").split("\n")[0].slice(0, 200);
+      const reply = String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40);
+      if (r.ok) {
+        addMessage({ role: "system", name: "Council Room", kind: "process",
+          text: `✓ ${provLabel} / ${model} — connected (reply: «${reply}»)`,
+          textRu: `✓ ${provLabel} / ${model} — подключён (ответ: «${reply}»)` });
+      } else {
+        addMessage({ role: "system", name: "Council Room", kind: "process",
+          text: `✗ ${provLabel} / ${model} — connection failed: ${errText}`,
+          textRu: `✗ ${provLabel} / ${model} — ошибка подключения: ${errText}` });
+      }
       broadcast();
       const info = publicState().providers;
       return sendJson(res, 200, {
         ok: Boolean(r.ok),
-        error: r.ok ? "" : String(r.text || "").split("\n")[0].slice(0, 200),
-        reply: r.ok ? String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40) : "",
+        error: r.ok ? "" : errText,
+        reply: r.ok ? reply : "",
         credentials: info.credentials,
         validated: info.validated,
       });
@@ -1314,8 +1329,6 @@ async function router(req, res) {
 
     if (method === "POST" && pathname === "/api/settings") {
       const body = await readBody(req);
-      // Allowing filesystem scan lifts strict scope (the two express opposite
-      // intents). One-way only: toggling strict scope leaves scan untouched.
       if (body.allowFilesystemScan === true) body.strictScope = false;
       // Phase 5: validate provider profiles before persisting them.
       if (Array.isArray(body.profiles)) {
@@ -1330,6 +1343,89 @@ async function router(req, res) {
         const perr = profiles.validateParticipants(body.participants, pool);
         if (perr) return sendJson(res, 400, { error: `Invalid participants: ${perr}` });
       }
+
+      // --- Trace: provider profile changes ---
+      const fmtProv = (p) => {
+        const prov = p.provider === "ollama" ? "Ollama" : p.provider || "?";
+        return `${p.label || p.id} (${prov}${p.model ? " / " + p.model : ""})`;
+      };
+      if (Array.isArray(body.profiles)) {
+        const oldProfs = state.settings.profiles || [];
+        const oldMap = new Map(oldProfs.map((p) => [p.id, p]));
+        const newMap = new Map(body.profiles.map((p) => [p.id, p]));
+        for (const [id, p] of newMap) {
+          if (!oldMap.has(id)) {
+            addMessage({ role: "system", name: "Council Room", kind: "process",
+              text: `Agent registered: ${fmtProv(p)}`,
+              textRu: `Агент зарегистрирован: ${fmtProv(p)}` });
+          }
+        }
+        for (const [id, p] of oldMap) {
+          if (!newMap.has(id)) {
+            addMessage({ role: "system", name: "Council Room", kind: "process",
+              text: `Agent removed from registry: ${fmtProv(p)}`,
+              textRu: `Агент удалён из реестра: ${fmtProv(p)}` });
+          }
+        }
+      } else if (body.profiles === null) {
+        const oldProfs = state.settings.profiles || [];
+        if (oldProfs.length) {
+          addMessage({ role: "system", name: "Council Room", kind: "process",
+            text: `All registered agents cleared.`,
+            textRu: `Все зарегистрированные агенты удалены.` });
+        }
+      }
+
+      // --- Trace: debate participant changes ---
+      const fmtBackend = (b) => {
+        if (!b) return "?";
+        const prov = b.provider === "cli-codex" ? "Codex CLI" : b.provider === "cli-claude" ? "Claude CLI"
+          : b.provider === "ollama" ? "Ollama" : b.provider || "?";
+        const acc = b.account ? ` acc ${b.account}` : "";
+        const mdl = b.model ? ` / ${b.model}` : "";
+        const eff = b.effort && b.effort !== "auto" ? ` / ${b.effort}` : "";
+        return `${prov}${acc}${mdl}${eff}`;
+      };
+      if (Array.isArray(body.participants)) {
+        const cur = state.run
+          ? (state.run.settings.participants || [])
+          : (state.settings.participants || []);
+        const oldMap = new Map(cur.map((p) => [p.key, p]));
+        for (const p of body.participants) {
+          const old = oldMap.get(p.key);
+          const bStr = fmtBackend(p.backend);
+          if (!old) {
+            addMessage({ role: "system", name: "Council Room", kind: "process",
+              text: `Debate agent added: ${p.label || p.key} → ${bStr}`,
+              textRu: `Агент дебатов добавлен: ${p.label || p.key} → ${bStr}` });
+          } else {
+            const ob = old.backend || {};
+            const nb = p.backend || {};
+            if (ob.provider !== nb.provider || ob.model !== nb.model || ob.effort !== nb.effort || ob.account !== nb.account) {
+              addMessage({ role: "system", name: "Council Room", kind: "process",
+                text: `Debate agent updated: ${p.label || p.key} → ${bStr}`,
+                textRu: `Агент дебатов обновлён: ${p.label || p.key} → ${bStr}` });
+            }
+          }
+        }
+        for (const old of cur) {
+          if (!body.participants.some((p) => p.key === old.key)) {
+            addMessage({ role: "system", name: "Council Room", kind: "process",
+              text: `Debate agent removed: ${old.label || old.key}`,
+              textRu: `Агент дебатов удалён: ${old.label || old.key}` });
+          }
+        }
+      } else if (body.participants === null) {
+        const cur = state.run
+          ? (state.run.settings.participants || [])
+          : (state.settings.participants || []);
+        if (cur.length) {
+          addMessage({ role: "system", name: "Council Room", kind: "process",
+            text: `Debate agents cleared.`,
+            textRu: `Агенты дебатов очищены.` });
+        }
+      }
+
       state.settings = { ...state.settings, ...body };
       if (state.run) {
         state.run.settings = { ...state.run.settings, ...body };
