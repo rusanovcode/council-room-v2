@@ -2461,7 +2461,12 @@ function bindAgentEditor() {
   q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; participantsApplied = false; renderAgentChips(); renderAgentEditor(); });
   q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; participantsApplied = false; });
   q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; participantsApplied = false; renderAgentChips(); renderAgentEditor(); });
-  q(".ag-apply")?.addEventListener("click", applyParticipants);
+  q(".ag-apply")?.addEventListener("click", async () => {
+    participantsApplied = true;
+    await applyParticipants();
+    renderAgentChips();
+    renderAgentEditor();
+  });
   q(".ag-remove")?.addEventListener("click", () => removeAgent(key));
 }
 
@@ -2528,12 +2533,7 @@ async function applyParticipants() {
   try {
     const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!res.ok) { const j = await res.json().catch(() => ({})); showProvidersMsg(j.error || `error ${res.status}`, true); return; }
-    if (participantsDraft.length >= 2) {
-      showProvidersMsg(t("ui.agentSaved"), false);
-      participantsApplied = true;
-      renderAgentChips();  // clears .pulse on chips
-      renderAgentEditor(); // clears hl-default on model/effort fields
-    }
+    if (participantsDraft.length >= 2) showProvidersMsg(t("ui.agentSaved"), false);
   } catch (e) { showProvidersMsg(e.message, true); }
 }
 
