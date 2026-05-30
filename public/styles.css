@@ -400,7 +400,7 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .acct-btn:hover { background: var(--border); }
 /* Phase 5: connected-agent chips (Profiles & roles), same pill style as the
    account buttons. Public build shows only these; full build shows them too. */
-.switcher-agents { display: flex; flex-direction: column; gap: 3px; }
+.switcher-agents { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; gap: 3px; align-items: center; }
 .agent-chip { cursor: help; }
 .agent-chip .agent-spend { opacity: 0.7; font-weight: 600; margin-left: 2px; }
 

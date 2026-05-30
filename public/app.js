@@ -150,7 +150,7 @@ const STRINGS = {
     "ui.agentReady": "проверен, рабочий",
     "ui.agentUnverified": "ключ задан, но не проверен",
     "ui.agentNoKey": "нет ключа",
-    "tip.agentChip": "{prov} · {model} — {status}. Бэкенд из «Профили и роли». Цвет: зелёный — ключ прошёл живой тест (или Ollama/CLI); жёлтый — ключ задан, но не проверен; серый — ключа нет.",
+    "tip.agentChip": "{prov} · {model} — {status}. Inline-бэкенд участника. Цвет: зелёный — ключ прошёл живой тест (или Ollama/CLI); жёлтый — ключ задан, но не проверен; серый — ключа нет.",
     "ui.toggleStatement": "Развернуть / свернуть текст постановки подзадачи",
     "ui.checkUpdates": "Обновления",
     "ui.checkUpdatesTitle": "Проверить обновления на GitHub",
@@ -235,19 +235,14 @@ const STRINGS = {
     "ui.keyTestNeedsModel": "Для проверки ключа сначала укажи модель в этом профиле.",
     "ui.keyVerified": "Ключ проверен живым запросом — рабочий (зелёная галочка).",
     "ui.keyUnverified": "Ключ задан, но не проверен (жёлтая галочка). Введи/перевведи ключ в поле — он протестируется автоматически.",
-    "ui.chainEmpty": "Профилей нет. Добавь профиль выше (+ Профиль) — он появится здесь галочкой для включения в цепочку.",
     "ui.remove": "Удалить",
-    "ui.roleMode": "Режим",
-    "ui.roleChain": "Бэкенды (failover по порядку)",
-    "ui.apiModeNote": "Режим API: подписочные CLI (Codex/Claude) отключены. Настрой роли через профили ниже.",
     "tip.providersPanel": "Регистрация агентов: здесь регистрируешь и авторизуешь бэкенды. Профиль — это именованный бэкенд: API-провайдер (по ключу из .env), локальная Ollama или (в full-сборке) подписочный CLI. Зарегистрированные профили становятся доступны при выборе агентов обсуждения (кнопка «Добавить агента» в шапке чата).|||Зарегистрируй профиль «DeepSeek» с ключом DEEPSEEK_API_KEY → он появится в списке бэкендов, когда добавляешь агента в чат.",
-    "tip.agentSettings": "Базовые настройки раунда: разрешение сканировать файлы, язык агентов и БЫСТРЫЙ выбор для двух стандартных спорщиков — модель/усилие/аккаунт Codex и Claude. Это упрощённый путь «по умолчанию». Окно «Профили и роли» — продвинутый путь: там можно подключить любые API-провайдеры/Ollama и собрать цепочки с failover. Если в «Профили и роли» заданы роли — они ПЕРЕОПРЕДЕЛЯЮТ выбор Codex/Claude отсюда (в режиме API эти простые контролы скрыты).|||Хочешь быстро сменить модель Codex на gpt-5.4-mini — здесь. Хочешь, чтобы спорщик A ходил в DeepSeek с откатом на Ollama — в «Профили и роли».",
-    "tip.profileLabel": "Человекочитаемое имя профиля — только для отображения (в списке цепочки роли и в логах раунда). Ни на что в запросе не влияет. Если оставить пустым, показывается технический id (например p_mprga7ou).|||«DeepSeek основной», «Ollama локальная».",
+    "tip.agentSettings": "Базовые настройки раунда: разрешение сканировать файлы, язык агентов и БЫСТРЫЙ выбор для двух стандартных спорщиков — модель/усилие/аккаунт Codex и Claude. Это упрощённый путь «по умолчанию». Для подключения API-провайдеров/Ollama используй «Регистрация агентов» (в режиме API эти простые контролы скрыты).|||Хочешь быстро сменить модель Codex на gpt-5.4-mini — здесь. Хочешь добавить DeepSeek или Ollama — в «Регистрация агентов».",
+    "tip.profileLabel": "Человекочитаемое имя профиля — только для отображения (в чипе агента и в логах раунда). Ни на что в запросе не влияет. Если оставить пустым, показывается технический id (например p_mprga7ou).|||«DeepSeek основной», «Ollama локальная».",
     "tip.profileModel": "Идентификатор модели у провайдера — точная строка, которую он ждёт в поле model запроса. Бери из документации провайдера. Для CLI можно оставить «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (то, что показывает `ollama list`).",
     "tip.profileBaseUrl": "Корень API провайдера, заканчивается на /v1 (адаптер сам допишет /chat/completions). Для пресета подставляется автоматически — меняй только для своего/прокси-эндпоинта или саморазмещённой Ollama.|||https://api.deepseek.com/v1 · http://localhost:11434/v1 (Ollama).",
     "tip.profileCredRef": "Имя переменной окружения, где лежит API-ключ (например DEEPSEEK_API_KEY). Сам ключ хранится в .env (он в .gitignore) или в окружении — НЕ в репозитории и не в state.json. Можно либо вписать ключ напрямую в поле ниже, либо самому добавить строку в .env.|||DEEPSEEK_API_KEY → в .env строка DEEPSEEK_API_KEY=sk-...",
     "tip.profileApiKey": "Можно вставить API-ключ прямо здесь — по «Применить» он сохранится в файл .env (он в .gitignore) под именем из «Env-переменная ключа», а НЕ в state.json. Поле всегда пустое (ключ не показывается); оставь пустым, чтобы не менять уже сохранённый.|||Вставь sk-... → в .env появится DEEPSEEK_API_KEY=sk-...",
-    "tip.roleChain": "Список профилей-бэкендов этой роли. Галочка = включить профиль в цепочку. Режим auto: на ошибке/лимите первого по списку пробуется следующий отмеченный (failover). Режим manual: используется только первый отмеченный. Имя в строке — это «Подпись» профиля (или его id, если подпись пуста).|||auto + отмечены [DeepSeek, Ollama]: DeepSeek упал → пробуем Ollama. manual: только DeepSeek.",
     "ui.addAgent": "Добавить агента",
     "ui.addAgentTitle": "Добавить агента",
     "ui.addAgentChoose": "Как добавить агентов в обсуждение?",
@@ -264,7 +259,7 @@ const STRINGS = {
     "ui.agentApply": "Применить",
     "ui.agentRemove": "Убрать агента",
     "ui.agentSaved": "Агенты сохранены ✓",
-    "ui.agentNoBackends": "Нет доступных бэкендов. Зарегистрируй/авторизуй агента в «Профили и роли».",
+    "ui.agentNoBackends": "Нет доступных бэкендов. Зарегистрируй/авторизуй агента в «Регистрация агентов».",
     "ui.agentMin2": "Нужно минимум 2 агента, чтобы запустить раунд.",
     "ui.agentMax": "Максимум 5 агентов.",
     "ui.agentNoneYet": "Агенты не выбраны",
@@ -443,7 +438,7 @@ const STRINGS = {
     "ui.agentReady": "verified, working",
     "ui.agentUnverified": "key set but unverified",
     "ui.agentNoKey": "no key",
-    "tip.agentChip": "{prov} · {model} — {status}. Backend from «Profiles & roles». Colour: green — key passed a live test (or Ollama/CLI); amber — key set but unverified; grey — no key.",
+    "tip.agentChip": "{prov} · {model} — {status}. Inline agent backend. Colour: green — key passed a live test (or Ollama/CLI); amber — key set but unverified; grey — no key.",
     "ui.toggleStatement": "Expand / collapse the subtask statement",
     "ui.checkUpdates": "Updates",
     "ui.checkUpdatesTitle": "Check for updates on GitHub",
@@ -528,19 +523,14 @@ const STRINGS = {
     "ui.keyTestNeedsModel": "Set a model in this profile first to test the key.",
     "ui.keyVerified": "Key verified with a live request — working (green check).",
     "ui.keyUnverified": "Key is set but unverified (amber check). Enter/re-enter the key in the field — it will be tested automatically.",
-    "ui.chainEmpty": "No profiles yet. Add one above (+ Profile) — it will appear here as a checkbox to include in the chain.",
     "ui.remove": "Remove",
-    "ui.roleMode": "Mode",
-    "ui.roleChain": "Backends (failover in order)",
-    "ui.apiModeNote": "API mode: subscription CLIs (Codex/Claude) are disabled. Configure roles via the profiles below.",
     "tip.providersPanel": "Agent registration: register and authorize backends here. A profile is a named backend: an API provider (key from .env), local Ollama, or (full build) a subscription CLI. Registered profiles become available when you pick debate agents (the \"Add agent\" button in the chat header).|||Register a \"DeepSeek\" profile with key DEEPSEEK_API_KEY → it shows up in the backend list when you add an agent to a chat.",
-    "tip.agentSettings": "Basic round settings: filesystem-scan permission, agent language, and a QUICK picker for the two standard debaters — Codex and Claude model/effort/account. This is the simple default path. The «Profiles & roles» panel is the advanced path: wire in any API provider/Ollama and build chains with failover. Roles defined in «Profiles & roles» OVERRIDE the Codex/Claude picks here (in API mode these simple controls are hidden).|||Want to quickly switch Codex to gpt-5.4-mini — do it here. Want debater A to hit DeepSeek with an Ollama fallback — use «Profiles & roles».",
-    "tip.profileLabel": "Human-readable name for the profile — display only (in the role's chain list and round logs). It has no effect on the request. If left empty, the technical id is shown (e.g. p_mprga7ou).|||«DeepSeek main», «Ollama local».",
+    "tip.agentSettings": "Basic round settings: filesystem-scan permission, agent language, and a QUICK picker for the two standard debaters — Codex and Claude model/effort/account. This is the simple default path. To wire in API providers/Ollama use «Agent registration» (in API mode these simple controls are hidden).|||Want to quickly switch Codex to gpt-5.4-mini — do it here. Want to add DeepSeek or Ollama — use «Agent registration».",
+    "tip.profileLabel": "Human-readable name for the profile — display only (in the agent chip and round logs). It has no effect on the request. If left empty, the technical id is shown (e.g. p_mprga7ou).|||«DeepSeek main», «Ollama local».",
     "tip.profileModel": "The provider's model id — the exact string it expects in the request's model field. Take it from the provider's docs. For CLI you can leave «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (whatever `ollama list` shows).",
     "tip.profileBaseUrl": "The provider's API root, ending in /v1 (the adapter appends /chat/completions). Auto-filled for a preset — change it only for a custom/proxy endpoint or a self-hosted Ollama.|||https://api.deepseek.com/v1 · http://localhost:11434/v1 (Ollama).",
     "tip.profileCredRef": "Name of the environment variable holding the API key (e.g. DEEPSEEK_API_KEY). The key itself lives in .env (gitignored) or the environment — NEVER in the repo or state.json. You can either type the key directly in the field below, or add the line to .env yourself.|||DEEPSEEK_API_KEY → a line DEEPSEEK_API_KEY=sk-... in .env",
     "tip.profileApiKey": "You can paste the API key right here — on «Apply» it is saved to the .env file (gitignored) under the «API key env var» name, NOT to state.json. The field is always blank (the key is never shown); leave it empty to keep the already-saved key.|||Paste sk-... → .env gets DEEPSEEK_API_KEY=sk-...",
-    "tip.roleChain": "The list of backend profiles for this role. A checkbox = include that profile in the chain. auto mode: on an error/limit of the first checked one, the next checked is tried (failover). manual mode: only the first checked is used. The name on each line is the profile's «Label» (or its id when the label is empty).|||auto + checked [DeepSeek, Ollama]: DeepSeek fails → try Ollama. manual: DeepSeek only.",
     "ui.addAgent": "Add agent",
     "ui.addAgentTitle": "Add agent",
     "ui.addAgentChoose": "How to add agents to the debate?",
@@ -557,7 +547,7 @@ const STRINGS = {
     "ui.agentApply": "Apply",
     "ui.agentRemove": "Remove agent",
     "ui.agentSaved": "Agents saved ✓",
-    "ui.agentNoBackends": "No available backends. Register/authorize one in «Profiles & roles».",
+    "ui.agentNoBackends": "No available backends. Register/authorize one in «Agent registration».",
     "ui.agentMin2": "At least 2 agents are required to run a round.",
     "ui.agentMax": "Maximum 5 agents.",
     "ui.agentNoneYet": "No agents selected",
@@ -1881,21 +1871,16 @@ function renderConnectedAgents() {
   box.innerHTML = "";
   const agents = connectedAgents();
   if (!agents.length) return;
-  const row = document.createElement("div");
-  row.className = "acct-row";
   for (const a of agents) {
     const chip = document.createElement("span");
-    // Dashed "unauthorized" only when there's no key at all; an unverified key
-    // is still solid (amber) since it might work.
     chip.className = `acct-btn agent-chip ${a.tok}${a.present ? "" : " unauthorized"}`;
     const spent = fmtSpentK(a.spentK);
     chip.innerHTML = `${escapeHtml(a.name)}${spent ? `<span class="agent-spend">${escapeHtml(spent)}</span>` : ""}`;
     const statusText = a.status === "ok" ? t("ui.agentReady") : (a.status === "unverified" ? t("ui.agentUnverified") : t("ui.agentNoKey"));
     chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: statusText })
       + (a.spentK ? ` · ~${a.spentK.toFixed(1)}K tok` : "");
-    row.appendChild(chip);
+    box.appendChild(chip);
   }
-  box.appendChild(row);
 }
 
 function renderSwitcher() {
