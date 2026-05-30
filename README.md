@@ -6,7 +6,7 @@
 
 ## English
 
-A local "council of agents": **Codex** and **Claude** debate a task in parallel rounds while you moderate. A rebuild of v1 around three objects that keep the prompt small even at round 30+:
+A local "council of agents": 2–5 AI models debate a task in parallel rounds while you moderate. Works with **Codex CLI**, **Claude CLI**, any OpenAI-compatible API (OpenAI, Anthropic, DeepSeek, Groq, …), and local **Ollama** models — mix and match freely. A rebuild of v1 around three objects that keep the prompt small even at round 30+:
 
 - **Subtask Stack** — isolated subtasks; only the active one goes into the prompt.
 - **Knowledge Base** — sectioned markdown (decisions / prohibitions / risks / …), sent to the agents as a snapshot instead of an ever-growing transcript.
@@ -18,7 +18,7 @@ Prompt size: **~1.7–2.5 KB per round** (vs 100+ KB in v1).
 
 ### Features
 
-- **Debate rounds** — Codex and Claude answer in parallel on the active subtask (read-only, no file changes).
+- **Debate rounds** — 2–5 agents answer in parallel on the active subtask (read-only, no file changes). Mix CLI agents and API-key providers freely.
 - **Autopilot** — the agents ping-pong on their own until a stop condition fires (debate-complete, stale×2, block, token limit, round budget, manual stop).
 - **Knowledge Base** per chat (`rooms/<id>/knowledge.md`).
 - **API-key backends** — register any OpenAI-compatible provider (OpenAI, Anthropic, Ollama, etc.) in the Backends panel alongside CLI agents.
@@ -85,7 +85,7 @@ Round data is stored locally in `rooms/<id>/` and never committed.
 
 ## Русский
 
-Локальный «совет агентов»: **Codex** и **Claude** обсуждают задачу в параллельных раундах, а ты модерируешь. Переработка v1 вокруг трёх объектов, которые удерживают промт маленьким даже на 30+ раунде:
+Локальный «совет агентов»: 2–5 AI-моделей обсуждают задачу в параллельных раундах, а ты модерируешь. Работает с **Codex CLI**, **Claude CLI**, любым OpenAI-совместимым API (OpenAI, Anthropic, DeepSeek, Groq, …) и локальными **Ollama**-моделями — можно миксовать в любых комбинациях. Переработка v1 вокруг трёх объектов, которые удерживают промт маленьким даже на 30+ раунде:
 
 - **Subtask Stack** — изолированные подзадачи; в промт идёт только активная.
 - **Knowledge Base** — секционный markdown (решения / запреты / риски / …), отправляется агентам как снапшот вместо растущего транскрипта.
@@ -97,7 +97,7 @@ Round data is stored locally in `rooms/<id>/` and never committed.
 
 ### Возможности
 
-- **Раунды дебатов** — Codex и Claude отвечают параллельно по активной подзадаче (read-only, файлы не меняются).
+- **Раунды дебатов** — 2–5 агентов отвечают параллельно по активной подзадаче (read-only, файлы не меняются). CLI-агенты и API-провайдеры можно свободно смешивать.
 - **Autopilot** — агенты пинг-понгуют сами, пока не сработает стоп-условие (debate-complete, stale×2, block, лимит токенов, бюджет раундов, ручной стоп).
 - **Knowledge Base** на чат (`rooms/<id>/knowledge.md`).
 - **API-key бэкенды** — зарегистрируй любого OpenAI-совместимого провайдера (OpenAI, Anthropic, Ollama и др.) в панели «Регистрация агентов».
