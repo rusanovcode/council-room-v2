@@ -2270,6 +2270,7 @@ async function applyProviders() {
 let participantsDraft = null;
 let participantsForRunId = undefined;
 let selectedAgentKey = null;
+let participantsApplied = false; // true after explicit Apply or when loading a chat with saved agents
 
 const CLI_MODELS = {
   "cli-codex": ["gpt-5.4-mini", "gpt-5.4", "gpt-5.5", "gpt-5.3-codex"],
@@ -2359,6 +2360,8 @@ function renderAgentsInit() {
     participantsForRunId = rid;
     initParticipantsDraft();
     selectedAgentKey = (participantsDraft[0] && participantsDraft[0].key) || null;
+    // Chats with already-saved participants are considered confirmed; fresh chats are not.
+    participantsApplied = participantsDraft.length >= 2;
   }
   renderAgentChips();
   renderAgentEditor();
@@ -2372,7 +2375,7 @@ function renderAgentChips() {
   box.innerHTML = "";
   for (const p of list) {
     const chip = document.createElement("span");
-    chip.className = `agent-chip-sel${p.key === selectedAgentKey ? " selected" : ""}${rounds === 0 ? " pulse" : ""}`;
+    chip.className = `agent-chip-sel${p.key === selectedAgentKey ? " selected" : ""}${rounds === 0 && !participantsApplied ? " pulse" : ""}`;
     chip.dataset.key = p.key;
     chip.dataset.tooltipText = t("ui.agentChipHint");
     chip.innerHTML = `<span class="ac-label">${escapeHtml(p.label || p.key)}</span>`
@@ -2411,16 +2414,19 @@ function renderOneAgentEditor(p) {
   if (cli) {
     const models = CLI_MODELS[b.provider] || [];
     const weak = weakModelFor(b.provider);
-    modelField = `<select class="ag-model${b.model === weak ? " hl-default" : ""}">${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
+    const hlModel = !participantsApplied && b.model === weak;
+    modelField = `<select class="ag-model${hlModel ? " hl-default" : ""}">${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
   } else {
-    modelField = `<input class="ag-model${b.model ? "" : " hl-default"}" value="${escapeHtml(b.model || "")}" placeholder="model">`;
+    const hlModel = !participantsApplied && !b.model;
+    modelField = `<input class="ag-model${hlModel ? " hl-default" : ""}" value="${escapeHtml(b.model || "")}" placeholder="model">`;
   }
   let effortField = "";
   if (cli) {
     const efforts = CLI_EFFORTS[b.provider] || [];
     const cur = b.effort || "auto";
+    const hlEffort = !participantsApplied && (cur === "low" || cur === "auto");
     effortField = `<label class="p-field"><span>${t("ui.agentEffort")} ${helpIcon("agentEffort2")}</span>`
-      + `<select class="ag-effort${(cur === "low" || cur === "auto") ? " hl-default" : ""}">${efforts.map((e) => `<option value="${e}"${e === cur ? " selected" : ""}>${e}</option>`).join("")}</select></label>`;
+      + `<select class="ag-effort${hlEffort ? " hl-default" : ""}">${efforts.map((e) => `<option value="${e}"${e === cur ? " selected" : ""}>${e}</option>`).join("")}</select></label>`;
   }
   return `<div class="agent-edit-card" data-key="${escapeHtml(p.key)}">
     <div class="agent-edit-name">${escapeHtml(p.label || p.key)}</div>
@@ -2448,12 +2454,13 @@ function bindAgentEditor() {
     const fresh = makeAgentFromCatalog(entry, idx < 0 ? 0 : idx);
     p.backend = fresh.backend;
     p.label = fresh.label;
+    participantsApplied = false; // backend changed — needs re-apply
     renderAgentChips();
     renderAgentEditor();
   });
-  q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; renderAgentChips(); });
-  q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; });
-  q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; });
+  q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; participantsApplied = false; renderAgentChips(); renderAgentEditor(); });
+  q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; participantsApplied = false; });
+  q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; participantsApplied = false; renderAgentChips(); renderAgentEditor(); });
   q(".ag-apply")?.addEventListener("click", applyParticipants);
   q(".ag-remove")?.addEventListener("click", () => removeAgent(key));
 }
@@ -2523,7 +2530,9 @@ async function applyParticipants() {
     if (!res.ok) { const j = await res.json().catch(() => ({})); showProvidersMsg(j.error || `error ${res.status}`, true); return; }
     if (participantsDraft.length >= 2) {
       showProvidersMsg(t("ui.agentSaved"), false);
-      renderAgentEditor(); // re-render so hl-default reflects the saved draft, not a stale SSE state
+      participantsApplied = true;
+      renderAgentChips();  // clears .pulse on chips
+      renderAgentEditor(); // clears hl-default on model/effort fields
     }
   } catch (e) { showProvidersMsg(e.message, true); }
 }
