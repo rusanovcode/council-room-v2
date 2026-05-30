@@ -216,6 +216,7 @@ const STRINGS = {
     "ui.addProfile": "+ Профиль",
     "ui.applyProviders": "Применить",
     "ui.providersSaved": "Сохранено ✓",
+    "ui.profileModelRequired": "Укажи модель для «{label}» (например: llama3.2, gpt-4o-mini)",
     "ui.noProfiles": "Профилей нет — раунд использует поведение по умолчанию (Codex/Claude).",
     "ui.profileProvider": "Провайдер",
     "ui.profileModel": "Модель",
@@ -506,6 +507,7 @@ const STRINGS = {
     "ui.addProfile": "+ Profile",
     "ui.applyProviders": "Apply",
     "ui.providersSaved": "Saved ✓",
+    "ui.profileModelRequired": "Enter a model name for «{label}» (e.g. llama3.2, gpt-4o-mini)",
     "ui.noProfiles": "No profiles — the round uses the default Codex/Claude behavior.",
     "ui.profileProvider": "Provider",
     "ui.profileModel": "Model",
@@ -2227,6 +2229,13 @@ async function applyProviders() {
   syncProvidersFromDOM();
   const ids = providersDraft.profiles.map((p) => p.id);
   if (new Set(ids).size !== ids.length) { showProvidersMsg("duplicate profile ids", true); return; }
+  for (const p of providersDraft.profiles) {
+    const isCli = isCliProviderId(p.provider);
+    if (!isCli && !(p.model || "").trim()) {
+      showProvidersMsg(t("ui.profileModelRequired", { label: p.label || p.id }), true);
+      return;
+    }
+  }
 
   // Direct API-key entry: any non-empty .p-apikey field is persisted to .env
   // (gitignored) under that profile's credentialRef — never into the profiles
