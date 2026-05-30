@@ -1841,6 +1841,15 @@ let statsPeriod = "today";
 let statsTab = localStorage.getItem("council-room-v2.statsTab") || "limits";
 let statsLoading = false;
 let lastStatsVersion = null; // server statsVersion last applied (re-fetch on bump)
+let switcherRefreshing = false;   // true while account-chip animation is running
+let switcherRefreshBaseVer = null; // statsVersion at the moment refresh was triggered
+
+function stopSwitcherRefreshAnim() {
+  if (!switcherRefreshing) return;
+  switcherRefreshing = false;
+  $("refreshIcon")?.classList.remove("refresh-spinning");
+  $("switcherAccounts")?.classList.remove("chips-loading");
+}
 
 async function loadStats() {
   statsLoading = true;
@@ -2068,6 +2077,10 @@ function renderSwitcher() {
   const el = $("switcherStatus");
   if (!el) return;
   const sw = currentState.switcher || {};
+  // Stop refresh animation once server broadcasts a new statsVersion.
+  if (switcherRefreshing && sw.statsVersion !== undefined && sw.statsVersion !== switcherRefreshBaseVer) {
+    stopSwitcherRefreshAnim();
+  }
   const connected = Boolean(sw.connected);
   const apiBuild = ((currentState.providers && currentState.providers.mode) || "full") === "api";
   const agents = connectedAgents();
@@ -3326,13 +3339,14 @@ function bindUi() {
   });
   $("refreshSwitcher")?.addEventListener("click", () => {
     if (confirm(t("ui.confirmRefresh"))) {
-      // Spin the ↻ icon and pulse only the switcher account chips (not provider chips).
+      // Animation runs until server broadcasts a new statsVersion (real work done).
+      switcherRefreshing = true;
+      switcherRefreshBaseVer = currentState?.switcher?.statsVersion ?? null;
       $("refreshIcon")?.classList.add("refresh-spinning");
       $("switcherAccounts")?.classList.add("chips-loading");
-      api("POST", "/api/switcher/refresh", {}).finally(() => {
-        $("refreshIcon")?.classList.remove("refresh-spinning");
-        $("switcherAccounts")?.classList.remove("chips-loading");
-      });
+      api("POST", "/api/switcher/refresh", {});
+      // Fallback: clear after 120s in case broadcast never arrives.
+      setTimeout(() => stopSwitcherRefreshAnim(), 120000);
     }
   });
   $("cancelLogin").addEventListener("click", () => $("loginModal").classList.add("hidden"));
