@@ -2744,31 +2744,24 @@ async function applyProviders() {
       showProvidersMsg(j.error || `error ${res.status}`, true);
       return;
     }
-    let successMsg;
-    if (ollamaProfiles.length) {
-      const names = (ollamaProfiles._testedModels || []).join(", ");
-      successMsg = t("ui.ollamaConnectedModels", { models: names });
-      // Log each registered Ollama profile.
-      for (const p of ollamaProfiles) {
-        const lbl = p.label ? `«${p.label}»` : `«${p.model}»`;
-        provLogAdd(
-          `Агент зарегистрирован: ${lbl} (Ollama / ${p.model})`,
-          `Agent registered: ${lbl} (Ollama / ${p.model})`
-        );
-      }
-    } else {
-      successMsg = keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved");
-      // Log non-Ollama profile registrations.
-      for (const p of providersDraft.profiles) {
-        if (!isCliProviderId(p.provider) && p.provider !== "ollama") {
-          const lbl = p.label ? `«${p.label}»` : `«${p.id}»`;
-          provLogAdd(
-            `Агент зарегистрирован: ${lbl} (${p.provider} / ${p.model || "—"})`,
-            `Agent registered: ${lbl} (${p.provider} / ${p.model || "—"})`
-          );
-        }
-      }
+    // Log ALL newly added profiles (any type: Ollama, CLI, API).
+    // savedIds was computed before the save — anything not in it is new.
+    for (const p of providersDraft.profiles) {
+      if (savedIds.has(p.id)) continue; // already existed before this Apply
+      const provLabel = p.provider === "cli-codex" ? "Codex CLI"
+        : p.provider === "cli-claude" ? "Claude CLI"
+        : p.provider === "ollama" ? "Ollama"
+        : p.provider || "API";
+      const lbl = p.label ? `«${p.label}»` : `«${p.model || p.id}»`;
+      const mdl = p.model ? ` / ${p.model}` : "";
+      provLogAdd(
+        `Агент зарегистрирован: ${lbl} (${provLabel}${mdl})`,
+        `Agent registered: ${lbl} (${provLabel}${mdl})`
+      );
     }
+    const successMsg = ollamaProfiles.length
+      ? t("ui.ollamaConnectedModels", { models: (ollamaProfiles._testedModels || []).join(", ") })
+      : (keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"));
     showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
     renderProviders(); // refresh key badges + clear the direct-key inputs
   } catch (e) {
@@ -3283,8 +3276,16 @@ function bindUi() {
     render();
     if (panelOpen.switcherStats) loadStats();
   });
-  $("refreshSwitcher").addEventListener("click", () => {
-    if (confirm(t("ui.confirmRefresh"))) api("POST", "/api/switcher/refresh", {});
+  $("refreshSwitcher")?.addEventListener("click", () => {
+    if (confirm(t("ui.confirmRefresh"))) {
+      // Animate chips while refresh is in flight.
+      $("switcherAgents")?.classList.add("chips-loading");
+      $("switcherAccounts")?.classList.add("chips-loading");
+      api("POST", "/api/switcher/refresh", {}).finally(() => {
+        $("switcherAgents")?.classList.remove("chips-loading");
+        $("switcherAccounts")?.classList.remove("chips-loading");
+      });
+    }
   });
   $("cancelLogin").addEventListener("click", () => $("loginModal").classList.add("hidden"));
   $("confirmLoginBtn").addEventListener("click", () => {

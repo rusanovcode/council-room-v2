@@ -1225,6 +1225,11 @@ button.square {
   max-height: 60vh;
   overflow-y: auto;
 }
+/* Registered models panel: max-height so it doesn't push KB off screen. */
+.col.right > #registeredModelsPanel[open] .providers-body {
+  max-height: 45vh;
+  overflow-y: auto;
+}
 /* Settings reuses the collapsible providers-panel look but is NOT sticky. */
 .col.right > #settingsDetails { margin: 0 0 8px; }
 .providers-panel > summary {
@@ -1374,6 +1379,11 @@ button.square {
 .plog-date { font-size: 10px; color: var(--muted); font-family: var(--mono); }
 .plog-time { font-size: 10px; color: var(--muted); font-family: var(--mono); }
 .plog-msg { font-size: 11px; color: var(--text); line-height: 1.4; word-break: break-word; margin-top: 1px; }
+/* Chip loading animation during switcher refresh */
+@keyframes chipPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.chips-loading .acct-btn,
+.chips-loading .agent-chip { animation: chipPulse 1s ease-in-out infinite; }
+
 /* Registered model row states */
 .rm-cell-retest { width: 24px; padding: 4px 2px; vertical-align: middle; }
 .rm-retest { font-size: 13px; padding: 0 3px; line-height: 1; background: none; border: none; color: var(--muted); cursor: pointer; }
