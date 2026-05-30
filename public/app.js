@@ -2496,6 +2496,7 @@ function addAgentAuto() {
   while (picks.length < 2) picks.push(cat[picks.length % cat.length]); // single backend → duplicate
   participantsDraft = rekeyAgents(picks.slice(0, 2).map((c, i) => makeAgentFromCatalog(c, i)));
   selectedAgentKey = participantsDraft[0].key;
+  participantsApplied = false;
   closeAddAgentModal();
   applyParticipants();
 }
@@ -2510,6 +2511,7 @@ function addAgentManual() {
   const entry = cat.find((c) => !used.has(`${c.provider}|${c.account || ""}`)) || cat[0];
   participantsDraft = rekeyAgents([...list, makeAgentFromCatalog(entry, list.length)]);
   selectedAgentKey = participantsDraft[participantsDraft.length - 1].key;
+  participantsApplied = false;
   closeAddAgentModal();
   renderAgentChips();
   renderAgentEditor();
@@ -2519,6 +2521,7 @@ function addAgentManual() {
 function removeAgent(key) {
   participantsDraft = rekeyAgents((participantsDraft || []).filter((p) => p.key !== key));
   if (selectedAgentKey === key) selectedAgentKey = (participantsDraft[0] && participantsDraft[0].key) || null;
+  participantsApplied = false;
   renderAgentChips();
   renderAgentEditor();
   applyParticipants();
