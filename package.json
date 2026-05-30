@@ -1,0 +1,12 @@
+{
+  "name": "council-room-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Council Room v2 — Subtask Stack + Knowledge Base + scoped debate",
+  "main": "server.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/providers.test.js && node test/roles.test.js && node test/round.integration.test.js"
+  }
+}

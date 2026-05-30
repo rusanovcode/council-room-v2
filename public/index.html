@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Council Room v2</title>
+    <link rel="stylesheet" href="/styles.css?v=__V__" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="col left">
+        <header class="col-head">
+          <h1 data-tooltip-key="t.councilRoom">
+            Council Room <span class="badge">v2</span>
+            <span class="help">?</span>
+          </h1>
+          <div class="head-actions">
+            <button id="newRun" class="ghost" data-i18n="ui.newChat">+ Новый чат</button>
+          </div>
+        </header>
+
+        <section class="block">
+          <h2>
+            <span data-i18n="ui.chats">Чаты</span>
+            <span class="h2-actions">
+              <button id="toggleChatArchive" class="ghost small" type="button" data-tooltip-key="t.chatArchive">🗄</button>
+              <button id="toggleChatTrash" class="ghost small" type="button" data-tooltip-key="t.chatTrash">🗑</button>
+            </span>
+          </h2>
+          <ul id="runList" class="run-list"></ul>
+          <div id="chatArchive" class="bin-panel hidden">
+            <div class="bin-panel-head"><span data-i18n="ui.archived">Архив</span></div>
+            <ul id="archivedRunList" class="run-list"></ul>
+          </div>
+          <div id="chatTrash" class="bin-panel hidden">
+            <div class="bin-panel-head">
+              <span data-i18n="ui.trash">Корзина</span>
+              <button id="emptyChatTrash" class="ghost small" type="button" data-i18n="ui.emptyTrash">Очистить</button>
+            </div>
+            <ul id="trashedRunList" class="run-list"></ul>
+          </div>
+        </section>
+
+        <section class="block">
+          <h2>
+            <span data-i18n="ui.subtaskStack">Стек подзадач</span>
+            <span class="help" data-tooltip-key="t.subtaskStack">?</span>
+            <span class="h2-actions">
+              <button id="toggleSubtaskArchive" class="ghost small" type="button" data-tooltip-key="t.subtaskArchive">🗄</button>
+              <button id="toggleSubtaskTrash" class="ghost small" type="button" data-tooltip-key="t.subtaskTrash">🗑</button>
+              <button id="openSubtask" class="ghost small" data-tooltip-key="t.openSubtask">+</button>
+            </span>
+          </h2>
+          <ul id="subtaskList" class="subtask-list"></ul>
+          <div id="subtaskArchive" class="bin-panel hidden">
+            <div class="bin-panel-head"><span data-i18n="ui.archived">Архив</span></div>
+            <ul id="archivedSubtaskList" class="subtask-list"></ul>
+          </div>
+          <div id="subtaskTrash" class="bin-panel hidden">
+            <div class="bin-panel-head">
+              <span data-i18n="ui.trash">Корзина</span>
+              <button id="emptyTrash" class="ghost small" type="button" data-i18n="ui.emptyTrash">Очистить</button>
+            </div>
+            <ul id="trashedSubtaskList" class="subtask-list"></ul>
+          </div>
+        </section>
+
+        <section class="block status-block">
+          <h2>
+            <span data-i18n="ui.status">Статус</span>
+          </h2>
+          <div id="status" class="status-line">idle</div>
+        </section>
+
+      </aside>
+
+      <section class="col center">
+        <header class="col-head">
+          <div>
+            <div id="activeSubtaskMeta" class="muted small"></div>
+          </div>
+          <div class="head-actions">
+            <!-- Phase 6b: debate-agent selection. Chips (one per chosen agent)
+                 sit left of the 2-line "Add agent" button, which is leftmost. -->
+            <span id="agentChips" class="agent-chips"></span>
+            <button id="addAgent" class="ghost agent-add" type="button"
+              data-tooltip-key="t.addAgent"><span data-i18n="ui.addAgent">Добавить агента</span></button>
+            <span class="head-divider"></span>
+            <button id="resolveSubtask" class="primary" disabled
+              data-i18n="ui.resolve" data-tooltip-key="t.resolve">Закрыть</button>
+            <button id="freezeSubtask" class="ghost" disabled
+              data-i18n="ui.freeze" data-tooltip-key="t.freeze">Заморозить</button>
+            <button id="toggleTrace" class="ghost" data-tooltip-key="t.trace">
+              <span data-i18n="ui.trace">Лог</span> ▾
+            </button>
+            <button id="toggleMsgTrash" class="ghost" type="button" data-tooltip-key="t.msgTrash">
+              <span data-i18n="ui.msgTrash">Корзина ответов</span> ▾
+            </button>
+            <button id="checkUpdates" class="ghost" type="button" data-i18n-title="ui.checkUpdatesTitle">
+              <span data-i18n="ui.checkUpdates">Обновления</span> ⟳
+            </button>
+            <span class="head-divider"></span>
+            <button id="fontDown" class="ghost square" type="button" data-tooltip-key="t.fontDown">A−</button>
+            <button id="fontUp" class="ghost square" type="button" data-tooltip-key="t.fontUp">A+</button>
+            <button id="langToggle" class="ghost square" type="button" data-tooltip-key="t.langToggle">RU</button>
+          </div>
+        </header>
+
+        <div id="subtaskStatement" class="subtask-statement">
+          <div id="subtaskStatementText" class="subtask-statement-text clamped"></div>
+          <button id="toggleSubtaskStatement" class="subtask-statement-toggle hidden" type="button"
+            data-i18n-title="ui.toggleStatement" aria-expanded="false">▾</button>
+        </div>
+
+        <div id="conversation" class="conversation"></div>
+
+        <section id="terminals" class="terminals empty">
+          <header class="terminals-head">
+            <button id="toggleTerminals" class="ghost small" type="button">
+              <span data-i18n="ui.terminals">Терминалы агентов</span>
+              <span class="help" data-tooltip-key="t.terminals">?</span>
+              <span class="terminals-arrow">▾</span>
+            </button>
+          </header>
+          <!-- Panes are created dynamically, one per debate participant (2..5),
+               keyed by the participant slot. See app.js ensureTermPane(). -->
+          <div class="terminals-body" id="terminalsBody"></div>
+        </section>
+
+        <div id="pinnedHint" class="pinned-hint hidden">
+          <div class="pinned-hint-head">
+            <span class="pinned-hint-title" id="pinnedHintTitle"></span>
+            <button id="pinnedHintPin" class="pinned-hint-pin" type="button" data-i18n-title="ui.unfoldHint" aria-label="unfold">📌</button>
+            <button id="pinnedHintClose" class="pinned-hint-close" type="button" aria-label="close">×</button>
+          </div>
+          <div id="pinnedHintBody" class="pinned-hint-body"></div>
+        </div>
+
+        <details id="trace" class="trace">
+          <summary data-i18n="ui.traceSummary">Служебные события</summary>
+          <div id="traceList" class="trace-list"></div>
+        </details>
+
+        <footer class="composer">
+          <textarea id="guidance" data-i18n-placeholder="ui.guidancePlaceholder"
+            placeholder="Направление на следующий раунд (опц.)"></textarea>
+          <div class="composer-actions">
+            <button id="runRound" class="primary" disabled
+              data-i18n="ui.runRound" data-tooltip-key="t.runRound">▶ Запустить раунд</button>
+            <button id="autopilot" class="ghost" disabled
+              data-i18n="ui.autopilotStart" data-tooltip-key="t.autopilot">Autopilot ▶</button>
+            <label class="autoresolve-row">
+              <input id="autoResolve" type="checkbox" />
+              <span data-i18n="ui.autoResolve">Авто-закрытие</span>
+              <span class="help" data-tooltip-key="t.autoResolve">?</span>
+            </label>
+            <span id="busyIndicator" class="muted small"></span>
+            <span id="switcherAgents" class="switcher-agents"></span>
+          </div>
+        </footer>
+      </section>
+
+      <aside class="col right">
+        <!-- Phase 6b: per-chat agent editor. Populated when an agent chip is
+             clicked; lets you reassign the backend / model / effort of that agent.
+             Pinned at the very top of the right column. -->
+        <section id="agentEditorPanel" class="providers-panel agent-editor-panel">
+          <div class="providers-body">
+            <div class="agent-editor-head">
+              <span class="agent-editor-title" id="agentEditorTitle" data-i18n="ui.agentsHeader">Агенты обсуждения</span>
+              <span class="help" data-tooltip-key="t.addAgent">?</span>
+            </div>
+            <div id="agentEditorBody"></div>
+          </div>
+        </section>
+
+        <!-- Filesystem-scan toggle: standalone field directly under the agent
+             editor so it's visually part of the "how agents run" group. -->
+        <section class="providers-panel filescan-panel">
+          <div class="providers-body">
+            <label class="toggle-row danger-toggle">
+              <input id="allowFilesystemScan" type="checkbox" />
+              <span data-i18n="ui.allowScan">Разрешить агентам сканировать файлы</span>
+              <span class="help" data-tooltip-key="t.allowScan">?</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Phase 5: configurable provider profiles + debate roles. Pinned to the
+             top of the right column so it stays reachable while the column scrolls. -->
+        <details id="providersDetails" class="providers-panel">
+          <summary>
+            <span data-i18n="ui.providersPanel">Регистрация агентов</span>
+            <span class="help" data-tooltip-key="t.providersPanel">?</span>
+            <span id="buildModeBadge" class="mode-badge"></span>
+          </summary>
+          <div class="providers-body">
+            <div class="providers-subhead">
+              <span data-i18n="ui.profiles">Профили</span>
+              <button id="addProfileBtn" type="button" class="small" data-i18n="ui.addProfile">+ Профиль</button>
+            </div>
+            <div id="profilesList"></div>
+            <div class="providers-actions">
+              <button id="applyProvidersBtn" type="button" class="primary small" data-i18n="ui.applyProviders">Применить</button>
+              <span id="providersMsg" class="providers-msg"></span>
+            </div>
+          </div>
+        </details>
+
+        <details id="settingsDetails" class="providers-panel" open>
+          <summary>
+            <span data-i18n="ui.settings">Настройки</span>
+            <span class="help" data-tooltip-key="t.agentSettings">?</span>
+          </summary>
+          <div class="providers-body">
+          <label>
+            <span data-i18n="ui.agentLanguage">Язык агентов</span>
+            <span class="help" data-tooltip-key="t.agentLanguage">?</span>
+            <select id="language">
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <div id="legacyAgents">
+          <label>
+            <span data-i18n="ui.codexModel">Модель Codex</span>
+            <span class="help" data-tooltip-key="t.model">?</span>
+            <select id="codexModel">
+              <option value="">auto</option>
+              <option value="gpt-5.5">gpt-5.5</option>
+              <option value="gpt-5.4">gpt-5.4</option>
+              <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+              <option value="gpt-5.3-codex">gpt-5.3-codex</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="ui.codexEffort">Codex effort</span>
+            <span class="help" data-tooltip-key="t.effort">?</span>
+            <select id="codexEffort">
+              <option value="auto">auto</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+            </select>
+          </label>
+          <div class="account-row">
+            <span class="account-label" data-i18n="ui.codexAccount">Codex — аккаунт</span>
+            <span class="help" data-tooltip-key="t.account">?</span>
+            <select id="codexMode">
+              <option value="auto">auto</option>
+              <option value="manual">manual</option>
+            </select>
+            <select id="codexAccount">
+              <option value="1">акк 1</option>
+              <option value="2">акк 2</option>
+            </select>
+          </div>
+          <label>
+            <span data-i18n="ui.claudeModel">Модель Claude</span>
+            <span class="help" data-tooltip-key="t.model">?</span>
+            <select id="claudeModel">
+              <option value="">auto</option>
+              <option value="opus">opus (alias)</option>
+              <option value="sonnet">sonnet (alias)</option>
+              <option value="haiku">haiku (alias)</option>
+              <option value="claude-opus-4-7">claude-opus-4-7</option>
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+              <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="ui.claudeEffort">Claude effort</span>
+            <span class="help" data-tooltip-key="t.effort">?</span>
+            <select id="claudeEffort">
+              <option value="auto">auto</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
+            </select>
+          </label>
+          <div class="account-row">
+            <span class="account-label" data-i18n="ui.claudeAccount">Claude — аккаунт</span>
+            <span class="help" data-tooltip-key="t.account">?</span>
+            <select id="claudeMode">
+              <option value="auto">auto</option>
+              <option value="manual">manual</option>
+            </select>
+            <select id="claudeAccount">
+              <option value="1">акк 1</option>
+              <option value="2">акк 2</option>
+            </select>
+          </div>
+          </div><!-- /#legacyAgents -->
+          </div><!-- /.providers-body -->
+        </details>
+
+        <!-- Phase 6b: per-chat attached reference documents (fed into the prompt). -->
+        <details id="documentsPanel" class="providers-panel">
+          <summary>
+            <span data-i18n="ui.documents">Документы</span>
+            <span class="help" data-tooltip-key="t.documents">?</span>
+            <span id="docsCount" class="mode-badge"></span>
+          </summary>
+          <div class="providers-body">
+            <div id="documentsList"></div>
+            <div class="doc-add">
+              <input id="docFile" type="file" accept=".txt,.md,.markdown,.json,.csv,.log,.js,.ts,.jsx,.tsx,.py,.html,.css,.yml,.yaml,.xml,.ini,.cfg,.sh,.sql" hidden />
+              <div class="doc-add-row">
+                <button id="docFileBtn" class="ghost small" type="button" data-i18n="ui.docAddFile">+ Файл</button>
+                <input id="docName" type="text" data-i18n-placeholder="ui.docNamePlaceholder" placeholder="Имя (опц.)" />
+              </div>
+              <textarea id="docText" rows="3" data-i18n-placeholder="ui.docPastePlaceholder" placeholder="…или вставь текст документа"></textarea>
+              <div class="doc-add-actions">
+                <button id="docAdd" class="primary small" type="button" data-i18n="ui.docAdd">Добавить</button>
+                <span id="docMsg" class="providers-msg"></span>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <header class="col-head kb-head">
+          <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
+          <span id="kbUpdated" class="muted small"></span>
+          <span class="help" data-tooltip-key="t.knowledgeBase">?</span>
+        </header>
+        <div id="kbSections" class="kb-sections"></div>
+      </aside>
+    </main>
+
+    <!-- Floating next-step coach -->
+    <div id="nextStep" class="next-step hidden">
+      <div class="next-step-head">
+        <span class="next-step-icon">💡</span>
+        <span class="next-step-title" id="nextStepTitle"></span>
+        <button id="nextStepPin" class="next-step-pin" type="button" data-i18n-title="ui.pinHint" aria-label="pin">📌</button>
+        <button id="nextStepClose" class="next-step-close" type="button" aria-label="close">×</button>
+      </div>
+      <div class="next-step-body" id="nextStepBody"></div>
+      <div class="next-step-action">
+        <button id="nextStepAction" class="primary small" type="button" hidden></button>
+      </div>
+    </div>
+    <button id="nextStepReopen" class="next-step-reopen hidden" type="button" aria-label="Подсказка">💡</button>
+
+    <!-- Modal: open / edit subtask -->
+    <div id="openSubtaskModal" class="modal hidden">
+      <div class="modal-box">
+        <h3>
+          <span id="subtaskModalTitle" data-i18n="ui.openNewSubtask">Открыть новую подзадачу</span>
+          <span class="help" data-tooltip-key="t.openSubtaskModal">?</span>
+        </h3>
+        <label>
+          <span data-i18n="ui.title">Постановка подзадачи</span>
+          <span class="help" data-tooltip-key="t.subtaskTitle">?</span>
+          <textarea id="subtaskTitleInput" rows="2"></textarea>
+        </label>
+        <label>
+          <span data-i18n="ui.mode">Режим</span>
+          <span class="help" data-tooltip-key="t.mode">?</span>
+          <select id="subtaskModeInput">
+            <option value="LIGHT">LIGHT</option>
+            <option value="STANDARD" selected>STANDARD</option>
+            <option value="STRICT">STRICT</option>
+            <option value="CRITICAL">CRITICAL</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button id="cancelSubtask" class="ghost" data-i18n="ui.cancel">Отмена</button>
+          <button id="confirmSubtask" class="primary" data-i18n="ui.open">Открыть</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: add a debate agent (auto / manual) -->
+    <div id="addAgentModal" class="modal hidden">
+      <div class="modal-box">
+        <h3 data-i18n="ui.addAgentTitle">Добавить агента</h3>
+        <p class="muted small" data-i18n="ui.addAgentChoose">Как добавить агентов в обсуждение?</p>
+        <div class="add-agent-choices">
+          <button id="addAgentAuto" class="primary" type="button">
+            <span data-i18n="ui.agentAddAuto">Авто — 2 разных</span>
+            <small class="muted" data-i18n="ui.agentAddAutoHint">Подобрать 2 разных доступных бэкенда с дешёвыми моделями.</small>
+          </button>
+          <button id="addAgentManual" class="ghost" type="button">
+            <span data-i18n="ui.agentAddManual">Вручную (+1)</span>
+            <small class="muted" data-i18n="ui.agentAddManualHint">Добавить одного агента и настроить его.</small>
+          </button>
+        </div>
+        <div id="addAgentMsg" class="providers-msg"></div>
+        <div class="modal-actions">
+          <button id="addAgentCancel" class="ghost" data-i18n="ui.cancel">Отмена</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: check / apply GitHub updates -->
+    <div id="updateModal" class="modal hidden">
+      <div class="modal-box">
+        <h3 data-i18n="ui.updateTitle">Обновление</h3>
+        <div id="updateModalBody" class="update-body"></div>
+        <div class="modal-actions">
+          <button id="updateCancel" class="ghost" data-i18n="ui.cancel">Отмена</button>
+          <button id="updateConfirm" class="primary hidden" data-i18n="ui.updateApply">Обновить</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js?v=__V__"></script>
+  </body>
+</html>

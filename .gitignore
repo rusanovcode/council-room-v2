@@ -1,0 +1,9 @@
+node_modules/
+rooms/
+!rooms/.keep
+.env
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
