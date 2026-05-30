@@ -2524,7 +2524,10 @@ async function applyParticipants() {
   try {
     const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!res.ok) { const j = await res.json().catch(() => ({})); showProvidersMsg(j.error || `error ${res.status}`, true); return; }
-    if (participantsDraft.length >= 2) showProvidersMsg(t("ui.agentSaved"), false);
+    if (participantsDraft.length >= 2) {
+      showProvidersMsg(t("ui.agentSaved"), false);
+      renderAgentEditor(); // re-render so hl-default reflects the saved draft, not a stale SSE state
+    }
   } catch (e) { showProvidersMsg(e.message, true); }
 }
 
