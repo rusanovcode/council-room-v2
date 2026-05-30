@@ -2135,6 +2135,11 @@ function provLogAdd(ru, en) {
   entries.push({ at: new Date().toISOString(), ru, en });
   provLogSave(entries);
   renderRegisteredModels(); // refresh the log section
+  // Mirror to "Служебные события" trace (no-op when no active run).
+  fetch("/api/log", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: en, textRu: ru }),
+  }).catch(() => {});
 }
 
 // baseUrl → string[] of model names fetched from Ollama /api/tags

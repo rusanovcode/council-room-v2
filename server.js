@@ -1237,6 +1237,19 @@ async function router(req, res) {
       return sendJson(res, 200, publicState());
     }
 
+    if (method === "POST" && pathname === "/api/log") {
+      // Lightweight client-side event logger: adds a process message to the
+      // current run's trace so it appears in "Служебные события". No-op when
+      // no run is active (addMessage guards against that).
+      const body = await readBody(req);
+      const text = String((body && body.text) || "").trim();
+      const textRu = String((body && body.textRu) || "").trim();
+      if (text || textRu) {
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: text || textRu, textRu: textRu || text });
+      }
+      return sendJson(res, 200, { ok: true });
+    }
+
     if (method === "POST" && pathname === "/api/switcher/refresh") {
       // Token monitor: fire a tiny prompt at the CHEAPEST model of every
       // authorized account so its usage source repopulates (Codex → a persisted
