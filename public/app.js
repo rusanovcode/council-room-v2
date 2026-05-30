@@ -664,17 +664,46 @@ async function api(method, path, body) {
 }
 
 const TERM_CAP = 40000; // chars per pinned terminal
-const termBuffers = { codex: "", claude: "" };
+// One live buffer per participant slot key (codex/claude legacy, or a1..a5).
+// Panes are created on demand so the count follows the chat's participants.
+const termBuffers = {};
 
-function appendTerminal(agent, chunk, reset) {
-  const el = agent === "codex" ? $("termCodex") : $("termClaude");
+// Ensure a <pre> pane exists for `key`, creating it (with a label header) on first
+// use. Returns the <pre> element, or null if the container isn't mounted.
+function ensureTermPane(key, label) {
+  const safe = String(key).replace(/[^A-Za-z0-9._-]/g, "_");
+  let pre = document.getElementById(`term-${safe}`);
+  if (!pre) {
+    const body = $("terminalsBody");
+    if (!body) return null;
+    const pane = document.createElement("div");
+    pane.className = "terminal-pane";
+    const lbl = document.createElement("div");
+    lbl.className = "terminal-label";
+    lbl.id = `termlabel-${safe}`;
+    lbl.textContent = label || key;
+    pre = document.createElement("pre");
+    pre.className = "terminal";
+    pre.id = `term-${safe}`;
+    pane.appendChild(lbl);
+    pane.appendChild(pre);
+    body.appendChild(pane);
+  } else if (label) {
+    const lbl = document.getElementById(`termlabel-${safe}`);
+    if (lbl) lbl.textContent = label;
+  }
+  return pre;
+}
+
+function appendTerminal(key, chunk, reset, label) {
+  const el = ensureTermPane(key, label);
   if (!el) return;
   if (reset) {
-    termBuffers[agent] = "";
+    termBuffers[key] = "";
   } else {
-    termBuffers[agent] = (termBuffers[agent] + chunk).slice(-TERM_CAP);
+    termBuffers[key] = ((termBuffers[key] || "") + chunk).slice(-TERM_CAP);
   }
-  el.textContent = termBuffers[agent];
+  el.textContent = termBuffers[key];
   el.scrollTop = el.scrollHeight;
   updateTerminalsVisibility();
 }
@@ -684,7 +713,7 @@ function appendTerminal(agent, chunk, reset) {
 function updateTerminalsVisibility() {
   const section = $("terminals");
   if (!section) return;
-  const hasContent = Boolean(termBuffers.codex.trim() || termBuffers.claude.trim());
+  const hasContent = Object.values(termBuffers).some((b) => b && b.trim());
   const show = hasContent || Boolean(currentState && currentState.busy);
   section.classList.toggle("empty", !show);
 }
@@ -702,8 +731,8 @@ function connectEvents() {
   source.addEventListener("stream", (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.agent !== "codex" && data.agent !== "claude") return;
-      appendTerminal(data.agent, data.chunk || "", Boolean(data.reset));
+      if (!data.agent) return; // slot key: codex/claude (legacy) or a1..a5
+      appendTerminal(data.agent, data.chunk || "", Boolean(data.reset), data.label);
     } catch (error) {
       console.error("SSE stream parse failed", error);
     }

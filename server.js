@@ -61,8 +61,8 @@ const ROUND_BUDGET = { LIGHT: 3, STANDARD: 6, STRICT: 10, CRITICAL: 12 };
 // The FINAL VERIFICATION pass (the gate that closes a subtask) is always run by
 // the strongest available agents at max reasoning, regardless of the cheaper
 // models used for regular debate rounds. Single source of truth in lib/profiles
-// (derived roles carry it as their verify override) so this never drifts.
-const VERIFY_AGENTS = profiles.VERIFY_AGENTS;
+// (derived roles/participants carry it as their per-slot verify override) so this
+// never drifts; runRound passes role.verify to roles.runRole in verifyMode.
 
 // Shared across manual round and autopilot so the Stop button can cancel either.
 let activeAbort = null;
@@ -231,7 +231,7 @@ function broadcastStream(agent, chunk, { subtaskId = "", round = 0, reset = fals
   }
 }
 
-function addMessage({ role, name, kind = "", text, textRu = "", subtaskId = "", round = 0 }) {
+function addMessage({ role, name, kind = "", text, textRu = "", subtaskId = "", round = 0, slot = "" }) {
   if (!state.run) return null;
   const item = {
     id: store.makeId("msg"),
@@ -241,6 +241,9 @@ function addMessage({ role, name, kind = "", text, textRu = "", subtaskId = "", 
     kind,
     subtaskId,
     round,
+    // Slot key of the authoring participant (codex/claude legacy, or a1..a5).
+    // Lets the client map an agent message to its live terminal pane.
+    ...(slot ? { slot } : {}),
     // Service/trace messages are bilingual: `text` holds English, `textRu` the
     // Russian variant. The client renders the one matching the UI language
     // (live-switchable). Agent replies pass only `text` (their own language).
@@ -252,12 +255,14 @@ function addMessage({ role, name, kind = "", text, textRu = "", subtaskId = "", 
   return item;
 }
 
-function recentTurnsForSubtask(runId, subtaskId, limit = 2) {
+// Return the last `count` agent/user turns of a subtask (one round = one turn
+// per participant, so callers pass participants.length * rounds-to-show).
+function recentTurnsForSubtask(runId, subtaskId, count = 4) {
   if (!subtaskId) return [];
   const messages = store.readJsonl(transcriptPath(runId));
   return messages
     .filter((m) => m.subtaskId === subtaskId && (m.role === "agent" || m.role === "user") && !m.trashed)
-    .slice(-limit * 2);
+    .slice(-count);
 }
 
 // Move an agent response to the trash (or restore it). Trashed messages are kept
@@ -290,9 +295,27 @@ async function runRound({ guidance = "" } = {}) {
     if (guidance) {
       addMessage({ role: "user", name: "User", kind: "guidance", text: guidance, subtaskId: active.id, round });
     }
-    const recent = recentTurnsForSubtask(state.run.id, active.id, 2);
     const kbSnapshot = knowledge.snapshotForPrompt(dir);
     const language = state.run.settings.language || "ru";
+
+    // Resolve the debate participants (2..5). Legacy / Phase-5 two-slot settings
+    // derive the old Codex/Claude behavior; explicit settings.participants override
+    // it. Each participant = { slot(key), label, mode, verify, chain }. The slot key
+    // is opaque — questions / KB / transcript / terminals all key off it.
+    const sw = switcher.detect();
+    const swInfo = {
+      connected: sw.connected,
+      codexAcc2: switcher.accountAvailable("codex", "acc2"),
+      claudeAcc2: switcher.accountAvailable("claude", "acc2"),
+    };
+    const eff = profiles.effectiveConfig(state.run.settings, swInfo);
+    const participants = eff.participants;
+    const partKeys = participants.map((p) => p.slot);
+
+    // Recent turns: show the last two FULL rounds (one round = one turn per
+    // participant). Prompts are intentionally NOT compressed — each agent sees the
+    // complete context of every other agent.
+    const recent = recentTurnsForSubtask(state.run.id, active.id, participants.length * 2);
 
     // Question lifecycle: feed only OPEN questions; if none open but some resolved
     // remain, this round is the FINAL VERIFICATION pass over the resolved batch.
@@ -307,12 +330,6 @@ async function runRound({ guidance = "" } = {}) {
     const verify = verifyMode
       ? { batch: resolvedQs.map((q) => ({ id: q.id, text: q.text, answer: q.answer })) }
       : null;
-
-    // Final verification → strongest agents at max reasoning; otherwise per-chat settings.
-    const codexModel = verifyMode ? VERIFY_AGENTS.codexModel : state.run.settings.codexModel;
-    const codexEffort = verifyMode ? VERIFY_AGENTS.codexEffort : state.run.settings.codexEffort;
-    const claudeModel = verifyMode ? VERIFY_AGENTS.claudeModel : state.run.settings.claudeModel;
-    const claudeEffort = verifyMode ? VERIFY_AGENTS.claudeEffort : state.run.settings.claudeEffort;
 
     const allowScan = Boolean(state.run.settings?.allowFilesystemScan ?? state.settings.allowFilesystemScan);
     const strictScope = Boolean(state.run.settings?.strictScope ?? state.settings.strictScope);
@@ -329,44 +346,30 @@ async function runRound({ guidance = "" } = {}) {
       verify,
       deferredMinors: minorOpen.map((q) => ({ id: q.id, text: q.text })),
     };
-    const codexPrompt = prompt.buildDebatePrompt({
-      ...promptCommon,
-      agentName: "Codex",
-      otherAgentName: "Claude Code",
-    });
-    const claudePrompt = prompt.buildDebatePrompt({
-      ...promptCommon,
-      agentName: "Claude Code",
-      otherAgentName: "Codex",
-    });
+    // Each participant sees the full context of all the others (no summarization).
+    const prompts = participants.map((p) =>
+      prompt.buildDebatePrompt({
+        ...promptCommon,
+        agentName: p.label,
+        otherAgentNames: participants.filter((x) => x !== p).map((x) => x.label),
+      }),
+    );
 
+    const promptSizes = participants.map((p, i) => `${p.label} ${prompts[i].length}c`).join(", ");
     addMessage({
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Round ${round} (subtask ${active.id})${verifyMode ? " — FINAL VERIFICATION (max agents: codex " + codexModel + "/" + codexEffort + ", claude " + claudeModel + "/" + claudeEffort + ")" : ""}: launching Codex and Claude in parallel. Codex prompt ${codexPrompt.length} chars, Claude prompt ${claudePrompt.length} chars.`,
-      textRu: `Раунд ${round} (subtask ${active.id})${verifyMode ? " — ФИНАЛЬНАЯ ПРОВЕРКА (максимальные агенты: codex " + codexModel + "/" + codexEffort + ", claude " + claudeModel + "/" + claudeEffort + ")" : ""}: запуск Codex и Claude параллельно. Codex prompt ${codexPrompt.length} chars, Claude prompt ${claudePrompt.length} chars.`,
+      text: `Round ${round} (subtask ${active.id})${verifyMode ? " — FINAL VERIFICATION (max agents)" : ""}: launching ${participants.length} agents in parallel [${promptSizes}].`,
+      textRu: `Раунд ${round} (subtask ${active.id})${verifyMode ? " — ФИНАЛЬНАЯ ПРОВЕРКА (максимальные агенты)" : ""}: запуск ${participants.length} агентов параллельно [${promptSizes}].`,
       subtaskId: active.id,
       round,
     });
 
-    // Clear pinned terminals for this round on the client.
-    broadcastStream("codex", "", { subtaskId: active.id, round, reset: true });
-    broadcastStream("claude", "", { subtaskId: active.id, round, reset: true });
-
-    // Resolve the two debate slots into roles (a profile chain + failover). Legacy
-    // settings derive the old Codex/Claude + acc1/acc2 behavior; explicit Phase 5
-    // settings (settings.profiles + settings.roles) override it. Slot "codex" =
-    // role A, slot "claude" = role B (historical keys kept for back-compat).
-    const sw = switcher.detect();
-    const swInfo = {
-      connected: sw.connected,
-      codexAcc2: switcher.accountAvailable("codex", "acc2"),
-      claudeAcc2: switcher.accountAvailable("claude", "acc2"),
-    };
-    const eff = profiles.effectiveConfig(state.run.settings, swInfo);
-    const roleA = eff.roles.a; // drives slot "codex"
-    const roleB = eff.roles.b; // drives slot "claude"
+    // Clear each participant's pinned terminal for this round on the client.
+    for (const p of participants) {
+      broadcastStream(p.slot, "", { subtaskId: active.id, round, reset: true, label: p.label });
+    }
 
     const stamp = `R${round}-${active.id}`;
     activeChildren = new Set();
@@ -374,16 +377,18 @@ async function runRound({ guidance = "" } = {}) {
       activeChildren.add(child);
       child.on("close", () => activeChildren.delete(child));
     };
-    // Run one slot via its role. Failover (auto mode) and the verify-pass model
-    // override are handled inside roles.runRole; onFailover logs the switch and
-    // clears the live terminal, exactly like the old per-account retry did.
+    // Run one participant via its role. Failover (auto mode) and the verify-pass
+    // model override are handled inside roles.runRole; onFailover logs the switch
+    // and clears the live terminal, exactly like the old per-account retry did.
+    // outFile is the codex CLI's raw transcript dump (other backends ignore it),
+    // keyed by the participant slot so any codex-backed agent writes its own file.
     const runSlot = (role, agentPrompt) => roles.runRole(role, agentPrompt, {
       workdir: WORKDIR,
       isolated: !allowScan,
       signal: ac.signal,
-      onStream: (chunk) => broadcastStream(role.slot, chunk, { subtaskId: active.id, round }),
+      onStream: (chunk) => broadcastStream(role.slot, chunk, { subtaskId: active.id, round, label: role.label }),
       onChild: trackChild,
-      outFile: role.slot === "codex" ? path.join(dir, `${stamp}-codex.txt`) : undefined,
+      outFile: path.join(dir, `${stamp}-${role.slot}.txt`),
       logFile: path.join(dir, `${stamp}-${role.slot}.log`),
       verify: verifyMode ? role.verify : null,
       onFailover: (next, prev) => {
@@ -393,22 +398,23 @@ async function runRound({ guidance = "" } = {}) {
           textRu: `${role.label}: ошибка/лимит на ${prev.label || prev.id} → переключаюсь на ${next.label || next.id} (auto-failover).`,
           subtaskId: active.id, round,
         });
-        broadcastStream(role.slot, "", { subtaskId: active.id, round, reset: true });
+        broadcastStream(role.slot, "", { subtaskId: active.id, round, reset: true, label: role.label });
       },
     });
 
     const backendOf = (role) => (role.chain[0] ? (role.chain[0].label || role.chain[0].id) : "—");
+    const backendList = participants.map((p) => `${p.label} via ${backendOf(p)} (${p.mode})`).join(", ");
     addMessage({
       role: "system",
       name: "Council Room",
       kind: "process",
-      text: `Round backends: ${roleA.label} via ${backendOf(roleA)} (${roleA.mode}), ${roleB.label} via ${backendOf(roleB)} (${roleB.mode}).${sw.connected ? "" : " Switch module not connected — standard mode."}`,
-      textRu: `Бэкенды раунда: ${roleA.label} через ${backendOf(roleA)} (${roleA.mode}), ${roleB.label} через ${backendOf(roleB)} (${roleB.mode}).${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
+      text: `Round backends: ${backendList}.${sw.connected ? "" : " Switch module not connected — standard mode."}`,
+      textRu: `Бэкенды раунда: ${backendList}.${sw.connected ? "" : " Модуль свитч не подключён — стандартный режим."}`,
       subtaskId: active.id,
       round,
     });
 
-    const [codexResult, claudeResult] = await Promise.all([runSlot(roleA, codexPrompt), runSlot(roleB, claudePrompt)]);
+    const results = await Promise.all(participants.map((p, i) => runSlot(p, prompts[i])));
 
     if (ac.signal.aborted) {
       addMessage({
@@ -427,35 +433,31 @@ async function runRound({ guidance = "" } = {}) {
     // usage, so only network providers contribute). The winning profile of each
     // slot is on the role result; bump the stats panel when anything was recorded.
     let usageRecorded = false;
-    for (const r of [codexResult, claudeResult]) {
+    for (const r of results) {
       const u = r && r.result && r.result.usage;
       if (u && r.profile) { usage.record(ROOMS_DIR, r.profile, u); usageRecorded = true; }
     }
     if (usageRecorded) { statsCache = {}; statsVersion++; }
 
-    const codexTail = prompt.parseAgentTail(codexResult.text);
-    const claudeTail = prompt.parseAgentTail(claudeResult.text);
+    const tails = results.map((r) => prompt.parseAgentTail(r.text));
 
-    addMessage({
-      role: "agent",
-      name: "Codex",
-      kind: "debate",
-      text: codexResult.text,
-      subtaskId: active.id,
-      round,
-    });
-    addMessage({
-      role: "agent",
-      name: "Claude Code",
-      kind: "debate",
-      text: claudeResult.text,
-      subtaskId: active.id,
-      round,
+    participants.forEach((p, i) => {
+      addMessage({
+        role: "agent",
+        name: p.label,
+        kind: "debate",
+        text: results[i].text,
+        subtaskId: active.id,
+        round,
+        slot: p.slot,
+      });
     });
 
     // Route KB-patches: open_questions go to the per-subtask questions store
-    // (deduped), everything else into the durable Knowledge Base.
-    for (const [agent, tail] of [["codex", codexTail], ["claude", claudeTail]]) {
+    // (deduped), everything else into the durable Knowledge Base. A question
+    // closes only when ALL current participants (partKeys) have marked it resolved.
+    participants.forEach((p, i) => {
+      const tail = tails[i];
       for (const patch of tail.kbPatches) {
         if (patch.section === "open_questions") {
           questions.addQuestion(dir, active.id, patch.item, round);
@@ -463,30 +465,30 @@ async function runRound({ guidance = "" } = {}) {
           try { knowledge.addItem(dir, patch.section, patch.item); } catch {}
         }
       }
-      // Record per-agent resolutions of existing questions.
-      for (const r of tail.resolved) questions.recordResolve(dir, r.id, agent, r.answer);
+      // Record this participant's resolutions of existing questions.
+      for (const r of tail.resolved) questions.recordResolve(dir, r.id, p.slot, r.answer, partKeys);
       // Apply priority changes; warn when a deferred question is promoted to critical.
       for (const pr of tail.priority || []) {
         const before = questions.forSubtask(dir, active.id).find((x) => x.id === pr.id);
         questions.setPriority(dir, pr.id, pr.priority);
         if (before && before.priority === "minor" && pr.priority === "critical" && before.status === "open") {
-          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ ${agent} raised question ${pr.id} to CRITICAL — it now blocks execution.`, textRu: `⚠️ ${agent} повысил вопрос ${pr.id} до CRITICAL — теперь он блокирует исполнение.`, subtaskId: active.id, round });
+          addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ ${p.label} raised question ${pr.id} to CRITICAL — it now blocks execution.`, textRu: `⚠️ ${p.label} повысил вопрос ${pr.id} до CRITICAL — теперь он блокирует исполнение.`, subtaskId: active.id, round });
         }
       }
-    }
+    });
 
-    // Final-verification pass: reopen anything either agent flagged; if both
-    // confirm with no reopens, mark the whole batch verified → debate complete.
+    // Final-verification pass: reopen anything any agent flagged; if ALL confirm
+    // with no reopens, mark the whole batch verified → debate complete.
     let verifyPassed = false;
     if (verifyMode) {
-      const reopen = new Set([...(codexTail.verify?.reopen || []), ...(claudeTail.verify?.reopen || [])]);
+      const reopen = new Set(tails.flatMap((t) => t.verify?.reopen || []));
       for (const id of reopen) questions.reopen(dir, id);
       if (reopen.size) {
         addMessage({ role: "system", name: "Council Room", kind: "process", text: `Final verification: returned to work — ${[...reopen].join(", ")}.`, textRu: `Финальная проверка: возвращены в работу — ${[...reopen].join(", ")}.`, subtaskId: active.id, round });
-      } else if (codexTail.verify?.ok && claudeTail.verify?.ok) {
+      } else if (tails.every((t) => t.verify?.ok)) {
         questions.markSubtaskVerified(dir, active.id);
         verifyPassed = true;
-        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Final verification passed by both — critical questions verified, subtask ready to close.`, textRu: `Финальная проверка пройдена обоими — критичные вопросы verified, подзадача готова к закрытию.`, subtaskId: active.id, round });
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: `Final verification passed by all agents — critical questions verified, subtask ready to close.`, textRu: `Финальная проверка пройдена всеми агентами — критичные вопросы verified, подзадача готова к закрытию.`, subtaskId: active.id, round });
         const stillMinor = questions.openForSubtask(dir, active.id).filter((q) => q.priority === "minor");
         if (stillMinor.length) {
           addMessage({ role: "system", name: "Council Room", kind: "process", text: `⚠️ Deferred ${stillMinor.length} minor question(s) — catch up later: ${stillMinor.map((q) => q.id).join(", ")}. If any becomes blocking — raise it to critical.`, textRu: `⚠️ Отложено ${stillMinor.length} второстепенных вопрос(ов) — догнать позже: ${stillMinor.map((q) => q.id).join(", ")}. Если какой-то станет блокирующим — повысь до critical.`, subtaskId: active.id, round });
@@ -508,37 +510,40 @@ async function runRound({ guidance = "" } = {}) {
 
     subtasks.incrementRounds(dir, active.id);
 
-    const codexStale = !codexTail.newFacts.length && !codexTail.newRisks.length && !codexTail.newAlternatives.length;
-    const claudeStale = !claudeTail.newFacts.length && !claudeTail.newRisks.length && !claudeTail.newAlternatives.length;
-    if (codexStale && claudeStale) {
+    // Stop signals are over ALL participants: stale = nobody added anything new;
+    // debate-complete = everyone resolved; block = anyone blocked.
+    const stale = tails.every((t) => !t.newFacts.length && !t.newRisks.length && !t.newAlternatives.length);
+    if (stale) {
       addMessage({
         role: "system",
         name: "Council Room",
         kind: "process",
-        text: `Round ${round}: stale (no new facts/risks/alternatives from either agent). Consider closing the subtask or giving guidance.`,
+        text: `Round ${round}: stale (no new facts/risks/alternatives from any agent). Consider closing the subtask or giving guidance.`,
         textRu: `Раунд ${round}: stale (нет новых facts/risks/alternatives ни у одного агента). Рекомендуется закрыть подзадачу или ввести guidance.`,
         subtaskId: active.id,
         round,
       });
     }
-    if (codexTail.status === "resolve" && claudeTail.status === "resolve") {
+    const allResolve = tails.every((t) => t.status === "resolve");
+    if (allResolve) {
       addMessage({
         role: "system",
         name: "Council Room",
         kind: "process",
-        text: `Round ${round}: both agents reported Status: resolve. The subtask can be closed.`,
-        textRu: `Раунд ${round}: оба агента сообщили Status: resolve. Можно закрывать подзадачу.`,
+        text: `Round ${round}: all agents reported Status: resolve. The subtask can be closed.`,
+        textRu: `Раунд ${round}: все агенты сообщили Status: resolve. Можно закрывать подзадачу.`,
         subtaskId: active.id,
         round,
       });
     }
-    const debateComplete = (codexTail.status === "resolve" && claudeTail.status === "resolve") || verifyPassed;
-    if (codexTail.status === "block" || claudeTail.status === "block") {
+    const debateComplete = allResolve || verifyPassed;
+    const anyBlock = tails.some((t) => t.status === "block");
+    if (anyBlock) {
       addMessage({
         role: "system",
         name: "Council Room",
         kind: "process",
-        text: `Round ${round}: one agent reported Status: block — user decision required.`,
+        text: `Round ${round}: an agent reported Status: block — user decision required.`,
         textRu: `Раунд ${round}: один из агентов сообщил Status: block — требуется решение пользователя.`,
         subtaskId: active.id,
         round,
@@ -552,9 +557,9 @@ async function runRound({ guidance = "" } = {}) {
       aborted: false,
       round,
       subtaskId: active.id,
-      stale: codexStale && claudeStale,
+      stale,
       resolve: debateComplete,
-      block: codexTail.status === "block" || claudeTail.status === "block",
+      block: anyBlock,
     };
   } finally {
     activeAbort = null;
@@ -585,7 +590,7 @@ function buildLocalSummary(dir, subtask) {
   const decisions = (kb.sections.decisions || []).slice(0, 5);
   const lines = [`Goal: ${subtask.title}`];
   if (decisions.length) lines.push(`Decisions: ${decisions.join("; ")}`);
-  lines.push("Closed by autopilot (DEBATE_COMPLETE: both agents Status: resolve).");
+  lines.push("Closed by autopilot (DEBATE_COMPLETE: all agents Status: resolve).");
   return lines.join("\n");
 }
 
@@ -1202,6 +1207,12 @@ async function router(req, res) {
           const err = profiles.validateProfile(p);
           if (err) return sendJson(res, 400, { error: `Invalid profile "${p && p.id || "?"}": ${err}` });
         }
+      }
+      // Phase 6: validate the N-agent participants (2..5) against the profiles.
+      if (Array.isArray(body.participants)) {
+        const pool = Array.isArray(body.profiles) ? body.profiles : (state.settings.profiles || []);
+        const perr = profiles.validateParticipants(body.participants, pool);
+        if (perr) return sendJson(res, 400, { error: `Invalid participants: ${perr}` });
       }
       state.settings = { ...state.settings, ...body };
       if (state.run) {

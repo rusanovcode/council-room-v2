@@ -80,15 +80,17 @@ async function waitForRound(port, timeoutMs = 15000) {
 (async () => {
   const mock = await startMock();
   const port = await freePort();
-  let child, createdRunId = null;
+  let child;
+  const createdRunIds = [];
   try {
     child = await startServer(port);
 
     // New run (becomes active).
     let r = await api(port, "POST", "/api/runs", { topic: "phase5-itest" });
     assert.strictEqual(r.status, 200, "create run");
-    createdRunId = r.json.activeRunId;
+    let createdRunId = r.json.activeRunId;
     assert.ok(createdRunId, "have active run id");
+    createdRunIds.push(createdRunId);
 
     // Seed explicit profiles/roles pointing both slots at the mock (writes run.settings).
     const profilesBody = {
@@ -125,12 +127,47 @@ async function waitForRound(port, timeoutMs = 15000) {
     assert.ok(mock.hits() >= 2, `mock received both slot requests (got ${mock.hits()})`);
     console.log("PASS real runRound executed both slots via the mock network backend");
 
+    // --- Phase 6: a fresh run with THREE participants (the N-agent path). ---
+    const hitsBefore = mock.hits();
+    r = await api(port, "POST", "/api/runs", { topic: "phase6-3agents" });
+    assert.strictEqual(r.status, 200, "create 3-agent run");
+    const runId3 = r.json.activeRunId;
+    createdRunIds.push(runId3);
+
+    const partBody = {
+      profiles: [
+        { id: "m1", label: "M1", provider: "ollama", model: "mock-model", baseUrl: mock.base },
+        { id: "m2", label: "M2", provider: "ollama", model: "mock-model", baseUrl: mock.base },
+        { id: "m3", label: "M3", provider: "ollama", model: "mock-model", baseUrl: mock.base },
+      ],
+      participants: [
+        { key: "a1", label: "M1", mode: "manual", profileIds: ["m1"] },
+        { key: "a2", label: "M2", mode: "manual", profileIds: ["m2"] },
+        { key: "a3", label: "M3", mode: "manual", profileIds: ["m3"] },
+      ],
+    };
+    r = await api(port, "POST", "/api/settings", partBody);
+    assert.strictEqual(r.status, 200, "seed 3 participants");
+
+    r = await api(port, "POST", "/api/subtasks/open", { title: "three-agent subtask", mode: "LIGHT" });
+    assert.strictEqual(r.status, 200, "open subtask (3-agent run)");
+    r = await api(port, "POST", "/api/round", {});
+    assert.strictEqual(r.status, 202, "round accepted (3-agent run)");
+
+    const state3 = await waitForRound(port);
+    assert.strictEqual(state3.run.rounds, 1, "3-agent run rounds incremented");
+    const agentMsgs3 = (state3.run.messages || []).filter((m) => m.role === "agent" && m.kind === "debate");
+    assert.strictEqual(agentMsgs3.length, 3, "three agent debate messages (one per participant)");
+    assert.deepStrictEqual(agentMsgs3.map((m) => m.slot), ["a1", "a2", "a3"], "messages carry participant slot keys");
+    assert.ok(mock.hits() - hitsBefore >= 3, `mock received all three participant requests (got ${mock.hits() - hitsBefore})`);
+    console.log("PASS real runRound executed three participants via the mock backend");
+
     console.log("\nROUND INTEGRATION TEST PASSED");
   } finally {
     if (child) child.kill("SIGTERM");
     await new Promise((r) => setTimeout(r, 300));
-    if (createdRunId) {
-      try { fs.rmSync(path.join(ROOT, "rooms", createdRunId), { recursive: true, force: true }); } catch {}
+    for (const id of createdRunIds) {
+      try { fs.rmSync(path.join(ROOT, "rooms", id), { recursive: true, force: true }); } catch {}
     }
     mock.srv.close();
   }

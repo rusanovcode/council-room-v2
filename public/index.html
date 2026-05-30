@@ -108,16 +108,9 @@
               <span class="terminals-arrow">▾</span>
             </button>
           </header>
-          <div class="terminals-body">
-            <div class="terminal-pane">
-              <div class="terminal-label" data-i18n="ui.termCodex">Codex</div>
-              <pre id="termCodex" class="terminal"></pre>
-            </div>
-            <div class="terminal-pane">
-              <div class="terminal-label" data-i18n="ui.termClaude">Claude</div>
-              <pre id="termClaude" class="terminal"></pre>
-            </div>
-          </div>
+          <!-- Panes are created dynamically, one per debate participant (2..5),
+               keyed by the participant slot. See app.js ensureTermPane(). -->
+          <div class="terminals-body" id="terminalsBody"></div>
         </section>
 
         <div id="pinnedHint" class="pinned-hint hidden">

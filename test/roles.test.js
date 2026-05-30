@@ -4,10 +4,13 @@
 // is exercised against a local mock /v1/chat/completions. Run: node test/roles.test.js
 const http = require("node:http");
 const path = require("node:path");
+const fs = require("node:fs");
+const os = require("node:os");
 const assert = require("node:assert");
 
 const profiles = require(path.resolve(__dirname, "../lib/profiles.js"));
 const roles = require(path.resolve(__dirname, "../lib/roles.js"));
+const questions = require(path.resolve(__dirname, "../lib/questions.js"));
 
 function chainIds(role) { return role.chain.map((p) => p.id); }
 
@@ -82,6 +85,96 @@ function testProfiles() {
   assert.throws(() => profiles.upsertProfile(s, { id: "x", provider: "openai-compatible" }), /model required/, "network needs model");
   assert.throws(() => profiles.upsertProfile(s, { id: "y", provider: "cli-codex" }), /account/, "CLI needs account");
   console.log("PASS profiles CRUD + validation");
+}
+
+// Phase 6: the N-agent participants model (2..5).
+function testParticipants() {
+  const base = {
+    profiles: [
+      { id: "p1", provider: "ollama", model: "m" },
+      { id: "p2", provider: "ollama", model: "m" },
+      { id: "p3", provider: "ollama", model: "m" },
+    ],
+  };
+
+  // explicit participants: 3 agents, with a failover chain on the second.
+  let eff = profiles.effectiveConfig({ ...base, participants: [
+    { key: "a1", label: "One", mode: "manual", profileIds: ["p1"] },
+    { key: "a2", label: "Two", mode: "auto", profileIds: ["p2", "p1"] },
+    { key: "a3", label: "Three", mode: "manual", profileIds: ["p3"] },
+  ] }, {});
+  assert.strictEqual(eff.participants.length, 3, "3 participants resolved");
+  assert.deepStrictEqual(eff.participants.map((p) => p.slot), ["a1", "a2", "a3"]);
+  assert.deepStrictEqual(chainIds(eff.participants[1]), ["p2", "p1"], "chain resolved with failover");
+  assert.strictEqual(eff.roles.a.slot, "a1", "roles.a = first participant (back-compat)");
+  assert.strictEqual(eff.roles.b.slot, "a2", "roles.b = second participant (back-compat)");
+  console.log("PASS participants: explicit N-agent config resolves");
+
+  // legacy still yields exactly 2 participants keyed codex/claude.
+  eff = profiles.effectiveConfig({ codexMode: "manual", codexAccount: 1 }, { connected: false });
+  assert.strictEqual(eff.participants.length, 2, "legacy = 2 participants");
+  assert.deepStrictEqual(eff.participants.map((p) => p.slot), ["codex", "claude"]);
+  console.log("PASS participants: legacy derives 2 participants codex/claude");
+
+  // validation: min/max/dup/unknown/empty
+  assert.ok(/at least 2/.test(profiles.validateParticipants([{ key: "a1", profileIds: ["p1"] }], base.profiles)));
+  const six = Array.from({ length: 6 }, (_, i) => ({ key: `a${i + 1}`, profileIds: ["p1"] }));
+  assert.ok(/at most 5/.test(profiles.validateParticipants(six, base.profiles)));
+  assert.ok(/duplicate/.test(profiles.validateParticipants(
+    [{ key: "a1", profileIds: ["p1"] }, { key: "a1", profileIds: ["p2"] }], base.profiles)));
+  assert.ok(/unknown profile/.test(profiles.validateParticipants(
+    [{ key: "a1", profileIds: ["nope"] }, { key: "a2", profileIds: ["p2"] }], base.profiles)));
+  assert.ok(/needs at least one profile/.test(profiles.validateParticipants(
+    [{ key: "a1", profileIds: [] }, { key: "a2", profileIds: ["p2"] }], base.profiles)));
+  assert.strictEqual(profiles.validateParticipants(
+    [{ key: "a1", profileIds: ["p1"] }, { key: "a2", profileIds: ["p2"] }], base.profiles), null, "valid 2 passes");
+  console.log("PASS participants: validation (min/max/dup/unknown/empty)");
+
+  // setParticipants normalizes defaults; removeProfile cleans participant chains.
+  const s = { profiles: [{ id: "p1", provider: "ollama", model: "m" }, { id: "p2", provider: "ollama", model: "m" }] };
+  profiles.setParticipants(s, [
+    { key: "a1", profileIds: ["p1"] },
+    { key: "a2", label: "B", mode: "manual", profileIds: ["p2", "p1"] },
+  ]);
+  assert.strictEqual(s.participants.length, 2);
+  assert.strictEqual(s.participants[0].label, "Agent 1", "default label applied");
+  assert.strictEqual(s.participants[0].mode, "auto", "default mode applied");
+  profiles.removeProfile(s, "p1");
+  assert.deepStrictEqual(s.participants[0].profileIds, [], "removeProfile cleared a1 chain");
+  assert.deepStrictEqual(s.participants[1].profileIds, ["p2"], "removeProfile kept p2 in a2 chain");
+  console.log("PASS participants: setParticipants + removeProfile cleanup");
+}
+
+// Phase 6: a question closes only when EVERY participant key marks it resolved.
+function testQuestionsNKeys() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cr-q-"));
+  try {
+    const keys = ["a1", "a2", "a3"];
+    const q = questions.addQuestion(dir, "S1", "Is X camelCase?", 1);
+    const statusOf = (id) => questions.forSubtask(dir, "S1").find((x) => x.id === id).status;
+
+    questions.recordResolve(dir, q.id, "a1", "yes", keys);
+    assert.strictEqual(statusOf(q.id), "open", "open after 1/3");
+    questions.recordResolve(dir, q.id, "a2", "", keys);
+    assert.strictEqual(statusOf(q.id), "open", "open after 2/3");
+    questions.recordResolve(dir, q.id, "a3", "", keys);
+    assert.strictEqual(statusOf(q.id), "resolved", "resolved after 3/3");
+
+    questions.reopen(dir, q.id);
+    const reopened = questions.forSubtask(dir, "S1").find((x) => x.id === q.id);
+    assert.strictEqual(reopened.status, "open", "reopened");
+    assert.deepStrictEqual(reopened.resolvedBy, {}, "reopen cleared all marks");
+
+    // legacy default keys (codex/claude) keep their two-agent semantics.
+    const q2 = questions.addQuestion(dir, "S1", "Another distinct thing?", 1);
+    questions.recordResolve(dir, q2.id, "codex", "");
+    assert.strictEqual(statusOf(q2.id), "open", "legacy open after codex only");
+    questions.recordResolve(dir, q2.id, "claude", "");
+    assert.strictEqual(statusOf(q2.id), "resolved", "legacy resolved after both");
+    console.log("PASS questions: closes only when all participant keys mark it resolved");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 async function testRoleFailover() {
@@ -185,6 +278,8 @@ async function testNetworkDispatch() {
 (async () => {
   try {
     testProfiles();
+    testParticipants();
+    testQuestionsNKeys();
     await testRoleFailover();
     await testNetworkDispatch();
     console.log("\nALL PROFILES/ROLES TESTS PASSED");
