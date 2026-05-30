@@ -144,8 +144,8 @@ const STRINGS = {
     "tip.chatTrash": "Корзина чатов. По «×» чат уходит сюда (восстановимо). ↩ — вернуть в «Чаты»; «Очистить» — удалить безвозвратно вместе со всей историей.|||удалил ненужный чат → он в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть навсегда.",
     "tip.subtaskArchive": "Архив подзадач. Кнопка «в архив» (🗄) на подзадаче убирает её из стека, но сохраняет. Клик по архивной — read-only просмотр в центре; ↩ — вернуть в стек.|||закрытую подзадачу «выбор БД» отправил в архив, чтобы не мешала. Позже кликнул — перечитал решение.",
     "tip.subtaskTrash": "Корзина подзадач. По «×» подзадача уходит сюда (восстановимо). Клик — read-only просмотр; ↩ — вернуть в стек; «Очистить» — удалить безвозвратно.|||создал лишнюю подзадачу, нажал × → в корзине. Передумал — ↩ вернул. Или «Очистить» — стереть весь мусор.",
-    "ui.switcherConnected": "модуль свитч подключён",
-    "ui.switcherOffline": "модуль свитч не подключён",
+    "ui.switcherConnected": "модуль свитч<br>подключён",
+    "ui.switcherOffline": "модуль свитч<br>не подключён",
     "ui.agentsLabel": "подключено:",
     "ui.agentReady": "проверен, рабочий",
     "ui.agentUnverified": "ключ задан, но не проверен",
@@ -260,7 +260,7 @@ const STRINGS = {
     "ui.agentRemove": "Убрать агента",
     "ui.agentSaved": "Агенты сохранены ✓",
     "ui.agentNoBackends": "Нет доступных бэкендов. Зарегистрируй/авторизуй агента в «Регистрация агентов».",
-    "ui.noRegisteredAgents": "Агенты не зарегистрированы",
+    "ui.noRegisteredAgents": "Агенты не<br>зарегистрированы",
     "tip.noRegisteredAgents": "Нет зарегистрированных бэкендов. Добавь профиль в панели «Регистрация агентов» (правая колонка).",
     "ui.agentMin2": "Нужно минимум 2 агента, чтобы запустить раунд.",
     "ui.agentMax": "Максимум 5 агентов.",
@@ -434,8 +434,8 @@ const STRINGS = {
     "tip.chatTrash": "Chat trash. The «×» sends a chat here (recoverable). ↩ returns it to «Chats»; «Empty» deletes it permanently along with all history.|||trashed an unneeded chat → it's in the trash. Changed your mind — ↩ restored it. Or «Empty» to wipe it for good.",
     "tip.subtaskArchive": "Subtask archive. The «🗄» button moves a subtask out of the stack but keeps it. Click an archived one for a read-only preview; ↩ returns it to the stack.|||archived the resolved «pick DB» subtask to keep it out of the way; later clicked it to re-read the decision.",
     "tip.subtaskTrash": "Subtask trash. The «×» sends a subtask here (recoverable). Click for a read-only preview; ↩ restores to the stack; «Empty» deletes permanently.|||made an extra subtask, hit × → in trash. Changed your mind — ↩ restored it. Or «Empty» to wipe the junk.",
-    "ui.switcherConnected": "switch module connected",
-    "ui.switcherOffline": "switch module not connected",
+    "ui.switcherConnected": "switch module<br>connected",
+    "ui.switcherOffline": "switch module<br>not connected",
     "ui.agentsLabel": "connected:",
     "ui.agentReady": "verified, working",
     "ui.agentUnverified": "key set but unverified",
@@ -550,7 +550,7 @@ const STRINGS = {
     "ui.agentRemove": "Remove agent",
     "ui.agentSaved": "Agents saved ✓",
     "ui.agentNoBackends": "No available backends. Register/authorize one in «Agent registration».",
-    "ui.noRegisteredAgents": "No agents registered",
+    "ui.noRegisteredAgents": "No agents<br>registered",
     "tip.noRegisteredAgents": "No backends registered yet. Add a profile in the «Agent registration» panel (right column).",
     "ui.agentMin2": "At least 2 agents are required to run a round.",
     "ui.agentMax": "Maximum 5 agents.",
@@ -1875,7 +1875,7 @@ function renderConnectedAgents() {
   if (!agents.length) {
     const ph = document.createElement("span");
     ph.className = "agent-no-reg nav-highlight";
-    ph.textContent = t("ui.noRegisteredAgents");
+    ph.innerHTML = t("ui.noRegisteredAgents");
     ph.dataset.tooltipText = t("tip.noRegisteredAgents");
     ph.addEventListener("click", () => openProfilesPanel(null));
     box.appendChild(ph);
@@ -1931,7 +1931,7 @@ function renderSwitcher() {
     el.classList.toggle("connected", agents.some((a) => a.ready));
   } else {
     el.classList.toggle("connected", connected);
-    $("switcherStatusText").textContent = connected ? t("ui.switcherConnected") : t("ui.switcherOffline");
+    $("switcherStatusText").innerHTML = connected ? t("ui.switcherConnected") : t("ui.switcherOffline");
   }
 
   renderConnectedAgents();
