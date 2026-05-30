@@ -1825,14 +1825,11 @@ function visibleAccounts(tool) {
   });
 }
 
-// Phase 5: the configured provider profiles ("Profiles & roles"), surfaced as
-// connected-backend chips next to the switcher status. Reads the live panel
-// draft when present (so chips preview as you add/edit profiles) and falls back
-// to the saved settings. Each entry = one model/API key the round can route to.
+// Phase 5/6c: registered backend profiles shown as chips next to the switcher.
+// Always reads the saved server state so chip additions/removals are immediate.
+// (The providersDraft is for the panel editor only — chips reflect persisted state.)
 function connectedAgents() {
-  const list = (providersDraft && providersDraft.profiles)
-    || (currentState.settings && currentState.settings.profiles)
-    || [];
+  const list = (currentState.settings && currentState.settings.profiles) || [];
   const creds = (currentState.providers && currentState.providers.credentials) || {};
   const validated = (currentState.providers && currentState.providers.validated) || {};
   const usage = (currentState.providers && currentState.providers.usage) || {};
