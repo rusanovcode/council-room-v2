@@ -1388,10 +1388,11 @@ button.square {
 .plog-date { font-size: 10px; color: var(--muted); font-family: var(--mono); }
 .plog-time { font-size: 10px; color: var(--muted); font-family: var(--mono); }
 .plog-msg { font-size: 11px; color: var(--text); line-height: 1.4; word-break: break-word; margin-top: 1px; }
-/* Chip loading animation during switcher refresh */
+/* Chip loading animation during switcher refresh (only switcher account chips) */
 @keyframes chipPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-.chips-loading .acct-btn,
-.chips-loading .agent-chip { animation: chipPulse 1s ease-in-out infinite; }
+@keyframes spinIcon { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.chips-loading .acct-btn { animation: chipPulse 1s ease-in-out infinite; }
+.refresh-spinning { animation: spinIcon 0.7s linear infinite; display: inline-block; }
 
 /* Registered model row states */
 .rm-cell-retest { width: 24px; padding: 4px 2px; vertical-align: middle; }

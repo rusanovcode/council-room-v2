@@ -3323,11 +3323,11 @@ function bindUi() {
   });
   $("refreshSwitcher")?.addEventListener("click", () => {
     if (confirm(t("ui.confirmRefresh"))) {
-      // Animate chips while refresh is in flight.
-      $("switcherAgents")?.classList.add("chips-loading");
+      // Spin the ↻ icon and pulse only the switcher account chips (not provider chips).
+      $("refreshIcon")?.classList.add("refresh-spinning");
       $("switcherAccounts")?.classList.add("chips-loading");
       api("POST", "/api/switcher/refresh", {}).finally(() => {
-        $("switcherAgents")?.classList.remove("chips-loading");
+        $("refreshIcon")?.classList.remove("refresh-spinning");
         $("switcherAccounts")?.classList.remove("chips-loading");
       });
     }
