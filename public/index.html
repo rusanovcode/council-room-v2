@@ -184,6 +184,18 @@
           </div>
         </section>
 
+        <!-- Filesystem-scan toggle: standalone field directly under the agent
+             editor so it's visually part of the "how agents run" group. -->
+        <section class="providers-panel filescan-panel">
+          <div class="providers-body">
+            <label class="toggle-row danger-toggle">
+              <input id="allowFilesystemScan" type="checkbox" />
+              <span data-i18n="ui.allowScan">Разрешить агентам сканировать файлы</span>
+              <span class="help" data-tooltip-key="t.allowScan">?</span>
+            </label>
+          </div>
+        </section>
+
         <!-- Phase 5: configurable provider profiles + debate roles. Pinned to the
              top of the right column so it stays reachable while the column scrolls. -->
         <details id="providersDetails" class="providers-panel">
@@ -211,11 +223,6 @@
             <span class="help" data-tooltip-key="t.agentSettings">?</span>
           </summary>
           <div class="providers-body">
-          <label class="toggle-row danger-toggle">
-            <input id="allowFilesystemScan" type="checkbox" />
-            <span data-i18n="ui.allowScan">Разрешить агентам сканировать файлы</span>
-            <span class="help" data-tooltip-key="t.allowScan">?</span>
-          </label>
           <label>
             <span data-i18n="ui.agentLanguage">Язык агентов</span>
             <span class="help" data-tooltip-key="t.agentLanguage">?</span>

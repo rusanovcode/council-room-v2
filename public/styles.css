@@ -1371,7 +1371,9 @@ button.square {
 .agent-chip-sel.pulse:not(.selected) { animation: agentPulse 1.8s ease-in-out infinite; }
 
 /* Right-column agent editor (populated when a chip is selected). */
-.agent-editor-panel { margin-bottom: 8px; }
+.agent-editor-panel { margin-bottom: 0; }
+.filescan-panel { margin-bottom: 8px; }
+.filescan-panel .providers-body { padding-top: 6px; padding-bottom: 6px; }
 .agent-editor-head { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 6px; }
 .agent-editor-title { font-size: 13px; }
 .agent-edit-card { display: flex; flex-direction: column; gap: 6px; }
