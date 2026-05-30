@@ -2280,7 +2280,6 @@ function initProvidersDraft() {
     profiles: Array.isArray(s.profiles) ? JSON.parse(JSON.stringify(s.profiles)) : [],
     roles: (s.roles && s.roles.a && s.roles.b) ? JSON.parse(JSON.stringify(s.roles)) : blankRoles(),
   };
-  providersDraft.profiles.push(makeBlankProfile());
 }
 
 function renderProvidersInit() {
