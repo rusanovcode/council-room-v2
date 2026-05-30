@@ -2418,19 +2418,19 @@ function renderRegisteredModels() {
   const logEntries = provLogLoad();
   let logHtml = "";
   if (logEntries.length) {
-    const rows = [...logEntries].reverse().map((e) => {
+    const items = [...logEntries].reverse().map((e) => {
       const dt = new Date(e.at);
       const dateStr = dt.toLocaleDateString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
       const timeStr = dt.toLocaleTimeString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       const msg = escapeHtml(UI_LANG === "ru" ? (e.ru || e.en || "") : (e.en || e.ru || ""));
-      return `<tr><td class="plog-dt">${dateStr} ${timeStr}</td><td class="plog-msg">${msg}</td></tr>`;
+      return `<div class="plog-entry"><span class="plog-dt">${dateStr} ${timeStr}</span><span class="plog-msg">${msg}</span></div>`;
     }).join("");
     logHtml = `<div class="plog-wrap">
       <div class="plog-head">
         <span class="rm-col-head" style="margin:0">${escapeHtml(t("ui.providerLog"))}</span>
         <button class="plog-clear ghost small" type="button">${escapeHtml(t("ui.providerLogClear"))}</button>
       </div>
-      <table class="plog-table"><tbody>${rows}</tbody></table>
+      <div class="plog-box">${items}</div>
     </div>`;
   }
 
