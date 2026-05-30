@@ -2501,7 +2501,14 @@ function agentCatalog() {
 function catalogEntryForBackend(b) {
   const cat = agentCatalog();
   if (!b) return cat[0] || null;
-  return cat.find((c) => c.provider === b.provider && (c.account || "") === (b.account || "")) || cat[0] || null;
+  // For CLI providers: match by provider + account.
+  // For network providers: prefer matching by model (since multiple Ollama/API
+  // profiles can share the same provider but have different models).
+  return cat.find((c) => {
+    if (c.provider !== b.provider) return false;
+    if (c.account || b.account) return (c.account || "") === (b.account || "");
+    return c.defaultModel === (b.model || "");
+  }) || cat.find((c) => c.provider === b.provider) || cat[0] || null;
 }
 
 function makeAgentFromCatalog(entry, idx) {
@@ -2669,8 +2676,14 @@ function addAgentAuto() {
   const picks = [];
   for (const c of cat) {
     if (picks.length >= 2) break;
-    if (picks.some((x) => x.provider === c.provider && (x.account || "") === (c.account || ""))) continue;
-    picks.push(c);
+    // For CLI: unique by provider+account. For network: unique by catalog id
+    // (each registered profile is a distinct backend even if same provider).
+    const isDup = picks.some((x) => {
+      if (x.provider !== c.provider) return false;
+      if (x.account || c.account) return (x.account || "") === (c.account || "");
+      return x.id === c.id;
+    });
+    if (!isDup) picks.push(c);
   }
   while (picks.length < 2) picks.push(cat[picks.length % cat.length]); // single backend → duplicate
   participantsDraft = rekeyAgents(picks.slice(0, 2).map((c, i) => makeAgentFromCatalog(c, i)));
@@ -2685,8 +2698,16 @@ function addAgentManual() {
   if (!cat.length) { showAddAgentMsg(t("ui.agentNoBackends"), true); return; }
   const list = participantsDraft || [];
   if (list.length >= 5) { showAddAgentMsg(t("ui.agentMax"), true); return; }
-  const used = new Set(list.map((p) => `${p.backend?.provider}|${p.backend?.account || ""}`));
-  const entry = cat.find((c) => !used.has(`${c.provider}|${c.account || ""}`)) || cat[0];
+  // Unique by catalog id for network providers, by provider+account for CLI.
+  const usedIds = new Set(list.map((p) => {
+    const match = agentCatalog().find((c) => {
+      if (c.provider !== p.backend?.provider) return false;
+      if (c.account || p.backend?.account) return (c.account || "") === (p.backend?.account || "");
+      return c.defaultModel === (p.backend?.model || "");
+    });
+    return match ? match.id : `${p.backend?.provider}|${p.backend?.account || ""}`;
+  }));
+  const entry = cat.find((c) => !usedIds.has(c.id)) || cat[0];
   const newAgent = makeAgentFromCatalog(entry, list.length);
   newAgent.backend.model = "";
   newAgent.backend.effort = "";
