@@ -1078,6 +1078,51 @@ async function router(req, res) {
       return sendJson(res, 200, { ...statsCache[key].data, providers: usage.summary(ROOMS_DIR) });
     }
 
+    if (method === "GET" && pathname === "/api/ollama/detect") {
+      // Auto-detect Ollama: try OLLAMA_HOST env, then default port 11434.
+      // Returns { detected, baseUrl, port, models[] }.
+      async function tryOllamaAt(baseUrl) {
+        const tagsUrl = baseUrl.replace(/\/v1\/?$/, "") + "/api/tags";
+        const mod = tagsUrl.startsWith("https") ? require("node:https") : require("node:http");
+        return new Promise((resolve) => {
+          const r2 = mod.get(tagsUrl, { timeout: 3000 }, (r) => {
+            let body = "";
+            r.on("data", (c) => { body += c; });
+            r.on("end", () => {
+              try {
+                const data = JSON.parse(body);
+                const models = Array.isArray(data.models)
+                  ? data.models.map((m) => m.name || m.model).filter(Boolean)
+                  : [];
+                resolve({ detected: true, models });
+              } catch { resolve(null); }
+            });
+          });
+          r2.on("error", () => resolve(null));
+          r2.on("timeout", () => { r2.destroy(); resolve(null); });
+        });
+      }
+
+      // Candidates: OLLAMA_HOST env first, then localhost:11434.
+      const envHost = process.env.OLLAMA_HOST || "";
+      const candidates = [];
+      if (envHost) {
+        const base = envHost.startsWith("http") ? envHost : `http://${envHost}`;
+        candidates.push(base.replace(/\/$/, "") + "/v1");
+      }
+      candidates.push("http://localhost:11434/v1");
+
+      for (const baseUrl of candidates) {
+        const result = await tryOllamaAt(baseUrl);
+        if (result) {
+          const portMatch = baseUrl.match(/:(\d+)/);
+          const port = portMatch ? Number(portMatch[1]) : 11434;
+          return sendJson(res, 200, { detected: true, baseUrl, port, models: result.models });
+        }
+      }
+      return sendJson(res, 200, { detected: false, baseUrl: "http://localhost:11434/v1", port: 11434, models: [] });
+    }
+
     if (method === "GET" && pathname === "/api/ollama/models") {
       // Proxy Ollama's model list to avoid CORS. baseUrl param mirrors the profile's
       // baseUrl (e.g. http://localhost:11434/v1); we strip /v1 to reach /api/tags.

@@ -219,6 +219,9 @@ const STRINGS = {
     "ui.profileModelRequired": "Укажи модель для «{label}» (например: llama3.2, gpt-4o-mini)",
     "ui.ollamaSelectModel": "— выбери модель —",
     "ui.ollamaNoModels": "Ollama не запущена?",
+    "ui.ollamaDetected": "Ollama обнаружена на порту {port} · {n} модел{suffix}",
+    "ui.ollamaNotFound": "Ollama не обнаружена (проверяется порт {port})",
+    "ui.ollamaChecking": "Проверяю Ollama…",
     "ui.noProfiles": "Профилей нет — раунд использует поведение по умолчанию (Codex/Claude).",
     "ui.profileProvider": "Провайдер",
     "ui.profileModel": "Модель",
@@ -512,6 +515,9 @@ const STRINGS = {
     "ui.profileModelRequired": "Enter a model name for «{label}» (e.g. llama3.2, gpt-4o-mini)",
     "ui.ollamaSelectModel": "— select model —",
     "ui.ollamaNoModels": "Ollama not running?",
+    "ui.ollamaDetected": "Ollama detected on port {port} · {n} model{suffix}",
+    "ui.ollamaNotFound": "Ollama not detected (checked port {port})",
+    "ui.ollamaChecking": "Checking Ollama…",
     "ui.noProfiles": "No profiles — the round uses the default Codex/Claude behavior.",
     "ui.profileProvider": "Provider",
     "ui.profileModel": "Model",
@@ -2038,8 +2044,22 @@ function renderSettings() {
 // chat changes or the UI language flips; otherwise it persists across renders.
 let providersDraft = null;
 let providersForRunId = undefined;
+// Ollama auto-detection result (null = not yet fetched).
+let ollamaDetect = null;
 // baseUrl → string[] of model names fetched from Ollama /api/tags
 const ollamaModelsCache = {};
+
+async function detectOllama() {
+  if (ollamaDetect !== null) return ollamaDetect;
+  try {
+    const r = await fetch("/api/ollama/detect");
+    ollamaDetect = await r.json().catch(() => ({ detected: false }));
+    if (ollamaDetect.detected && Array.isArray(ollamaDetect.models)) {
+      ollamaModelsCache[ollamaDetect.baseUrl] = ollamaDetect.models;
+    }
+  } catch { ollamaDetect = { detected: false }; }
+  return ollamaDetect;
+}
 
 async function fetchOllamaModels(baseUrl) {
   const key = baseUrl || "http://localhost:11434/v1";
@@ -2079,15 +2099,9 @@ function renderProvidersInit() {
     renderProviders();
   }
   providersLang = UI_LANG;
-  // Pre-fetch Ollama models for any already-registered Ollama profiles.
-  const profiles = (providersDraft && providersDraft.profiles) || [];
-  for (const p of profiles) {
-    if (p.provider === "ollama") {
-      const baseUrl = p.baseUrl || "http://localhost:11434/v1";
-      if (!ollamaModelsCache[baseUrl]) {
-        fetchOllamaModels(baseUrl).then(() => renderProviders());
-      }
-    }
+  // Auto-detect Ollama (fills banner + model cache for dropdown).
+  if (ollamaDetect === null) {
+    detectOllama().then(() => renderProviders());
   }
 }
 
@@ -2179,18 +2193,29 @@ function renderProfileRow(p) {
   </div>`;
 }
 
+function ollamaBanner() {
+  if (ollamaDetect === null) return `<div class="ollama-status checking">${escapeHtml(t("ui.ollamaChecking"))}</div>`;
+  if (!ollamaDetect.detected) {
+    return `<div class="ollama-status miss">${escapeHtml(t("ui.ollamaNotFound", { port: ollamaDetect.port || 11434 }))}</div>`;
+  }
+  const n = (ollamaDetect.models || []).length;
+  const suffix = UI_LANG === "ru" ? (n === 1 ? "ь" : n >= 2 && n <= 4 ? "и" : "ей") : (n === 1 ? "" : "s");
+  const names = (ollamaDetect.models || []).slice(0, 5).map(escapeHtml).join(", ");
+  const more = n > 5 ? ` +${n - 5}` : "";
+  return `<div class="ollama-status ok">${escapeHtml(t("ui.ollamaDetected", { port: ollamaDetect.port, n, suffix }))}`
+    + (names ? `<br><span class="ollama-models">${names}${more}</span>` : "") + `</div>`;
+}
+
 function renderProviders() {
   if (!providersDraft) return;
+  const banner = $("ollamaBanner");
+  if (banner) banner.innerHTML = ollamaBanner();
   const list = $("profilesList");
   if (!list) return;
   list.innerHTML = providersDraft.profiles.length
     ? providersDraft.profiles.map(renderProfileRow).join("")
     : `<div class="muted small">${t("ui.noProfiles")}</div>`;
-  // Phase 6b: debate agents are picked per-chat via the "Add agent" chips
-  // (settings.participants), so the legacy role A/B editor was removed from this
-  // panel — it now only registers/authorizes backend profiles. Any roles already
-  // saved on a chat still persist (effectiveConfig honors participants first).
-  renderConnectedAgents(); // keep the connected-agent chips in sync with panel edits
+  renderConnectedAgents();
 }
 
 function syncProvidersFromDOM() {
@@ -2214,9 +2239,15 @@ function syncProvidersFromDOM() {
 function addProfileDraft() {
   syncProvidersFromDOM();
   const apiMode = (currentState.providers && currentState.providers.mode) === "api";
-  const provider = apiMode ? "ollama" : "cli-codex";
+  // Default to Ollama if it was auto-detected; otherwise CLI (full) or ollama (api).
+  const useOllama = ollamaDetect && ollamaDetect.detected;
+  const provider = (apiMode || useOllama) ? "ollama" : "cli-codex";
   const p = { id: `p${Date.now().toString(36)}`, label: "", provider, model: "" };
-  if (isCliProviderId(provider)) p.account = "acc1";
+  if (isCliProviderId(provider)) {
+    p.account = "acc1";
+  } else if (provider === "ollama" && useOllama) {
+    p.baseUrl = ollamaDetect.baseUrl;
+  }
   providersDraft.profiles.push(p);
   renderProviders();
 }

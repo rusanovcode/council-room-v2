@@ -1328,6 +1328,12 @@ button.square {
 .providers-msg { font-size: 12px; }
 .providers-msg.ok { color: var(--green); }
 .providers-msg.err { color: var(--red); }
+.ollama-status { font-size: 11px; padding: 4px 6px; border-radius: 4px; margin-bottom: 6px; line-height: 1.4; }
+.ollama-status:empty { display: none; }
+.ollama-status.checking { color: var(--muted); }
+.ollama-status.ok { color: var(--green); background: rgba(70,232,90,0.07); border: 1px solid rgba(70,232,90,0.2); }
+.ollama-status.miss { color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); }
+.ollama-status .ollama-models { color: var(--muted); font-size: 10px; }
 .muted.small { font-size: 12px; color: var(--muted); }
 
 /* ---- Phase 6b: debate-agent selection ---- */
