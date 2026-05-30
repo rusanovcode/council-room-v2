@@ -1396,3 +1396,22 @@ button.square {
   text-align: left; padding: 8px 10px; width: 100%;
 }
 .add-agent-choices button small { font-weight: 400; }
+
+/* Attached documents panel */
+.doc-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.doc-row:last-child { border-bottom: none; }
+.doc-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-chars { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.doc-remove {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px;
+}
+.doc-remove:hover { color: var(--red); }
+.doc-add { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.doc-add-row { display: flex; gap: 6px; align-items: center; }
+.doc-add-row #docName { flex: 1 1 auto; min-width: 0; }
+.doc-add textarea { width: 100%; resize: vertical; }
+.doc-add-actions { display: flex; align-items: center; gap: 8px; }

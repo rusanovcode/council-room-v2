@@ -12,6 +12,7 @@ const store = require("./lib/store");
 const subtasks = require("./lib/subtasks");
 const knowledge = require("./lib/knowledge");
 const questions = require("./lib/questions");
+const documents = require("./lib/documents");
 const prompt = require("./lib/prompt");
 const cli = require("./lib/cli");
 const switcher = require("./lib/switcher");
@@ -113,13 +114,17 @@ function transcriptPath(runId) {
 }
 
 function defaultRun(topic) {
+  // A new chat is a clean slate (Phase 6b): inherit the global defaults (models,
+  // language, scan, strictScope…) but NOT the previous chat's agent selection —
+  // the user picks agents fresh for each chat.
+  const { participants, ...inheritable } = state.settings || {};
   return {
     id: store.makeRunId(topic),
     topic: String(topic || "Untitled").slice(0, 200),
     createdAt: store.now(),
     rounds: 0,
     archived: false,
-    settings: { ...state.settings },
+    settings: { ...inheritable },
   };
 }
 
@@ -206,6 +211,7 @@ function publicState() {
       subtasks: allSubtasks,
       knowledge: knowledge.load(dir),
       questions: activeQuestions,
+      documents: documents.listMeta(dir),
       messages,
     },
     autopilot: state.autopilot,
@@ -300,6 +306,7 @@ async function runRound({ guidance = "" } = {}) {
       addMessage({ role: "user", name: "User", kind: "guidance", text: guidance, subtaskId: active.id, round });
     }
     const kbSnapshot = knowledge.snapshotForPrompt(dir);
+    const documentsSnapshot = documents.snapshotForPrompt(dir);
     const language = state.run.settings.language || "ru";
 
     // Resolve the debate participants (2..5). Legacy / Phase-5 two-slot settings
@@ -341,6 +348,7 @@ async function runRound({ guidance = "" } = {}) {
       language,
       subtask: active,
       kbSnapshot,
+      documentsSnapshot,
       recentTurns: recent,
       guidance,
       round,
@@ -967,6 +975,24 @@ async function router(req, res) {
       return sendJson(res, 200, publicState());
     }
 
+    // Phase 6b: per-chat attached reference documents (fed into the debate prompt).
+    if (method === "POST" && pathname === "/api/documents/add") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      if (!body.text || !String(body.text).trim()) return sendJson(res, 400, { error: "Empty document" });
+      documents.add(runDir(state.run.id), body.name, body.text);
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/documents/remove") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      documents.remove(runDir(state.run.id), body.id);
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
     if (method === "POST" && pathname === "/api/questions/add") {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
@@ -1289,6 +1315,9 @@ function applyRunSettings(run) {
   for (const [key, value] of Object.entries(run.settings)) {
     if (value !== undefined) state.settings[key] = value;
   }
+  // Agent selection is strictly per-chat: mirror it exactly (clearing it when the
+  // chat has none), so a fresh/blank chat never shows the previous chat's agents.
+  state.settings.participants = run.settings.participants || null;
 }
 
 // Auto-select the most recently created chat on startup so a server restart

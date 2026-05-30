@@ -296,6 +296,30 @@
           </div><!-- /.providers-body -->
         </details>
 
+        <!-- Phase 6b: per-chat attached reference documents (fed into the prompt). -->
+        <details id="documentsPanel" class="providers-panel">
+          <summary>
+            <span data-i18n="ui.documents">Документы</span>
+            <span class="help" data-tooltip-key="t.documents">?</span>
+            <span id="docsCount" class="mode-badge"></span>
+          </summary>
+          <div class="providers-body">
+            <div id="documentsList"></div>
+            <div class="doc-add">
+              <input id="docFile" type="file" accept=".txt,.md,.markdown,.json,.csv,.log,.js,.ts,.jsx,.tsx,.py,.html,.css,.yml,.yaml,.xml,.ini,.cfg,.sh,.sql" hidden />
+              <div class="doc-add-row">
+                <button id="docFileBtn" class="ghost small" type="button" data-i18n="ui.docAddFile">+ Файл</button>
+                <input id="docName" type="text" data-i18n-placeholder="ui.docNamePlaceholder" placeholder="Имя (опц.)" />
+              </div>
+              <textarea id="docText" rows="3" data-i18n-placeholder="ui.docPastePlaceholder" placeholder="…или вставь текст документа"></textarea>
+              <div class="doc-add-actions">
+                <button id="docAdd" class="primary small" type="button" data-i18n="ui.docAdd">Добавить</button>
+                <span id="docMsg" class="providers-msg"></span>
+              </div>
+            </div>
+          </div>
+        </details>
+
         <header class="col-head kb-head">
           <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
           <span id="kbUpdated" class="muted small"></span>

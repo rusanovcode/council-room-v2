@@ -282,6 +282,18 @@ const STRINGS = {
     "tip.agentBackend": "Какой бэкенд отвечает за этого агента: подписочный CLI (Codex/Claude, по аккаунтам), сетевой API-провайдер или локальная Ollama. Список — из доступного: авторизованные аккаунты + зарегистрированные провайдеры.|||«Codex · акк 1», «Claude · акк 2», «DeepSeek», «Ollama (локально)».",
     "tip.agentModel2": "Модель выбранного бэкенда. По умолчанию — самая дешёвая (экономия токенов). Для CLI — из списка; для сетевого провайдера — точная строка модели.|||Codex: gpt-5.4-mini (дёшево) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
     "tip.agentEffort2": "Усилие рассуждения (только для подписочных CLI). По умолчанию low — дёшево и быстро. Выше — дороже и медленнее, но тщательнее. У сетевых провайдеров такой ручки нет.|||low — быстрый черновой проход; high/xhigh/max — для сложных спорных мест.",
+    "ui.documents": "Документы",
+    "ui.docAddFile": "+ Файл",
+    "ui.docAdd": "Добавить",
+    "ui.docNamePlaceholder": "Имя (опц.)",
+    "ui.docPastePlaceholder": "…или вставь текст документа",
+    "ui.docEmpty": "Документов нет. Приложи текстовый файл или вставь текст — он попадёт в контекст агентов на раунде.",
+    "ui.docRemove": "Удалить документ",
+    "ui.docAdded": "Документ добавлен ✓",
+    "ui.docCharsBadge": "{docs} док · {chars} симв.",
+    "ui.docChars": "{n} симв.",
+    "ui.docBudgetNote": "В промт идёт до ~{n} символов суммарно (дальше — усечение). Экономь токены.",
+    "tip.documents": "Приложенные текстовые документы этого чата — справочный материал, который кладётся в промт каждого раунда секцией ATTACHED DOCUMENTS. В отличие от сканирования файлов, это явно переданный тобой источник, поэтому разрешён даже в изолированном режиме. В промт идёт до ~12000 символов суммарно (дальше усечение) — следи за расходом.|||Прикладываешь спецификацию API или кусок лога → агенты ссылаются на него в дебате, не угадывая.",
   },
   en: {
     "ui.newChat": "+ New chat",
@@ -561,6 +573,18 @@ const STRINGS = {
     "tip.agentBackend": "Which backend powers this agent: a subscription CLI (Codex/Claude, per account), a network API provider, or local Ollama. The list comes from what's available: authorized accounts + registered providers.|||«Codex · acc 1», «Claude · acc 2», «DeepSeek», «Ollama (local)».",
     "tip.agentModel2": "The chosen backend's model. Defaults to the cheapest (token economy). For CLI — from a list; for a network provider — the exact model string.|||Codex: gpt-5.4-mini (cheap) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
     "tip.agentEffort2": "Reasoning effort (subscription CLI only). Defaults to low — cheap and fast. Higher = pricier and slower but more thorough. Network providers have no such knob.|||low — a quick draft pass; high/xhigh/max — for hard contested points.",
+    "ui.documents": "Documents",
+    "ui.docAddFile": "+ File",
+    "ui.docAdd": "Add",
+    "ui.docNamePlaceholder": "Name (opt.)",
+    "ui.docPastePlaceholder": "…or paste document text",
+    "ui.docEmpty": "No documents. Attach a text file or paste text — it goes into the agents' context for the round.",
+    "ui.docRemove": "Remove document",
+    "ui.docAdded": "Document added ✓",
+    "ui.docCharsBadge": "{docs} doc · {chars} chars",
+    "ui.docChars": "{n} chars",
+    "ui.docBudgetNote": "Up to ~{n} chars total go into the prompt (truncated beyond that). Mind the tokens.",
+    "tip.documents": "Text documents attached to this chat — reference material injected into every round's prompt as an ATTACHED DOCUMENTS section. Unlike filesystem scanning, this is a source you explicitly provided, so it's allowed even in isolated mode. Up to ~12000 chars total go into the prompt (truncated beyond) — watch the spend.|||Attach an API spec or a log snippet → agents cite it in the debate instead of guessing.",
   },
 };
 
@@ -825,6 +849,7 @@ function render() {
   renderActiveSubtask();
   renderConversation();
   renderKnowledge();
+  renderDocuments();
   renderSettings();
   renderAgentsInit();
   renderNextStep();
@@ -944,7 +969,9 @@ function computeNextStep() {
       title: t("coach.agentsConfig.title"),
       body: t("coach.agentsConfig.body"),
       action: { label: t("coach.agentsConfig.action"), target: "runRound" },
-      highlight: ["agentChips", "runRound", "autopilot"],
+      // "галочки / документы / запуск всё подсвечивается" — the optional configure
+      // controls + both run paths glow until the round starts.
+      highlight: ["agentChips", "documentsPanel", "allowFilesystemScan", "autoResolve", "runRound", "autopilot"],
     };
   }
   // Inspect last two agent messages of this subtask
@@ -2489,6 +2516,34 @@ async function applyParticipants() {
   } catch (e) { showProvidersMsg(e.message, true); }
 }
 
+// ---- Phase 6b: attached documents ----------------------------------------
+function showDocMsg(text, isError) {
+  const el = $("docMsg");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `providers-msg ${text ? (isError ? "err" : "ok") : ""}`;
+  clearTimeout(showDocMsg._t);
+  showDocMsg._t = setTimeout(() => { el.textContent = ""; el.className = "providers-msg"; }, 4000);
+}
+
+function renderDocuments() {
+  const list = $("documentsList");
+  if (!list) return;
+  const docs = (currentState.run && currentState.run.documents) || [];
+  const total = docs.reduce((s, d) => s + (d.chars || 0), 0);
+  const badge = $("docsCount");
+  if (badge) badge.textContent = docs.length ? t("ui.docCharsBadge", { docs: docs.length, chars: total }) : "";
+  if (!docs.length) {
+    list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.docEmpty"))}</div>`;
+    return;
+  }
+  list.innerHTML = docs.map((d) => `<div class="doc-row" data-id="${escapeHtml(d.id)}">
+    <span class="doc-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</span>
+    <span class="doc-chars">${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
+    <button class="doc-remove" type="button" title="${escapeHtml(t("ui.docRemove"))}">×</button>
+  </div>`).join("");
+}
+
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
@@ -2761,6 +2816,38 @@ function bindUi() {
     selectedAgentKey = key;
     renderAgentChips();
     renderAgentEditor();
+  });
+
+  // Phase 6b: attached documents (file upload read as text, or pasted).
+  $("docFileBtn")?.addEventListener("click", () => $("docFile")?.click());
+  $("docFile")?.addEventListener("change", (event) => {
+    const f = event.target.files && event.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      $("docText").value = String(reader.result || "");
+      if (!$("docName").value.trim()) $("docName").value = f.name;
+    };
+    reader.onerror = () => showDocMsg(t("ui.docEmpty"), true);
+    reader.readAsText(f);
+    event.target.value = ""; // allow re-selecting the same file
+  });
+  $("docAdd")?.addEventListener("click", async () => {
+    const text = $("docText").value;
+    if (!text.trim()) { showDocMsg(t("ui.docEmpty"), true); return; }
+    const name = $("docName").value.trim() || "document";
+    try {
+      const r = await fetch("/api/documents/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, text }) });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); showDocMsg(j.error || `error ${r.status}`, true); return; }
+      $("docText").value = ""; $("docName").value = "";
+      showDocMsg(t("ui.docAdded"), false);
+    } catch (e) { showDocMsg(e.message, true); }
+  });
+  $("documentsList")?.addEventListener("click", (event) => {
+    const rm = event.target.closest(".doc-remove");
+    if (!rm) return;
+    const id = rm.closest(".doc-row")?.dataset.id;
+    if (id) api("POST", "/api/documents/remove", { id });
   });
 
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.
