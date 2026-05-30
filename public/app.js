@@ -218,6 +218,7 @@ const STRINGS = {
     "ui.providersSaved": "Сохранено ✓",
     "ui.profileModelRequired": "Укажи модель для «{label}» (например: llama3.2, gpt-4o-mini)",
     "ui.ollamaSelectModel": "— выбери модель —",
+    "ui.ollamaRegisterHint": "← зарегистрируй в «Регистрация агентов»",
     "ui.ollamaNoModels": "Ollama не запущена?",
     "ui.ollamaDetected": "Ollama обнаружена на порту {port} · {n} модел{suffix}",
     "ui.ollamaNotFound": "Ollama не обнаружена (проверяется порт {port})",
@@ -280,6 +281,9 @@ const STRINGS = {
     "coach.agents.title": "Шаг 3: выбери агентов",
     "coach.agents.body": "Сверху по центру нажми «Добавить агента». Можно «Авто» (2 разных бэкенда подберутся сами) или «Вручную». Нужно минимум 2, максимум 5. Чем больше агентов — тем дороже раунд (промт не сжимается).",
     "coach.agents.action": "Добавить агента",
+    "coach.ollamaReg.title": "Нужно зарегистрировать Ollama",
+    "coach.ollamaReg.body": "Ты выбрал Ollama как бэкенд, но профиль ещё не зарегистрирован. Открой панель «Регистрация агентов» справа → нажми «+ Профиль» → выбери Ollama → укажи модель (например llama3.2) → «Применить». После этого модель появится в списке бэкендов.",
+    "coach.ollamaReg.action": "Открыть регистрацию",
     "coach.agentsConfig.title": "Шаг 4: проверь модели агентов",
     "coach.agentsConfig.body": "По умолчанию подставлены слабые модели и низкое усилие — дёшево. Кликни по чипу агента сверху, чтобы сменить бэкенд/модель/усилие. Готово — запусти раунд.",
     "coach.agentsConfig.action": "Запустить раунд",
@@ -514,6 +518,7 @@ const STRINGS = {
     "ui.providersSaved": "Saved ✓",
     "ui.profileModelRequired": "Enter a model name for «{label}» (e.g. llama3.2, gpt-4o-mini)",
     "ui.ollamaSelectModel": "— select model —",
+    "ui.ollamaRegisterHint": "← register in «Agent registration»",
     "ui.ollamaNoModels": "Ollama not running?",
     "ui.ollamaDetected": "Ollama detected on port {port} · {n} model{suffix}",
     "ui.ollamaNotFound": "Ollama not detected (checked port {port})",
@@ -576,6 +581,9 @@ const STRINGS = {
     "coach.agents.title": "Step 3: pick your agents",
     "coach.agents.body": "At the top center click «Add agent». Use «Auto» (2 distinct backends are picked for you) or «Manually». Minimum 2, maximum 5. More agents = a pricier round (prompts are not compressed).",
     "coach.agents.action": "Add agent",
+    "coach.ollamaReg.title": "Register Ollama first",
+    "coach.ollamaReg.body": "You picked Ollama as backend but no profile is registered yet. Open «Agent registration» panel on the right → click «+ Profile» → select Ollama → enter a model name (e.g. llama3.2) → click «Apply». The model will then appear in the backend list.",
+    "coach.ollamaReg.action": "Open registration",
     "coach.agentsConfig.title": "Step 4: check the agents' models",
     "coach.agentsConfig.body": "Weak models and low effort are pre-filled by default — cheap. Click an agent chip at the top to change its backend/model/effort. When ready, run the round.",
     "coach.agentsConfig.action": "Run round",
@@ -853,6 +861,10 @@ function connectEvents() {
 
 function render() {
   if (!currentState) return;
+  // Clear the Ollama registration hint once a profile is saved.
+  if (pendingOllamaRegistration && hasRegisteredOllamaProfile()) {
+    pendingOllamaRegistration = false;
+  }
   renderRuns();
   renderStatus();
   renderSubtasks();
@@ -880,6 +892,15 @@ function needsAgents() {
 }
 
 // ---- Next-step coach -----------------------------------------------------
+
+// Set when the user picks the fallback "Ollama (local)" backend that has no
+// registered profile yet. Cleared once a real Ollama profile appears in state.
+let pendingOllamaRegistration = false;
+
+function hasRegisteredOllamaProfile() {
+  return ((currentState.settings && currentState.settings.profiles) || [])
+    .some((p) => p.provider === "ollama");
+}
 
 let nextStepDismissed = false;
 let subtaskStatementExpanded = false; // subtask-statement field: collapsed (2 lines) ↔ full
@@ -939,6 +960,15 @@ function computeNextStep() {
       title: t("coach.autopilot.title"),
       body: t("coach.autopilot.body"),
       action: { label: t("coach.autopilot.action"), target: "autopilot" },
+    };
+  }
+  if (pendingOllamaRegistration && !hasRegisteredOllamaProfile()) {
+    return {
+      title: t("coach.ollamaReg.title"),
+      body: t("coach.ollamaReg.body"),
+      action: { label: t("coach.ollamaReg.action"), target: "providersDetails" },
+      highlight: ["providersDetails"],
+      tone: "warn",
     };
   }
   if (!active && !subtasks.length) {
@@ -1175,6 +1205,9 @@ function triggerCoachTarget(target) {
   if (target === "guidance") {
     el.focus();
     el.scrollIntoView({ behavior: "smooth", block: "center" });
+  } else if (el.tagName === "DETAILS") {
+    el.open = true;
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } else {
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.click();
@@ -2499,6 +2532,8 @@ function renderOneAgentEditor(p) {
     : `<option value="">${escapeHtml(t("ui.agentNoBackends"))}</option>`;
   const cli = isCliProviderId(b.provider);
   const hl = !p._confirmed; // highlight only unconfirmed participants
+  // True when the selected backend is the auto-added fallback Ollama (no registered profile).
+  const isFallbackOllama = curId === "ollama-local" && !hasRegisteredOllamaProfile();
   let modelField;
   if (cli) {
     const models = CLI_MODELS[b.provider] || [];
@@ -2506,6 +2541,8 @@ function renderOneAgentEditor(p) {
     const hlModel = hl && (b.model === weak || b.model === "");
     const emptyModelOpt = b.model === "" ? `<option value="" selected>—</option>` : "";
     modelField = `<select class="ag-model${hlModel ? " hl-default" : ""}">${emptyModelOpt}${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
+  } else if (isFallbackOllama) {
+    modelField = `<span class="ag-model-hint">${escapeHtml(t("ui.ollamaRegisterHint"))}</span>`;
   } else {
     modelField = `<input class="ag-model${hl && !b.model ? " hl-default" : ""}" value="${escapeHtml(b.model || "")}" placeholder="model">`;
   }
@@ -2546,8 +2583,11 @@ function bindAgentEditor() {
     p.backend = fresh.backend;
     p.label = fresh.label;
     p._confirmed = false;
+    // Show navigator hint when fallback Ollama (no registered profile) is picked.
+    pendingOllamaRegistration = (entry.id === "ollama-local" && !hasRegisteredOllamaProfile());
     renderAgentChips();
     renderAgentEditor();
+    renderNextStep();
   });
   q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); });
   q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; p._confirmed = false; });
