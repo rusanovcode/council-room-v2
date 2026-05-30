@@ -1272,8 +1272,9 @@ function renderRuns() {
   $("chatArchive").classList.toggle("hidden", !panelOpen.chatArchive);
   fillRunBin($("archivedRunList"), archived, { trash: true });
 
-  // Chat trash panel — restore back to active; "Очистить" wipes it permanently.
-  $("toggleChatTrash").textContent = `🗑${trashed.length ? " " + trashed.length : ""}`;
+  // Chat trash panel — hide button and panel when empty.
+  $("toggleChatTrash").style.display = trashed.length ? "" : "none";
+  if (!trashed.length) panelOpen.chatTrash = false;
   $("chatTrash").classList.toggle("hidden", !panelOpen.chatTrash);
   fillRunBin($("trashedRunList"), trashed, { trash: false });
 }
@@ -1407,6 +1408,11 @@ function renderSubtasks() {
 
   $("toggleSubtaskArchive").textContent = `🗄${archived.length ? " " + archived.length : ""}`;
   $("toggleSubtaskTrash").textContent = `🗑${trashed.length ? " " + trashed.length : ""}`;
+  // Hide trash/archive buttons and panels when empty.
+  $("toggleSubtaskArchive").style.display = archived.length ? "" : "none";
+  $("toggleSubtaskTrash").style.display = trashed.length ? "" : "none";
+  if (!archived.length) panelOpen.subtaskArchive = false;
+  if (!trashed.length) panelOpen.subtaskTrash = false;
   $("subtaskArchive").classList.toggle("hidden", !panelOpen.subtaskArchive);
   $("subtaskTrash").classList.toggle("hidden", !panelOpen.subtaskTrash);
 
