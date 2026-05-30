@@ -371,10 +371,10 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 /* Account buttons — one row per service (Codex / Claude); API adds a 3rd in the row */
 .switcher-accounts {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 3px;
 }
-.acct-row { display: flex; gap: 3px; justify-content: flex-end; }
+.acct-row { display: flex; flex-direction: column; gap: 3px; }
 .acct-btn {
   font-family: var(--mono);
   font-size: 10px;
