@@ -965,6 +965,9 @@ function render() {
   if (pendingOllamaRegistration && hasRegisteredOllamaProfile()) {
     pendingOllamaRegistration = false;
   }
+  // Green border on Updates button when an update is available.
+  const hasUpdate = Boolean(currentState.updateStatus && currentState.updateStatus.updateAvailable);
+  $("checkUpdates")?.classList.toggle("update-available", hasUpdate);
   renderRuns();
   renderStatus();
   renderSubtasks();

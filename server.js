@@ -39,6 +39,7 @@ let state = {
   status: "idle",
   run: null,
   autopilot: { running: false, subtaskId: null, reason: "", startedAt: null, round: 0 },
+  updateStatus: { checked: false, updateAvailable: false },
   settings: {
     language: "ru",
     codexModel: "",
@@ -196,6 +197,7 @@ function publicState() {
       workdir: WORKDIR,
       port: PORT,
       cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
+      updateStatus: state.updateStatus,
     };
   }
   const dir = runDir(state.run.id);
@@ -225,6 +227,7 @@ function publicState() {
     workdir: WORKDIR,
     port: PORT,
     cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
+    updateStatus: state.updateStatus,
   };
 }
 
@@ -1543,6 +1546,21 @@ void selectLastRunOnStartup;
   const gs = store.readJson(GLOBAL_SETTINGS_PATH) || {};
   if (Array.isArray(gs.profiles)) state.settings.profiles = gs.profiles;
 }
+
+// Background update check on every server start — result broadcast via SSE.
+async function checkUpdateOnStartup() {
+  try {
+    const repo = (await git(["rev-parse", "--is-inside-work-tree"])).stdout === "true";
+    if (!repo) return;
+    const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).stdout || "main";
+    const fetched = await git(["fetch", "origin", branch, "--quiet"]);
+    if (!fetched.ok) return;
+    const behind = Number((await git(["rev-list", "--count", `HEAD..origin/${branch}`])).stdout) || 0;
+    state.updateStatus = { checked: true, updateAvailable: behind > 0 };
+    broadcast();
+  } catch {}
+}
+checkUpdateOnStartup();
 
 // Poll the switch-module gateway so the UI reflects profiles/active/tokens live.
 refreshSwitcher().then(broadcast);
