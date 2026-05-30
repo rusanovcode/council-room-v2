@@ -1302,6 +1302,7 @@ button.square {
 }
 .p-key-wrap .key-ok { color: var(--green); }
 .p-key-wrap .key-pending { color: var(--amber); }
+.profile-key-row { padding: 2px 0 0 2px; }
 .key-badge {
   font-size: 10px;
   padding: 1px 6px;

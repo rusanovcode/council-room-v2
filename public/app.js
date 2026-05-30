@@ -2291,9 +2291,9 @@ function renderProfileRow(p) {
       <input class="p-label" value="${escapeHtml(p.label || "")}" placeholder="${t("ui.profileLabel")}">
       ${helpIcon("profileLabel")}
       <select class="p-provider">${provSel}</select>
-      ${keyBadge}
       <button type="button" class="p-remove" title="${t("ui.remove")}">×</button>
     </div>
+    ${keyBadge ? `<div class="profile-key-row">${keyBadge}</div>` : ""}
     <div class="profile-fields">${fields}</div>
   </div>`;
 }
