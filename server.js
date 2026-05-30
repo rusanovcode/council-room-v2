@@ -44,7 +44,11 @@ let state = {
     claudeEffort: "auto",
     moderator: "codex",
     allowFilesystemScan: false,
-    strictScope: false,
+    // Strict scope ON by default (Phase 6b): everything outside "Files in Scope"
+    // is off-limits. On a fresh chat files_in_scope is empty, so this just tells
+    // agents to clarify scope before touching anything — reinforces isolation.
+    // Turning on allowFilesystemScan auto-clears it (see /api/settings).
+    strictScope: true,
     codexMode: "auto",
     codexAccount: 1,
     claudeMode: "auto",

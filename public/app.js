@@ -246,6 +246,42 @@ const STRINGS = {
     "tip.profileCredRef": "Имя переменной окружения, где лежит API-ключ (например DEEPSEEK_API_KEY). Сам ключ хранится в .env (он в .gitignore) или в окружении — НЕ в репозитории и не в state.json. Можно либо вписать ключ напрямую в поле ниже, либо самому добавить строку в .env.|||DEEPSEEK_API_KEY → в .env строка DEEPSEEK_API_KEY=sk-...",
     "tip.profileApiKey": "Можно вставить API-ключ прямо здесь — по «Применить» он сохранится в файл .env (он в .gitignore) под именем из «Env-переменная ключа», а НЕ в state.json. Поле всегда пустое (ключ не показывается); оставь пустым, чтобы не менять уже сохранённый.|||Вставь sk-... → в .env появится DEEPSEEK_API_KEY=sk-...",
     "tip.roleChain": "Список профилей-бэкендов этой роли. Галочка = включить профиль в цепочку. Режим auto: на ошибке/лимите первого по списку пробуется следующий отмеченный (failover). Режим manual: используется только первый отмеченный. Имя в строке — это «Подпись» профиля (или его id, если подпись пуста).|||auto + отмечены [DeepSeek, Ollama]: DeepSeek упал → пробуем Ollama. manual: только DeepSeek.",
+    "ui.addAgent": "Добавить агента",
+    "ui.addAgentTitle": "Добавить агента",
+    "ui.addAgentChoose": "Как добавить агентов в обсуждение?",
+    "ui.agentAddAuto": "Авто — 2 разных",
+    "ui.agentAddAutoHint": "Подобрать 2 разных доступных бэкенда с дешёвыми моделями.",
+    "ui.agentAddManual": "Вручную (+1)",
+    "ui.agentAddManualHint": "Добавить одного агента и настроить его.",
+    "ui.agentsHeader": "Агенты обсуждения",
+    "ui.agentEditorEmpty": "Кликни по чипу агента в шапке, чтобы настроить бэкенд, модель и усилие.",
+    "ui.agentBackend": "Агент (бэкенд)",
+    "ui.agentModel": "Модель",
+    "ui.agentEffort": "Усилие",
+    "ui.agentLabelField": "Подпись",
+    "ui.agentApply": "Применить",
+    "ui.agentRemove": "Убрать агента",
+    "ui.agentSaved": "Агенты сохранены ✓",
+    "ui.agentNoBackends": "Нет доступных бэкендов. Зарегистрируй/авторизуй агента в «Профили и роли».",
+    "ui.agentMin2": "Нужно минимум 2 агента, чтобы запустить раунд.",
+    "ui.agentMax": "Максимум 5 агентов.",
+    "ui.agentNoneYet": "Агенты не выбраны",
+    "ui.agentChipHint": "Клик — настроить · ×: убрать",
+    "ui.tokenWarnTitle": "Расход токенов",
+    "ui.tokenWarn2": "2 агента — базовый дебат, расход умеренный.",
+    "ui.tokenWarn3": "3 агента: каждый видит ПОЛНЫЙ контекст двух других — расход заметно растёт (≈×1.5 к раунду).",
+    "ui.tokenWarn4": "4 агента: полный контекст ×4 без сжатия — дорого. Это 4 бэкенда/подписки за каждый раунд.",
+    "ui.tokenWarn5": "5 агентов — максимум. Очень дорого: полный контекст ×5 каждому, без сжатия промта.",
+    "coach.agents.title": "Шаг 3: выбери агентов",
+    "coach.agents.body": "Сверху по центру нажми «Добавить агента». Можно «Авто» (2 разных бэкенда подберутся сами) или «Вручную». Нужно минимум 2, максимум 5. Чем больше агентов — тем дороже раунд (промт не сжимается).",
+    "coach.agents.action": "Добавить агента",
+    "coach.agentsConfig.title": "Шаг 4: проверь модели агентов",
+    "coach.agentsConfig.body": "По умолчанию подставлены слабые модели и низкое усилие — дёшево. Кликни по чипу агента сверху, чтобы сменить бэкенд/модель/усилие. Готово — запусти раунд.",
+    "coach.agentsConfig.action": "Запустить раунд",
+    "tip.addAgent": "Добавляет спорщика в обсуждение (от 2 до 5). «Авто» подберёт 2 разных доступных бэкенда с дешёвыми моделями; «Вручную» добавит одного, которого ты настроишь. Каждый агент видит полный контекст всех остальных — поэтому каждый добавленный заметно увеличивает расход токенов.|||2 агента — базовый дебат. 4–5 — дорого: полный контекст ×N за раунд.",
+    "tip.agentBackend": "Какой бэкенд отвечает за этого агента: подписочный CLI (Codex/Claude, по аккаунтам), сетевой API-провайдер или локальная Ollama. Список — из доступного: авторизованные аккаунты + зарегистрированные провайдеры.|||«Codex · акк 1», «Claude · акк 2», «DeepSeek», «Ollama (локально)».",
+    "tip.agentModel2": "Модель выбранного бэкенда. По умолчанию — самая дешёвая (экономия токенов). Для CLI — из списка; для сетевого провайдера — точная строка модели.|||Codex: gpt-5.4-mini (дёшево) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
+    "tip.agentEffort2": "Усилие рассуждения (только для подписочных CLI). По умолчанию low — дёшево и быстро. Выше — дороже и медленнее, но тщательнее. У сетевых провайдеров такой ручки нет.|||low — быстрый черновой проход; high/xhigh/max — для сложных спорных мест.",
   },
   en: {
     "ui.newChat": "+ New chat",
@@ -489,6 +525,42 @@ const STRINGS = {
     "tip.profileCredRef": "Name of the environment variable holding the API key (e.g. DEEPSEEK_API_KEY). The key itself lives in .env (gitignored) or the environment — NEVER in the repo or state.json. You can either type the key directly in the field below, or add the line to .env yourself.|||DEEPSEEK_API_KEY → a line DEEPSEEK_API_KEY=sk-... in .env",
     "tip.profileApiKey": "You can paste the API key right here — on «Apply» it is saved to the .env file (gitignored) under the «API key env var» name, NOT to state.json. The field is always blank (the key is never shown); leave it empty to keep the already-saved key.|||Paste sk-... → .env gets DEEPSEEK_API_KEY=sk-...",
     "tip.roleChain": "The list of backend profiles for this role. A checkbox = include that profile in the chain. auto mode: on an error/limit of the first checked one, the next checked is tried (failover). manual mode: only the first checked is used. The name on each line is the profile's «Label» (or its id when the label is empty).|||auto + checked [DeepSeek, Ollama]: DeepSeek fails → try Ollama. manual: DeepSeek only.",
+    "ui.addAgent": "Add agent",
+    "ui.addAgentTitle": "Add agent",
+    "ui.addAgentChoose": "How to add agents to the debate?",
+    "ui.agentAddAuto": "Auto — 2 distinct",
+    "ui.agentAddAutoHint": "Pick 2 distinct available backends with cheap models.",
+    "ui.agentAddManual": "Manually (+1)",
+    "ui.agentAddManualHint": "Add one agent and configure it.",
+    "ui.agentsHeader": "Debate agents",
+    "ui.agentEditorEmpty": "Click an agent chip in the header to set its backend, model and effort.",
+    "ui.agentBackend": "Agent (backend)",
+    "ui.agentModel": "Model",
+    "ui.agentEffort": "Effort",
+    "ui.agentLabelField": "Label",
+    "ui.agentApply": "Apply",
+    "ui.agentRemove": "Remove agent",
+    "ui.agentSaved": "Agents saved ✓",
+    "ui.agentNoBackends": "No available backends. Register/authorize one in «Profiles & roles».",
+    "ui.agentMin2": "At least 2 agents are required to run a round.",
+    "ui.agentMax": "Maximum 5 agents.",
+    "ui.agentNoneYet": "No agents selected",
+    "ui.agentChipHint": "Click — configure · ×: remove",
+    "ui.tokenWarnTitle": "Token spend",
+    "ui.tokenWarn2": "2 agents — basic debate, moderate spend.",
+    "ui.tokenWarn3": "3 agents: each sees the FULL context of the other two — spend grows noticeably (≈×1.5 per round).",
+    "ui.tokenWarn4": "4 agents: full context ×4, no compression — expensive. That's 4 backends/subscriptions per round.",
+    "ui.tokenWarn5": "5 agents — the maximum. Very expensive: full context ×5 for each, no prompt compression.",
+    "coach.agents.title": "Step 3: pick your agents",
+    "coach.agents.body": "At the top center click «Add agent». Use «Auto» (2 distinct backends are picked for you) or «Manually». Minimum 2, maximum 5. More agents = a pricier round (prompts are not compressed).",
+    "coach.agents.action": "Add agent",
+    "coach.agentsConfig.title": "Step 4: check the agents' models",
+    "coach.agentsConfig.body": "Weak models and low effort are pre-filled by default — cheap. Click an agent chip at the top to change its backend/model/effort. When ready, run the round.",
+    "coach.agentsConfig.action": "Run round",
+    "tip.addAgent": "Adds a debater (2 to 5). «Auto» picks 2 distinct available backends with cheap models; «Manually» adds one for you to configure. Every agent sees the full context of all the others — so each added agent noticeably raises token spend.|||2 agents — a basic debate. 4–5 — expensive: full context ×N per round.",
+    "tip.agentBackend": "Which backend powers this agent: a subscription CLI (Codex/Claude, per account), a network API provider, or local Ollama. The list comes from what's available: authorized accounts + registered providers.|||«Codex · acc 1», «Claude · acc 2», «DeepSeek», «Ollama (local)».",
+    "tip.agentModel2": "The chosen backend's model. Defaults to the cheapest (token economy). For CLI — from a list; for a network provider — the exact model string.|||Codex: gpt-5.4-mini (cheap) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
+    "tip.agentEffort2": "Reasoning effort (subscription CLI only). Defaults to low — cheap and fast. Higher = pricier and slower but more thorough. Network providers have no such knob.|||low — a quick draft pass; high/xhigh/max — for hard contested points.",
   },
 };
 
@@ -754,10 +826,22 @@ function render() {
   renderConversation();
   renderKnowledge();
   renderSettings();
+  renderAgentsInit();
   renderNextStep();
   renderPinnedHint();
   renderSwitcher();
   updateTerminalsVisibility();
+}
+
+// Phase 6b: how many debate agents the active chat has explicitly chosen, and
+// whether a fresh subtask is still missing the required minimum (2). Legacy
+// chats with history (rounds > 0) are never blocked — they ran with defaults.
+function selectedAgentCount() {
+  return (currentState?.settings?.participants?.length) || 0;
+}
+function needsAgents() {
+  const active = currentState?.run?.activeSubtask;
+  return Boolean(active) && (active.rounds || 0) === 0 && selectedAgentCount() < 2;
 }
 
 // ---- Next-step coach -----------------------------------------------------
@@ -844,10 +928,18 @@ function computeNextStep() {
     return { title: t("coach.busy.title"), body: t("coach.busy.body"), action: null };
   }
   if (active.rounds === 0) {
+    // Phase 6b: agents must be chosen (2–5) before the first round.
+    if (selectedAgentCount() < 2) {
+      return {
+        title: t("coach.agents.title"),
+        body: t("coach.agents.body"),
+        action: { label: t("coach.agents.action"), target: "addAgent" },
+      };
+    }
     return {
-      title: t("coach.step3.title"),
-      body: t("coach.step3.body"),
-      action: { label: t("coach.step3.action"), target: "runRound" },
+      title: t("coach.agentsConfig.title"),
+      body: t("coach.agentsConfig.body"),
+      action: { label: t("coach.agentsConfig.action"), target: "runRound" },
     };
   }
   // Inspect last two agent messages of this subtask
@@ -1215,7 +1307,7 @@ function renderActiveSubtask() {
   $("activeSubtaskMeta").textContent = active
     ? t("ui.subtaskMeta", { id: active.id, mode: active.mode, rounds: active.rounds })
     : t("ui.noActiveSubtaskHint");
-  $("runRound").disabled = !active || currentState.busy || autopilotRunning;
+  $("runRound").disabled = !active || currentState.busy || autopilotRunning || needsAgents();
   $("resolveSubtask").disabled = !active || autopilotRunning;
   $("freezeSubtask").disabled = !active || autopilotRunning;
   renderAutopilot();
@@ -1230,8 +1322,9 @@ function renderAutopilot() {
   btn.classList.toggle("running", running);
   btn.classList.toggle("primary", running);
   btn.classList.toggle("ghost", !running);
-  // While running, Stop must stay clickable; otherwise needs an active subtask.
-  btn.disabled = running ? false : (!active || currentState.busy);
+  // While running, Stop must stay clickable; otherwise needs an active subtask
+  // and the minimum agents chosen (Phase 6b).
+  btn.disabled = running ? false : (!active || currentState.busy || needsAgents());
   const autoResolve = $("autoResolve");
   if (autoResolve) autoResolve.disabled = running;
 }
@@ -2110,6 +2203,271 @@ async function applyProviders() {
   }
 }
 
+// ---- Phase 6b: debate-agent selection ------------------------------------
+// Per-chat selection of 2–5 debate agents. Each agent carries an INLINE backend
+// (provider/account/model/effort) — fully decoupled from the registry
+// (settings.profiles / the Phase-5 panel). The working list lives in a draft and
+// is persisted to settings.participants once it has the required 2+ agents.
+let participantsDraft = null;
+let participantsForRunId = undefined;
+let selectedAgentKey = null;
+
+const CLI_MODELS = {
+  "cli-codex": ["gpt-5.4-mini", "gpt-5.4", "gpt-5.5", "gpt-5.3-codex"],
+  "cli-claude": ["haiku", "sonnet", "opus", "claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
+};
+const CLI_EFFORTS = {
+  "cli-codex": ["auto", "low", "medium", "high", "xhigh"],
+  "cli-claude": ["auto", "low", "medium", "high", "xhigh", "max"],
+};
+// Weakest (cheapest) model per backend — the token-saving default.
+function weakModelFor(provider, fallback) {
+  if (provider === "cli-codex") return "gpt-5.4-mini";
+  if (provider === "cli-claude") return "haiku";
+  return fallback || "";
+}
+function isWeakBackend(b) {
+  if (!b) return false;
+  return b.model === weakModelFor(b.provider, b.model) && (b.effort === "low" || b.effort === "auto" || !isCliProviderId(b.provider));
+}
+
+// Available backends to choose an agent from: authorized subscription CLI
+// accounts (full build) + registered network profiles + local Ollama.
+function agentCatalog() {
+  const info = currentState.providers || {};
+  const apiBuild = (info.mode || "full") === "api";
+  const out = [];
+  if (!apiBuild) {
+    const toolName = { codex: "Codex", claude: "Claude" };
+    for (const tool of ["codex", "claude"]) {
+      // acc1 is the default account — always available, even without the switcher
+      // gateway. acc2 only when the switch module reports it authorized.
+      const accNums = new Set([1]);
+      for (const a of visibleAccounts(tool)) {
+        if (a.id === "apikey" || a.mode === "api") continue;
+        const num = a.account || (a.id === "acc1" ? 1 : a.id === "acc2" ? 2 : null);
+        if (num) accNums.add(num);
+      }
+      for (const num of [...accNums].sort()) {
+        out.push({
+          id: `cli-${tool}-acc${num}`, kind: "cli", provider: `cli-${tool}`,
+          account: `acc${num}`, label: `${toolName[tool]} · ${t("ui.accShort")} ${num}`,
+          defaultModel: weakModelFor(`cli-${tool}`),
+        });
+      }
+    }
+  }
+  for (const p of (currentState.settings && currentState.settings.profiles) || []) {
+    if (isCliProviderId(p.provider)) continue;
+    out.push({
+      id: `net-${p.id}`, kind: "net", provider: p.provider, baseUrl: p.baseUrl,
+      credentialRef: p.credentialRef, label: p.label || p.provider, defaultModel: p.model || "",
+    });
+  }
+  if (!out.some((o) => o.provider === "ollama")) {
+    out.push({ id: "ollama-local", kind: "net", provider: "ollama", baseUrl: "http://localhost:11434/v1", label: "Ollama (local)", defaultModel: "" });
+  }
+  return out;
+}
+
+function catalogEntryForBackend(b) {
+  const cat = agentCatalog();
+  if (!b) return cat[0] || null;
+  return cat.find((c) => c.provider === b.provider && (c.account || "") === (b.account || "")) || cat[0] || null;
+}
+
+function makeAgentFromCatalog(entry, idx) {
+  const provider = entry.provider;
+  const backend = { provider, model: entry.defaultModel || weakModelFor(provider, ""), effort: isCliProviderId(provider) ? "low" : "auto" };
+  if (entry.account) backend.account = entry.account;
+  if (entry.baseUrl) backend.baseUrl = entry.baseUrl;
+  if (entry.credentialRef) backend.credentialRef = entry.credentialRef;
+  return { key: `a${idx + 1}`, label: entry.label, mode: "manual", backend };
+}
+
+function rekeyAgents(list) {
+  return (list || []).map((p, i) => ({ ...p, key: `a${i + 1}` }));
+}
+
+function initParticipantsDraft() {
+  const s = currentState.settings || {};
+  participantsDraft = Array.isArray(s.participants) ? JSON.parse(JSON.stringify(s.participants)) : [];
+}
+
+function renderAgentsInit() {
+  const rid = currentState.activeRunId || null;
+  if (participantsDraft === null || participantsForRunId !== rid) {
+    participantsForRunId = rid;
+    initParticipantsDraft();
+    selectedAgentKey = (participantsDraft[0] && participantsDraft[0].key) || null;
+  }
+  renderAgentChips();
+  renderAgentEditor();
+}
+
+function renderAgentChips() {
+  const box = $("agentChips");
+  if (!box) return;
+  const list = participantsDraft || [];
+  const rounds = currentState.run?.activeSubtask?.rounds || 0;
+  box.innerHTML = "";
+  for (const p of list) {
+    const b = p.backend || {};
+    const chip = document.createElement("span");
+    chip.className = `agent-chip-sel${p.key === selectedAgentKey ? " selected" : ""}${rounds === 0 ? " pulse" : ""}`;
+    chip.dataset.key = p.key;
+    chip.dataset.tooltipText = t("ui.agentChipHint");
+    chip.innerHTML = `<span class="ac-label">${escapeHtml(p.label || p.key)}</span>`
+      + `<span class="ac-model">${escapeHtml(b.model || b.provider || "")}</span>`
+      + `<button class="ac-remove" type="button" title="${escapeHtml(t("ui.agentRemove"))}">×</button>`;
+    box.appendChild(chip);
+  }
+  const addBtn = $("addAgent");
+  if (addBtn) addBtn.disabled = !currentState.activeRunId || list.length >= 5;
+}
+
+function renderAgentEditor() {
+  const body = $("agentEditorBody");
+  if (!body) return;
+  const list = participantsDraft || [];
+  let warnHtml = "";
+  if (list.length >= 2) warnHtml = `<div class="token-warn lvl${Math.min(5, list.length)}">${escapeHtml(t(`ui.tokenWarn${Math.min(5, list.length)}`))}</div>`;
+  else if (list.length === 1) warnHtml = `<div class="token-warn muted">${escapeHtml(t("ui.agentMin2"))}</div>`;
+  if (!list.length) {
+    body.innerHTML = `<div class="muted small">${escapeHtml(t("ui.agentEditorEmpty"))}</div>`;
+    return;
+  }
+  const sel = list.find((p) => p.key === selectedAgentKey) || null;
+  body.innerHTML = warnHtml + (sel ? renderOneAgentEditor(sel) : `<div class="muted small">${escapeHtml(t("ui.agentEditorEmpty"))}</div>`);
+  bindAgentEditor();
+}
+
+function renderOneAgentEditor(p) {
+  const cat = agentCatalog();
+  const b = p.backend || {};
+  const curId = (catalogEntryForBackend(b) || {}).id || "";
+  const backendOpts = cat.length
+    ? cat.map((c) => `<option value="${escapeHtml(c.id)}"${c.id === curId ? " selected" : ""}>${escapeHtml(c.label)}</option>`).join("")
+    : `<option value="">${escapeHtml(t("ui.agentNoBackends"))}</option>`;
+  const cli = isCliProviderId(b.provider);
+  let modelField;
+  if (cli) {
+    const models = CLI_MODELS[b.provider] || [];
+    const weak = weakModelFor(b.provider);
+    modelField = `<select class="ag-model${b.model === weak ? " hl-default" : ""}">${models.map((m) => `<option value="${m}"${m === b.model ? " selected" : ""}>${m}</option>`).join("")}</select>`;
+  } else {
+    modelField = `<input class="ag-model${b.model ? "" : " hl-default"}" value="${escapeHtml(b.model || "")}" placeholder="model">`;
+  }
+  let effortField = "";
+  if (cli) {
+    const efforts = CLI_EFFORTS[b.provider] || [];
+    const cur = b.effort || "auto";
+    effortField = `<label class="p-field"><span>${t("ui.agentEffort")} ${helpIcon("agentEffort2")}</span>`
+      + `<select class="ag-effort${(cur === "low" || cur === "auto") ? " hl-default" : ""}">${efforts.map((e) => `<option value="${e}"${e === cur ? " selected" : ""}>${e}</option>`).join("")}</select></label>`;
+  }
+  return `<div class="agent-edit-card" data-key="${escapeHtml(p.key)}">
+    <div class="agent-edit-name">${escapeHtml(p.label || p.key)}</div>
+    <label class="p-field"><span>${t("ui.agentBackend")} ${helpIcon("agentBackend")}</span><select class="ag-backend">${backendOpts}</select></label>
+    <label class="p-field"><span>${t("ui.agentModel")} ${helpIcon("agentModel2")}</span>${modelField}</label>
+    ${effortField}
+    <div class="agent-edit-actions">
+      <button class="primary small ag-apply" type="button">${t("ui.agentApply")}</button>
+      <button class="ghost small ag-remove" type="button">${t("ui.agentRemove")}</button>
+    </div>
+  </div>`;
+}
+
+function bindAgentEditor() {
+  const card = document.querySelector(".agent-edit-card");
+  if (!card) return;
+  const key = card.dataset.key;
+  const p = (participantsDraft || []).find((x) => x.key === key);
+  if (!p) return;
+  const q = (sel) => card.querySelector(sel);
+  q(".ag-backend")?.addEventListener("change", (e) => {
+    const entry = agentCatalog().find((c) => c.id === e.target.value);
+    if (!entry) return;
+    const idx = participantsDraft.findIndex((x) => x.key === key);
+    const fresh = makeAgentFromCatalog(entry, idx < 0 ? 0 : idx);
+    p.backend = fresh.backend;
+    p.label = fresh.label;
+    renderAgentChips();
+    renderAgentEditor();
+  });
+  q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; renderAgentChips(); });
+  q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; });
+  q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; });
+  q(".ag-apply")?.addEventListener("click", applyParticipants);
+  q(".ag-remove")?.addEventListener("click", () => removeAgent(key));
+}
+
+function openAddAgentModal() {
+  showAddAgentMsg("", false);
+  $("addAgentModal").classList.remove("hidden");
+}
+function closeAddAgentModal() { $("addAgentModal").classList.add("hidden"); }
+function showAddAgentMsg(text, isError) {
+  const el = $("addAgentMsg");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `providers-msg ${text ? (isError ? "err" : "ok") : ""}`;
+}
+
+// Auto: pick 2 distinct available backends with cheap defaults (replaces the
+// list — only offered from a blank slate).
+function addAgentAuto() {
+  const cat = agentCatalog();
+  if (!cat.length) { showAddAgentMsg(t("ui.agentNoBackends"), true); return; }
+  const picks = [];
+  for (const c of cat) {
+    if (picks.length >= 2) break;
+    if (picks.some((x) => x.provider === c.provider && (x.account || "") === (c.account || ""))) continue;
+    picks.push(c);
+  }
+  while (picks.length < 2) picks.push(cat[picks.length % cat.length]); // single backend → duplicate
+  participantsDraft = rekeyAgents(picks.slice(0, 2).map((c, i) => makeAgentFromCatalog(c, i)));
+  selectedAgentKey = participantsDraft[0].key;
+  closeAddAgentModal();
+  applyParticipants();
+}
+
+// Manual: append one agent (a distinct backend if available), up to 5.
+function addAgentManual() {
+  const cat = agentCatalog();
+  if (!cat.length) { showAddAgentMsg(t("ui.agentNoBackends"), true); return; }
+  const list = participantsDraft || [];
+  if (list.length >= 5) { showAddAgentMsg(t("ui.agentMax"), true); return; }
+  const used = new Set(list.map((p) => `${p.backend?.provider}|${p.backend?.account || ""}`));
+  const entry = cat.find((c) => !used.has(`${c.provider}|${c.account || ""}`)) || cat[0];
+  participantsDraft = rekeyAgents([...list, makeAgentFromCatalog(entry, list.length)]);
+  selectedAgentKey = participantsDraft[participantsDraft.length - 1].key;
+  closeAddAgentModal();
+  renderAgentChips();
+  renderAgentEditor();
+  if (participantsDraft.length >= 2) applyParticipants();
+}
+
+function removeAgent(key) {
+  participantsDraft = rekeyAgents((participantsDraft || []).filter((p) => p.key !== key));
+  if (selectedAgentKey === key) selectedAgentKey = (participantsDraft[0] && participantsDraft[0].key) || null;
+  renderAgentChips();
+  renderAgentEditor();
+  applyParticipants();
+}
+
+// Persist the selection. Server validateParticipants needs 2..5, so a sub-2 draft
+// clears the explicit participants (reverts to legacy) but is kept locally so the
+// in-progress chips/editor survive until a 2nd agent is added.
+async function applyParticipants() {
+  participantsDraft = rekeyAgents(participantsDraft || []);
+  const body = participantsDraft.length >= 2 ? { participants: participantsDraft } : { participants: null };
+  try {
+    const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); showProvidersMsg(j.error || `error ${res.status}`, true); return; }
+    if (participantsDraft.length >= 2) showProvidersMsg(t("ui.agentSaved"), false);
+  } catch (e) { showProvidersMsg(e.message, true); }
+}
+
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
@@ -2363,6 +2721,26 @@ function bindUi() {
       api("POST", "/api/settings", { allowFilesystemScan: scan.checked });
     });
   }
+
+  // Phase 6b: debate-agent selection. The "Add agent" button offers auto/manual
+  // from a blank slate; once agents exist it just appends one. Chips select an
+  // agent (→ editor) or remove it.
+  $("addAgent")?.addEventListener("click", () => {
+    if (!(participantsDraft && participantsDraft.length)) openAddAgentModal();
+    else addAgentManual();
+  });
+  $("addAgentAuto")?.addEventListener("click", addAgentAuto);
+  $("addAgentManual")?.addEventListener("click", addAgentManual);
+  $("addAgentCancel")?.addEventListener("click", closeAddAgentModal);
+  $("agentChips")?.addEventListener("click", (event) => {
+    const chip = event.target.closest(".agent-chip-sel");
+    if (!chip) return;
+    const key = chip.dataset.key;
+    if (event.target.closest(".ac-remove")) { removeAgent(key); return; }
+    selectedAgentKey = key;
+    renderAgentChips();
+    renderAgentEditor();
+  });
 
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.
   $("addProfileBtn")?.addEventListener("click", addProfileDraft);

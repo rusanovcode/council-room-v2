@@ -124,7 +124,7 @@ function testParticipants() {
     [{ key: "a1", profileIds: ["p1"] }, { key: "a1", profileIds: ["p2"] }], base.profiles)));
   assert.ok(/unknown profile/.test(profiles.validateParticipants(
     [{ key: "a1", profileIds: ["nope"] }, { key: "a2", profileIds: ["p2"] }], base.profiles)));
-  assert.ok(/needs at least one profile/.test(profiles.validateParticipants(
+  assert.ok(/needs a backend or a profile/.test(profiles.validateParticipants(
     [{ key: "a1", profileIds: [] }, { key: "a2", profileIds: ["p2"] }], base.profiles)));
   assert.strictEqual(profiles.validateParticipants(
     [{ key: "a1", profileIds: ["p1"] }, { key: "a2", profileIds: ["p2"] }], base.profiles), null, "valid 2 passes");
@@ -143,6 +143,27 @@ function testParticipants() {
   assert.deepStrictEqual(s.participants[0].profileIds, [], "removeProfile cleared a1 chain");
   assert.deepStrictEqual(s.participants[1].profileIds, ["p2"], "removeProfile kept p2 in a2 chain");
   console.log("PASS participants: setParticipants + removeProfile cleanup");
+
+  // Phase 6b: inline backends (decoupled from settings.profiles / the registry).
+  let effB = profiles.effectiveConfig({ participants: [
+    { key: "a1", label: "Codex", mode: "manual", backend: { provider: "cli-codex", account: "acc1", model: "gpt-5.4-mini", effort: "low" } },
+    { key: "a2", label: "Local", mode: "manual", backend: { provider: "ollama", model: "llama3", baseUrl: "http://127.0.0.1:11434/v1" } },
+  ] }, {});
+  assert.strictEqual(effB.participants.length, 2, "inline-backend participants resolve without profiles[]");
+  assert.strictEqual(effB.participants[0].chain.length, 1, "synthetic profile in chain");
+  assert.strictEqual(effB.participants[0].chain[0].provider, "cli-codex");
+  assert.strictEqual(effB.participants[0].chain[0].model, "gpt-5.4-mini");
+  assert.strictEqual(effB.participants[1].chain[0].provider, "ollama");
+  // validation accepts backend, rejects a bad one
+  assert.strictEqual(profiles.validateParticipants([
+    { key: "a1", backend: { provider: "cli-codex", account: "acc1" } },
+    { key: "a2", backend: { provider: "ollama", model: "m" } },
+  ], []), null, "inline backends valid");
+  assert.ok(/backend:/.test(profiles.validateParticipants([
+    { key: "a1", backend: { provider: "openai-compatible" } },
+    { key: "a2", backend: { provider: "ollama", model: "m" } },
+  ], [])), "network backend without model rejected");
+  console.log("PASS participants: inline backend resolve + validation");
 }
 
 // Phase 6: a question closes only when EVERY participant key marks it resolved.

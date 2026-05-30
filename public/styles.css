@@ -1328,3 +1328,59 @@ button.square {
 .providers-msg.ok { color: var(--green); }
 .providers-msg.err { color: var(--red); }
 .muted.small { font-size: 12px; color: var(--muted); }
+
+/* ---- Phase 6b: debate-agent selection ---- */
+/* The center toolbar can wrap so chips + the 2-line button never hide buttons. */
+.head-actions { flex-wrap: wrap; }
+.agent-add {
+  line-height: 1.05;
+  white-space: normal;
+  max-width: 88px;
+  text-align: center;
+  padding: 3px 8px;
+}
+.agent-chips { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.agent-chip-sel {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 6px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--panel-2); color: var(--text);
+  font-size: 11px; cursor: pointer; max-width: 160px;
+}
+.agent-chip-sel:hover { border-color: var(--accent); }
+.agent-chip-sel.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.agent-chip-sel .ac-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92px; }
+.agent-chip-sel .ac-model { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62px; }
+.agent-chip-sel .ac-remove {
+  border: none; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 0 1px;
+}
+.agent-chip-sel .ac-remove:hover { color: var(--red); }
+@keyframes agentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 157, 255, 0); }
+  50% { box-shadow: 0 0 0 2px rgba(91, 157, 255, 0.4); }
+}
+.agent-chip-sel.pulse:not(.selected) { animation: agentPulse 1.8s ease-in-out infinite; }
+
+/* Right-column agent editor (populated when a chip is selected). */
+.agent-editor-panel { margin-bottom: 8px; }
+.agent-editor-head { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 6px; }
+.agent-editor-title { font-size: 13px; }
+.agent-edit-card { display: flex; flex-direction: column; gap: 6px; }
+.agent-edit-name { font-weight: 600; color: var(--accent); font-size: 12px; }
+.agent-edit-actions { display: flex; gap: 6px; margin-top: 4px; }
+.token-warn {
+  font-size: 11px; padding: 5px 7px; border-radius: 6px; margin-bottom: 7px;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+}
+.token-warn.lvl3 { color: var(--amber); border-color: var(--amber); }
+.token-warn.lvl4, .token-warn.lvl5 { color: var(--red); border-color: var(--red); }
+/* Amber outline marks a still-default (cheap) field the navigator suggests changing. */
+.hl-default { border-color: var(--amber) !important; box-shadow: 0 0 0 1px var(--amber) inset; }
+
+.add-agent-choices { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.add-agent-choices button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  text-align: left; padding: 8px 10px; width: 100%;
+}
+.add-agent-choices button small { font-weight: 400; }
