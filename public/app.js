@@ -224,7 +224,9 @@ const STRINGS = {
     "ui.ollamaNotFound": "Ollama не обнаружена (проверяется порт {port})",
     "ui.ollamaChecking": "Проверяю Ollama…",
     "ui.ollamaTesting": "Идёт проверка подключения к Ollama…",
+    "ui.ollamaTestingModel": "Проверяю: {model}…",
     "ui.ollamaConnected": "✓ Подключено",
+    "ui.ollamaConnectedModels": "✓ Подключено: {models}",
     "ui.ollamaNotConnected": "✗ Не подключена: {e}",
     "ui.noProfiles": "Профилей нет — раунд использует поведение по умолчанию (Codex/Claude).",
     "ui.profileProvider": "Провайдер",
@@ -527,7 +529,9 @@ const STRINGS = {
     "ui.ollamaNotFound": "Ollama not detected (checked port {port})",
     "ui.ollamaChecking": "Checking Ollama…",
     "ui.ollamaTesting": "Testing Ollama connection…",
+    "ui.ollamaTestingModel": "Testing: {model}…",
     "ui.ollamaConnected": "✓ Connected",
+    "ui.ollamaConnectedModels": "✓ Connected: {models}",
     "ui.ollamaNotConnected": "✗ Not connected: {e}",
     "ui.noProfiles": "No profiles — the round uses the default Codex/Claude behavior.",
     "ui.profileProvider": "Provider",
@@ -2354,9 +2358,10 @@ async function applyProviders() {
   // the test passes — so we only proceed to the POST /api/settings on success.
   const ollamaProfiles = providersDraft.profiles.filter((p) => p.provider === "ollama");
   if (ollamaProfiles.length) {
-    showProvidersMsg(t("ui.ollamaTesting"), false, 0); // no auto-clear while testing
+    const testedModels = [];
     for (const p of ollamaProfiles) {
-      let testOk = false;
+      const lbl = p.label ? `${p.label} (${p.model})` : p.model;
+      showProvidersMsg(t("ui.ollamaTestingModel", { model: lbl }), false, 0);
       try {
         const r = await fetch("/api/providers/test", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -2364,17 +2369,18 @@ async function applyProviders() {
         });
         const j = await r.json().catch(() => ({}));
         if (j.validated && currentState.providers) currentState.providers.validated = j.validated;
-        testOk = Boolean(j.ok);
-        if (!testOk) {
+        if (!j.ok) {
           showProvidersMsg(t("ui.ollamaNotConnected", { e: j.error || `HTTP ${r.status}` }), true);
-          return; // abort — don't save, chip won't appear
+          return;
         }
+        testedModels.push(lbl);
       } catch (e) {
         showProvidersMsg(t("ui.ollamaNotConnected", { e: e.message }), true);
         return;
       }
     }
-    // All Ollama profiles passed — fall through to save, then show "подключено".
+    // All passed — store for success message after save.
+    ollamaProfiles._testedModels = testedModels;
   }
 
   // Direct API-key entry: any non-empty .p-apikey field is persisted to .env
@@ -2411,7 +2417,13 @@ async function applyProviders() {
       showProvidersMsg(j.error || `error ${res.status}`, true);
       return;
     }
-    const successMsg = ollamaProfiles.length ? t("ui.ollamaConnected") : (keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"));
+    let successMsg;
+    if (ollamaProfiles.length) {
+      const names = (ollamaProfiles._testedModels || []).join(", ");
+      successMsg = t("ui.ollamaConnectedModels", { models: names });
+    } else {
+      successMsg = keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved");
+    }
     showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
     renderProviders(); // refresh key badges + clear the direct-key inputs
   } catch (e) {
