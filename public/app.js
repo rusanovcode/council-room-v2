@@ -212,13 +212,14 @@ const STRINGS = {
     "coach.autopilot.body": "Codex и Claude идут раунд за раундом по активной подзадаче. Остановится сам по стоп-условию (оба resolve / stale×2 / block / лимит раундов). Можешь прервать в любой момент.",
     "coach.autopilot.action": "⏹ Остановить autopilot",
     "ui.providersPanel": "Регистрация агентов",
-    "ui.profiles": "Профили",
+    "ui.profiles": "Профиль",
     "ui.registeredModels": "Зарегистрированные модели",
     "ui.regModelLabel": "Подпись",
     "ui.regModelAgent": "Агент",
     "ui.regModelModel": "Модель",
     "ui.regModelEffort": "Сила",
     "ui.regModelSpeed": "Скорость",
+    "ui.noNewProfiles": "Нет новых профилей. Нажми «+ Профиль» чтобы добавить.",
     "ui.regModelNoProfiles": "Нет зарегистрированных моделей. Добавь профиль в «Регистрация агентов».",
     "ui.regModelSaved": "Модель сохранена",
     "ui.providerLog": "Журнал событий",
@@ -528,13 +529,14 @@ const STRINGS = {
     "coach.autopilot.body": "Codex and Claude are going round after round on the active subtask. It stops on its own at a stop-condition (both resolve / stale×2 / block / round budget). You can interrupt anytime.",
     "coach.autopilot.action": "⏹ Stop autopilot",
     "ui.providersPanel": "Agent registration",
-    "ui.profiles": "Profiles",
+    "ui.profiles": "Profile",
     "ui.registeredModels": "Registered models",
     "ui.regModelLabel": "Label",
     "ui.regModelAgent": "Agent",
     "ui.regModelModel": "Model",
     "ui.regModelEffort": "Effort",
     "ui.regModelSpeed": "Speed",
+    "ui.noNewProfiles": "No new profiles. Click «+ Profile» to add one.",
     "ui.regModelNoProfiles": "No registered models. Add a profile in «Agent registration».",
     "ui.regModelSaved": "Model saved",
     "ui.providerLog": "Event log",
@@ -2325,9 +2327,13 @@ function renderProviders() {
   }
   const list = $("profilesList");
   if (!list) return;
-  list.innerHTML = providersDraft.profiles.length
-    ? providersDraft.profiles.map(renderProfileRow).join("")
-    : `<div class="muted small">${t("ui.noProfiles")}</div>`;
+  // Show only profiles not yet saved (new, unsaved additions).
+  // Already-saved profiles are displayed in "Зарегистрированные модели" panel.
+  const savedIds = new Set(((currentState.settings && currentState.settings.profiles) || []).map((p) => p.id));
+  const newProfiles = providersDraft.profiles.filter((p) => !savedIds.has(p.id));
+  list.innerHTML = newProfiles.length
+    ? newProfiles.map(renderProfileRow).join("")
+    : `<div class="muted small">${t("ui.noNewProfiles")}</div>`;
   renderConnectedAgents();
   renderRegisteredModels();
 }
@@ -2591,7 +2597,9 @@ async function applyProviders() {
 
   // Ollama profiles: run a live test before saving. The chip only appears if
   // the test passes — so we only proceed to the POST /api/settings on success.
-  const ollamaProfiles = providersDraft.profiles.filter((p) => p.provider === "ollama");
+  // Test only NEW Ollama profiles (not already saved ones — they passed test before).
+  const savedIds = new Set(((currentState.settings && currentState.settings.profiles) || []).map((p) => p.id));
+  const ollamaProfiles = providersDraft.profiles.filter((p) => p.provider === "ollama" && !savedIds.has(p.id));
   if (ollamaProfiles.length) {
     const testedModels = [];
     for (const p of ollamaProfiles) {
