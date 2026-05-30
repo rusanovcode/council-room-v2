@@ -2432,7 +2432,7 @@ function renderOneAgentEditor(p) {
     <label class="p-field"><span>${t("ui.agentModel")} ${helpIcon("agentModel2")}</span>${modelField}</label>
     ${effortField}
     <div class="agent-edit-actions">
-      <button class="primary small ag-apply" type="button">${t("ui.agentApply")}</button>
+      <button class="primary small ag-apply${hl ? " nav-highlight" : ""}" type="button">${t("ui.agentApply")}</button>
       <button class="ghost small ag-remove" type="button">${t("ui.agentRemove")}</button>
     </div>
   </div>`;
