@@ -1320,8 +1320,12 @@ function applyRunSettings(run) {
   state.settings.participants = run.settings.participants || null;
 }
 
-// Auto-select the most recently created chat on startup so a server restart
-// doesn't land the user on an empty screen ("куда делись чаты?").
+// Phase 6b+: a server restart intentionally lands on a CLEAN start screen — no
+// chat selected, empty fields, no agents — so every session begins fresh for a
+// new task. The chat list stays available in the sidebar (publicState always
+// returns `runs`), so the user can return to a previous session by picking it
+// from "Chats". Kept as a function in case we later add an opt-in "resume last
+// chat" setting; it is deliberately NOT invoked on startup anymore.
 function selectLastRunOnStartup() {
   const runs = listRuns(); // sorted ascending by createdAt
   if (!runs.length) return;
@@ -1331,7 +1335,8 @@ function selectLastRunOnStartup() {
   applyRunSettings(last);
 }
 
-selectLastRunOnStartup();
+// Intentionally NOT called — clean start screen on every server start (see above).
+void selectLastRunOnStartup;
 
 // Poll the switch-module gateway so the UI reflects profiles/active/tokens live.
 refreshSwitcher().then(broadcast);

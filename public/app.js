@@ -209,7 +209,7 @@ const STRINGS = {
     "coach.autopilot.title": "Autopilot работает",
     "coach.autopilot.body": "Codex и Claude идут раунд за раундом по активной подзадаче. Остановится сам по стоп-условию (оба resolve / stale×2 / block / лимит раундов). Можешь прервать в любой момент.",
     "coach.autopilot.action": "⏹ Остановить autopilot",
-    "ui.providersPanel": "Профили и роли",
+    "ui.providersPanel": "Регистрация агентов",
     "ui.profiles": "Профили",
     "ui.addProfile": "+ Профиль",
     "ui.applyProviders": "Применить",
@@ -238,7 +238,7 @@ const STRINGS = {
     "ui.roleMode": "Режим",
     "ui.roleChain": "Бэкенды (failover по порядку)",
     "ui.apiModeNote": "Режим API: подписочные CLI (Codex/Claude) отключены. Настрой роли через профили ниже.",
-    "tip.providersPanel": "Единый слой провайдеров (Фаза 5). Профиль — это именованный бэкенд: API-провайдер (по ключу из .env), локальная Ollama или (в full-сборке) подписочный CLI. Роль A управляет слотом Codex, роль B — слотом Claude; каждая роль указывает на цепочку профилей (первый + failover). Если роли заданы здесь — они переопределяют простые контролы Codex/Claude выше.|||Роль A: [deepseek-chat]. Роль B: [ollama-llama3 → deepseek-chat] (auto) — на ошибке llama3 переключится на deepseek.",
+    "tip.providersPanel": "Регистрация агентов: здесь регистрируешь и авторизуешь бэкенды. Профиль — это именованный бэкенд: API-провайдер (по ключу из .env), локальная Ollama или (в full-сборке) подписочный CLI. Зарегистрированные профили становятся доступны при выборе агентов обсуждения (кнопка «Добавить агента» в шапке чата).|||Зарегистрируй профиль «DeepSeek» с ключом DEEPSEEK_API_KEY → он появится в списке бэкендов, когда добавляешь агента в чат.",
     "tip.agentSettings": "Базовые настройки раунда: разрешение сканировать файлы, язык агентов и БЫСТРЫЙ выбор для двух стандартных спорщиков — модель/усилие/аккаунт Codex и Claude. Это упрощённый путь «по умолчанию». Окно «Профили и роли» — продвинутый путь: там можно подключить любые API-провайдеры/Ollama и собрать цепочки с failover. Если в «Профили и роли» заданы роли — они ПЕРЕОПРЕДЕЛЯЮТ выбор Codex/Claude отсюда (в режиме API эти простые контролы скрыты).|||Хочешь быстро сменить модель Codex на gpt-5.4-mini — здесь. Хочешь, чтобы спорщик A ходил в DeepSeek с откатом на Ollama — в «Профили и роли».",
     "tip.profileLabel": "Человекочитаемое имя профиля — только для отображения (в списке цепочки роли и в логах раунда). Ни на что в запросе не влияет. Если оставить пустым, показывается технический id (например p_mprga7ou).|||«DeepSeek основной», «Ollama локальная».",
     "tip.profileModel": "Идентификатор модели у провайдера — точная строка, которую он ждёт в поле model запроса. Бери из документации провайдера. Для CLI можно оставить «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (то, что показывает `ollama list`).",
@@ -500,7 +500,7 @@ const STRINGS = {
     "coach.autopilot.title": "Autopilot running",
     "coach.autopilot.body": "Codex and Claude are going round after round on the active subtask. It stops on its own at a stop-condition (both resolve / stale×2 / block / round budget). You can interrupt anytime.",
     "coach.autopilot.action": "⏹ Stop autopilot",
-    "ui.providersPanel": "Profiles & Roles",
+    "ui.providersPanel": "Agent registration",
     "ui.profiles": "Profiles",
     "ui.addProfile": "+ Profile",
     "ui.applyProviders": "Apply",
@@ -529,7 +529,7 @@ const STRINGS = {
     "ui.roleMode": "Mode",
     "ui.roleChain": "Backends (failover in order)",
     "ui.apiModeNote": "API mode: subscription CLIs (Codex/Claude) are disabled. Configure roles via the profiles below.",
-    "tip.providersPanel": "Unified provider layer (Phase 5). A profile is a named backend: an API provider (key from .env), local Ollama, or (full build) a subscription CLI. Role A drives the Codex slot, role B the Claude slot; each role points at a profile chain (primary + failover). Roles defined here override the simple Codex/Claude controls above.|||Role A: [deepseek-chat]. Role B: [ollama-llama3 → deepseek-chat] (auto) — on a llama3 error it fails over to deepseek.",
+    "tip.providersPanel": "Agent registration: register and authorize backends here. A profile is a named backend: an API provider (key from .env), local Ollama, or (full build) a subscription CLI. Registered profiles become available when you pick debate agents (the \"Add agent\" button in the chat header).|||Register a \"DeepSeek\" profile with key DEEPSEEK_API_KEY → it shows up in the backend list when you add an agent to a chat.",
     "tip.agentSettings": "Basic round settings: filesystem-scan permission, agent language, and a QUICK picker for the two standard debaters — Codex and Claude model/effort/account. This is the simple default path. The «Profiles & roles» panel is the advanced path: wire in any API provider/Ollama and build chains with failover. Roles defined in «Profiles & roles» OVERRIDE the Codex/Claude picks here (in API mode these simple controls are hidden).|||Want to quickly switch Codex to gpt-5.4-mini — do it here. Want debater A to hit DeepSeek with an Ollama fallback — use «Profiles & roles».",
     "tip.profileLabel": "Human-readable name for the profile — display only (in the role's chain list and round logs). It has no effect on the request. If left empty, the technical id is shown (e.g. p_mprga7ou).|||«DeepSeek main», «Ollama local».",
     "tip.profileModel": "The provider's model id — the exact string it expects in the request's model field. Take it from the provider's docs. For CLI you can leave «auto».|||DeepSeek: deepseek-chat / deepseek-reasoner · OpenAI: gpt-4o-mini · Groq: llama-3.3-70b-versatile · Ollama: llama3.1 (whatever `ollama list` shows).",
@@ -2096,25 +2096,6 @@ function renderProfileRow(p) {
   </div>`;
 }
 
-function renderRoleEditor(slot) {
-  const r = providersDraft.roles[slot];
-  const title = slot === "a" ? "A · Codex" : "B · Claude";
-  const checks = providersDraft.profiles.map((p) => {
-    const checked = (r.profileIds || []).includes(p.id);
-    return `<label class="chain-item"><input type="checkbox" class="role-chain" data-id="${escapeHtml(p.id)}"${checked ? " checked" : ""}> ${escapeHtml(p.label || p.id)}</label>`;
-  }).join("") || `<span class="muted small">${escapeHtml(t("ui.chainEmpty"))}</span>`;
-  return `<div class="role-card" data-slot="${slot}">
-    <div class="role-title">${title}</div>
-    <label class="p-field"><span>${t("ui.profileLabel")} ${helpIcon("profileLabel")}</span><input class="role-label" value="${escapeHtml(r.label || "")}"></label>
-    <label class="p-field"><span>${t("ui.roleMode")}</span><select class="role-mode">
-      <option value="auto"${r.mode === "auto" ? " selected" : ""}>auto</option>
-      <option value="manual"${r.mode === "manual" ? " selected" : ""}>manual</option>
-    </select></label>
-    <div class="role-chain-label">${t("ui.roleChain")} ${helpIcon("roleChain")}</div>
-    <div class="role-chain-list">${checks}</div>
-  </div>`;
-}
-
 function renderProviders() {
   if (!providersDraft) return;
   const list = $("profilesList");
@@ -2122,8 +2103,10 @@ function renderProviders() {
   list.innerHTML = providersDraft.profiles.length
     ? providersDraft.profiles.map(renderProfileRow).join("")
     : `<div class="muted small">${t("ui.noProfiles")}</div>`;
-  $("roleAEdit").innerHTML = renderRoleEditor("a");
-  $("roleBEdit").innerHTML = renderRoleEditor("b");
+  // Phase 6b: debate agents are picked per-chat via the "Add agent" chips
+  // (settings.participants), so the legacy role A/B editor was removed from this
+  // panel — it now only registers/authorizes backend profiles. Any roles already
+  // saved on a chat still persist (effectiveConfig honors participants first).
   renderConnectedAgents(); // keep the connected-agent chips in sync with panel edits
 }
 
@@ -2140,14 +2123,9 @@ function syncProvidersFromDOM() {
     if (q(".p-baseurl")) p.baseUrl = q(".p-baseurl").value;
     if (q(".p-credref")) p.credentialRef = q(".p-credref").value;
   });
-  for (const slot of ["a", "b"]) {
-    const card = document.querySelector(`.role-card[data-slot="${slot}"]`);
-    if (!card) continue;
-    const r = providersDraft.roles[slot];
-    if (card.querySelector(".role-label")) r.label = card.querySelector(".role-label").value;
-    if (card.querySelector(".role-mode")) r.mode = card.querySelector(".role-mode").value;
-    r.profileIds = [...card.querySelectorAll(".role-chain:checked")].map((c) => c.dataset.id);
-  }
+  // Roles A/B are no longer edited in this panel (debate agents are picked per-chat
+  // via the "Add agent" chips → settings.participants). The draft keeps whatever
+  // roles were already persisted so applyProviders re-sends them untouched.
 }
 
 function addProfileDraft() {

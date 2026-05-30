@@ -1299,37 +1299,6 @@ button.square {
   padding: 0 2px;
 }
 .p-remove:hover { color: var(--red); }
-.roles-edit {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-.role-card {
-  flex: 1 1 0;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 7px 8px;
-  background: var(--panel-2);
-}
-.role-title { font-weight: 600; font-size: 12px; margin-bottom: 5px; }
-.role-chain-label {
-  font-size: 11px;
-  color: var(--muted);
-  margin: 6px 0 3px;
-}
-.role-chain-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.chain-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.chain-item input { width: auto; }
 .providers-actions {
   display: flex;
   align-items: center;
