@@ -223,6 +223,9 @@ const STRINGS = {
     "ui.ollamaDetected": "Ollama обнаружена на порту {port} · {n} модел{suffix}",
     "ui.ollamaNotFound": "Ollama не обнаружена (проверяется порт {port})",
     "ui.ollamaChecking": "Проверяю Ollama…",
+    "ui.ollamaTesting": "Идёт проверка подключения к Ollama…",
+    "ui.ollamaConnected": "✓ Подключено",
+    "ui.ollamaNotConnected": "✗ Не подключена: {e}",
     "ui.noProfiles": "Профилей нет — раунд использует поведение по умолчанию (Codex/Claude).",
     "ui.profileProvider": "Провайдер",
     "ui.profileModel": "Модель",
@@ -523,6 +526,9 @@ const STRINGS = {
     "ui.ollamaDetected": "Ollama detected on port {port} · {n} model{suffix}",
     "ui.ollamaNotFound": "Ollama not detected (checked port {port})",
     "ui.ollamaChecking": "Checking Ollama…",
+    "ui.ollamaTesting": "Testing Ollama connection…",
+    "ui.ollamaConnected": "✓ Connected",
+    "ui.ollamaNotConnected": "✗ Not connected: {e}",
     "ui.noProfiles": "No profiles — the round uses the default Codex/Claude behavior.",
     "ui.profileProvider": "Provider",
     "ui.profileModel": "Model",
@@ -2321,13 +2327,15 @@ async function testProfileKey(p, apiKey) {
   }
 }
 
-function showProvidersMsg(text, isError) {
+function showProvidersMsg(text, isError, timeoutMs = 4000) {
   const el = $("providersMsg");
   if (!el) return;
   el.textContent = text;
   el.className = `providers-msg ${isError ? "err" : "ok"}`;
   clearTimeout(showProvidersMsg._t);
-  showProvidersMsg._t = setTimeout(() => { el.textContent = ""; el.className = "providers-msg"; }, 4000);
+  if (timeoutMs > 0) {
+    showProvidersMsg._t = setTimeout(() => { el.textContent = ""; el.className = "providers-msg"; }, timeoutMs);
+  }
 }
 
 async function applyProviders() {
@@ -2340,6 +2348,33 @@ async function applyProviders() {
       showProvidersMsg(t("ui.profileModelRequired", { label: p.label || p.id }), true);
       return;
     }
+  }
+
+  // Ollama profiles: run a live test before saving. The chip only appears if
+  // the test passes — so we only proceed to the POST /api/settings on success.
+  const ollamaProfiles = providersDraft.profiles.filter((p) => p.provider === "ollama");
+  if (ollamaProfiles.length) {
+    showProvidersMsg(t("ui.ollamaTesting"), false, 0); // no auto-clear while testing
+    for (const p of ollamaProfiles) {
+      let testOk = false;
+      try {
+        const r = await fetch("/api/providers/test", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: "ollama", baseUrl: p.baseUrl || "http://localhost:11434/v1", model: p.model }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (j.validated && currentState.providers) currentState.providers.validated = j.validated;
+        testOk = Boolean(j.ok);
+        if (!testOk) {
+          showProvidersMsg(t("ui.ollamaNotConnected", { e: j.error || `HTTP ${r.status}` }), true);
+          return; // abort — don't save, chip won't appear
+        }
+      } catch (e) {
+        showProvidersMsg(t("ui.ollamaNotConnected", { e: e.message }), true);
+        return;
+      }
+    }
+    // All Ollama profiles passed — fall through to save, then show "подключено".
   }
 
   // Direct API-key entry: any non-empty .p-apikey field is persisted to .env
@@ -2376,7 +2411,8 @@ async function applyProviders() {
       showProvidersMsg(j.error || `error ${res.status}`, true);
       return;
     }
-    showProvidersMsg(keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"), false);
+    const successMsg = ollamaProfiles.length ? t("ui.ollamaConnected") : (keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"));
+    showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
     renderProviders(); // refresh key badges + clear the direct-key inputs
   } catch (e) {
     showProvidersMsg(e.message, true);
