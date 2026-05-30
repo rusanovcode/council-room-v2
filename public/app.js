@@ -894,6 +894,7 @@ function computeNextStep() {
       title: t("coach.step1.title"),
       body: t("coach.step1.body"),
       action: { label: t("coach.step1.action"), target: "newRun" },
+      highlight: ["newRun", "runList"],
     };
   }
   const active = s.run?.activeSubtask;
@@ -910,6 +911,7 @@ function computeNextStep() {
       title: t("coach.step2.title"),
       body: t("coach.step2.body"),
       action: { label: t("coach.step2.action"), target: "openSubtask" },
+      highlight: ["openSubtask"],
     };
   }
   if (!active) {
@@ -922,6 +924,7 @@ function computeNextStep() {
       title: t("coach.step2.title"),
       body: t("coach.step2.body"),
       action: { label: t("coach.step2.action"), target: "openSubtask" },
+      highlight: ["openSubtask"],
     };
   }
   if (s.busy) {
@@ -934,12 +937,14 @@ function computeNextStep() {
         title: t("coach.agents.title"),
         body: t("coach.agents.body"),
         action: { label: t("coach.agents.action"), target: "addAgent" },
+        highlight: ["addAgent"],
       };
     }
     return {
       title: t("coach.agentsConfig.title"),
       body: t("coach.agentsConfig.body"),
       action: { label: t("coach.agentsConfig.action"), target: "runRound" },
+      highlight: ["agentChips", "runRound", "autopilot"],
     };
   }
   // Inspect last two agent messages of this subtask
@@ -980,10 +985,26 @@ function computeNextStep() {
   };
 }
 
+// Navigator highlights: persistently glow the control(s) the current step points
+// at, until the step is satisfied. computeNextStep recomputes every render, so a
+// highlight clears itself the moment its step is done. Cleared while the coach is
+// dismissed (quiet mode). This is the "подсвечивает кнопку … гаснет когда сделано"
+// behavior threaded through every onboarding step.
+let navHighlighted = [];
+function applyNavHighlights(ids) {
+  const want = new Set(ids || []);
+  for (const id of navHighlighted) {
+    if (!want.has(id)) { const el = $(id); if (el) el.classList.remove("nav-highlight"); }
+  }
+  for (const id of want) { const el = $(id); if (el) el.classList.add("nav-highlight"); }
+  navHighlighted = [...want];
+}
+
 function renderNextStep() {
   const step = computeNextStep();
   const panel = $("nextStep");
   const reopen = $("nextStepReopen");
+  applyNavHighlights(step && !nextStepDismissed ? (step.highlight || []) : []);
   if (coachPinned) {
     // Guidance is docked at the bottom — hide the floating panel to avoid duplication.
     panel.classList.add("hidden");
