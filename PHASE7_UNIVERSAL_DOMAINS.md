@@ -390,6 +390,48 @@ scope/scan toggles). Hide/disable the scan/scope toggles when `guards.scanApplie
 
 ---
 
+## Phase 7j — File-based profiles + builder UI
+
+Goal: let users add a profile (a custom system prompt) WITHOUT editing `lib/domains.js`,
+either by dropping a file or via an in-app builder. Built-in profiles stay in code.
+
+### Step 7j.1 — File loader (`lib/domains.js`)
+- A `profiles/` folder at repo root. Each `*.md` = one profile: a `---` frontmatter block
+  (`id`, `label_en`, `label_ru`, `scan`, `scope`, repeated `section: key | Title | tip`) and a
+  body that becomes `systemLines`. `README.md` is ignored.
+- Built-in profiles move to `BUILTIN`; the live registry = `BUILTIN` + files. `reload()` re-scans.
+- `parseProfileFile` returns `null` for non-profile text (so stray files are skipped); invalid id
+  or id collision with a built-in/another file → skipped with a `console.warn`.
+- `open_questions` auto-added if missing; section keys validated `^[a-z_]+$`; id `^[a-z][a-z0-9_]*$`.
+
+**Check 7j.1**
+- [ ] `parseProfileFile`/`serializeProfile` round-trip preserves systemLines (incl. blank lines).
+- [ ] `README.md` and malformed files are skipped; built-ins still load.
+- [ ] A hand-written `profiles/<id>.md` appears in `list()`/`options()` after `reload()`.
+
+### Step 7j.2 — Create endpoint (`server.js`)
+- `POST /api/domains/create` → `domains.createProfile(body)` writes `profiles/<id>.md` and reloads;
+  validation errors → HTTP 400 with message; success → `{ok, id, domains}` and a `broadcast()`.
+- `createProfile` validates BEFORE writing (no stray files on bad input).
+
+**Check 7j.2**
+- [ ] Valid payload creates the file and the profile is immediately in `options()`.
+- [ ] Duplicate id, bad section key, empty prompt → 400, and no file written.
+
+### Step 7j.3 — Builder UI (`public/app.js`)
+- A **"+ New profile"** button next to the Mode selector opens a **two-step modal** (English only):
+  step 1 = a guide explaining each field and why; step 2 = the form (id, labels, system prompt,
+  KB sections as `key | Title | tip` lines, two guard checkboxes).
+- The Mode selector reconciles its options against `state.domains` each render, so a freshly
+  created profile shows up without a page reload.
+
+**Check 7j.3**
+- [ ] Clicking "+ New profile" shows the guide first, then the form.
+- [ ] Creating a profile closes the modal and the new profile appears in the Mode selector.
+- [ ] Server-side validation errors are shown inline in the form.
+
+---
+
 ## Final acceptance (return to the lead agent — review together)
 
 Run everything at once and present the results:
@@ -420,5 +462,8 @@ Run everything at once and present the results:
 | `lib/prompt.js` | `TAIL_CONTRACT`, `tailPromptLines`, `availableSectionsLines`, `QUESTIONS_PROTOCOL`; `buildDebatePrompt(domain)`; `parseAgentTail` on the contract |
 | `lib/knowledge.js` | sections as a function of the profile |
 | `server.js` | `discussionMode` (dual store + validation), pass `domain` into prompt and KB, `state.domain` in publicState |
-| `public/app.js` | KB sections/tips/profile selector from `state.domain`; scan/scope toggles per guards |
+| `public/app.js` | KB sections/tips/profile selector from `state.domain`; scan/scope toggles per guards; **7j** "+ New profile" two-step builder modal; selector reconciles with `state.domains` |
 | `test/` | `prompt.snapshot.test.js` + `__snapshots__/` (golden code prompt + parse parity) |
+| `lib/domains.js` (7j) | file loader (`profiles/*.md`), `parseProfileFile`/`serializeProfile`, `reload`, `createProfile` |
+| `server.js` (7j) | `POST /api/domains/create` (write file + reload) |
+| `profiles/` (7j) | NEW: user profile files + `README.md` (format documentation, English) |

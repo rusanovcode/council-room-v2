@@ -2269,12 +2269,35 @@ function renderSettings() {
           alert(e.message);
         }
       });
+      const newBtn = document.createElement("button");
+      newBtn.type = "button";
+      newBtn.id = "newProfileBtn";
+      newBtn.textContent = uiLang === "en" ? "+ New profile" : "+ Новый профиль";
+      newBtn.title = "Create a custom discussion profile (a system prompt that defines how the agents think)";
+      newBtn.style.cssText = "font-size:12px;white-space:nowrap;cursor:pointer";
+      newBtn.addEventListener("click", openProfileBuilder);
       wrapper.appendChild(lbl);
       wrapper.appendChild(modeSelect);
+      wrapper.appendChild(newBtn);
       scanPanel.insertAdjacentElement("beforebegin", wrapper);
     }
   }
-  if (modeSelect) modeSelect.value = s.discussionMode || "code";
+  if (modeSelect) {
+    // Reconcile options with the live registry so a freshly created profile
+    // (pushed via SSE) appears without a page reload.
+    const opts = currentState.domains || [];
+    if (opts.length && modeSelect.options.length !== opts.length) {
+      const uiLang = s.language || "ru";
+      modeSelect.innerHTML = "";
+      for (const p of opts) {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = (p.label && (p.label[uiLang] || p.label.ru)) || p.id;
+        modeSelect.appendChild(opt);
+      }
+    }
+    modeSelect.value = s.discussionMode || "code";
+  }
   // Account / mode controls. The account dropdown is built from the switch
   // module's profiles (acc1 + registered acc2/api), so it auto-includes new
   // accounts. Values are profile ids ("acc1"/"acc2"/"apikey").
@@ -3707,6 +3730,194 @@ function bindUi() {
     unpinCoach();
   });
   $("pinnedHintClose").addEventListener("click", closeCoachPinned);
+}
+
+// ── Custom profile builder ─────────────────────────────────────────────────
+// A two-step modal: (1) a guide explaining what a profile is and what to fill in
+// and why, then (2) the form. All builder copy is intentionally English-only.
+function openProfileBuilder() {
+  const existing = document.getElementById("profileBuilderOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "profileBuilderOverlay";
+  overlay.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px";
+  const card = document.createElement("div");
+  card.style.cssText =
+    "background:var(--bg,#1b1b1f);color:var(--text,#eee);max-width:760px;width:100%;max-height:90vh;overflow:auto;border-radius:10px;padding:22px 24px;box-shadow:0 10px 40px rgba(0,0,0,.5);font-size:14px;line-height:1.5";
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+  // ── Step 1: guide ──────────────────────────────────────────────────────────
+  function renderGuide() {
+    card.innerHTML = "";
+    const h = document.createElement("h2");
+    h.textContent = "Create a custom discussion profile";
+    h.style.cssText = "margin:0 0 6px;font-size:19px";
+    const sub = document.createElement("p");
+    sub.style.cssText = "margin:0 0 14px;color:var(--text-muted,#aaa)";
+    sub.textContent =
+      "A profile is the system prompt that defines HOW the agents think for a domain " +
+      "(software, research, legal, etc.). It is separate from attached documents, which are WHAT they think about.";
+    card.appendChild(h);
+    card.appendChild(sub);
+
+    const steps = [
+      ["1. Profile id", "A short machine name, lowercase letters/digits/underscore (e.g. legal, history_ru). It becomes the filename profiles/&lt;id&gt;.md and cannot collide with an existing profile."],
+      ["2. Display names", "The label shown in the Mode selector — English (required) and Russian (optional)."],
+      ["3. System prompt", "The framing and rules the agents must follow. Do NOT write the closing tail (New facts / New risks / New alternatives / Status / KB-patch) or the open-questions rules — those are shared and added automatically. Keep answers focused; one rule per line."],
+      ["4. Knowledge-Base sections", "The buckets the debate fills in. One per line as <code>key | Title | tip</code>. Keys must be lowercase letters/underscores. An <code>open_questions</code> section is required and is added for you if missing."],
+      ["5. Guards (advanced)", "Leave both OFF for non-code domains. Turn ON only for software-style profiles that should be isolated from the user's files (scan) or restricted to a declared file scope (scope)."],
+    ];
+    const ol = document.createElement("div");
+    for (const [t, d] of steps) {
+      const row = document.createElement("div");
+      row.style.cssText = "margin:0 0 10px";
+      row.innerHTML = `<strong>${t}</strong><br><span style="color:var(--text-muted,#aaa)">${d}</span>`;
+      ol.appendChild(row);
+    }
+    card.appendChild(ol);
+
+    const note = document.createElement("p");
+    note.style.cssText = "margin:6px 0 16px;color:var(--text-muted,#aaa);font-size:13px";
+    note.innerHTML =
+      "The new profile is saved as a file in <code>profiles/</code> and appears in the Mode selector immediately. " +
+      "You can also edit that file by hand later.";
+    card.appendChild(note);
+
+    const bar = document.createElement("div");
+    bar.style.cssText = "display:flex;gap:10px;justify-content:flex-end";
+    const cancel = mkBtn("Cancel", close, false);
+    const cont = mkBtn("Continue →", renderForm, true);
+    bar.appendChild(cancel);
+    bar.appendChild(cont);
+    card.appendChild(bar);
+  }
+
+  // ── Step 2: form ───────────────────────────────────────────────────────────
+  function renderForm() {
+    card.innerHTML = "";
+    const h = document.createElement("h2");
+    h.textContent = "New profile";
+    h.style.cssText = "margin:0 0 14px;font-size:19px";
+    card.appendChild(h);
+
+    const id = mkField(card, "Profile id", "input", { placeholder: "e.g. legal" });
+    const labelEn = mkField(card, "Display name (English)", "input", { placeholder: "e.g. Legal" });
+    const labelRu = mkField(card, "Display name (Russian, optional)", "input", { placeholder: "e.g. Юридический" });
+    const prompt = mkField(card, "System prompt (one rule per line)", "textarea", {
+      rows: 10,
+      value:
+        "You are a participant in Council Room — a closed room of 2 to 5 AI agents.\n" +
+        "Room goal: drive every open subtask to a closed state through structured debate.\n" +
+        "\n" +
+        "Rules (fixed, no need to repeat):\n" +
+        "- <describe how this domain should reason>\n" +
+        "- Answer about THE ONE active subtask only.\n" +
+        "- Ground every claim in the Knowledge Base or attached documents; if something is missing, ask via `QUESTION:`.\n" +
+        "- Each answer <= 12 sentences.",
+    });
+    const sections = mkField(card, "Knowledge-Base sections (key | Title | tip)", "textarea", {
+      rows: 5,
+      value: "thesis | Thesis | The question under analysis\nevidence | Evidence | Facts and sources\nopen_questions | Open Questions",
+    });
+
+    // Guards
+    const gWrap = document.createElement("div");
+    gWrap.style.cssText = "margin:8px 0 14px;display:flex;flex-direction:column;gap:6px";
+    const scan = mkCheck("Isolate from the user's files (NO-FILESYSTEM-SCAN guard)");
+    const scope = mkCheck("Restrict to a declared file scope (STRICT-SCOPE guard)");
+    gWrap.appendChild(scan.wrap);
+    gWrap.appendChild(scope.wrap);
+    card.appendChild(gWrap);
+
+    const msg = document.createElement("div");
+    msg.style.cssText = "color:#e66;min-height:18px;margin-bottom:8px;font-size:13px";
+    card.appendChild(msg);
+
+    const bar = document.createElement("div");
+    bar.style.cssText = "display:flex;gap:10px;justify-content:flex-end";
+    const back = mkBtn("← Back", renderGuide, false);
+    const create = mkBtn("Create profile", onCreate, true);
+    bar.appendChild(back);
+    bar.appendChild(create);
+    card.appendChild(bar);
+
+    async function onCreate() {
+      msg.textContent = "";
+      const secLines = sections.value.split("\n").map((l) => l.trim()).filter(Boolean);
+      const secArr = secLines.map((l) => {
+        const p = l.split("|").map((x) => x.trim());
+        return { key: p[0], title: p[1] || p[0], tip: p[2] || "" };
+      });
+      const payload = {
+        id: id.value.trim(),
+        label: { en: labelEn.value.trim(), ru: labelRu.value.trim() },
+        guards: { scanApplies: scan.input.checked, scopeApplies: scope.input.checked },
+        systemLines: prompt.value,
+        sections: secArr,
+      };
+      create.disabled = true;
+      try {
+        const res = await fetch("/api/domains/create", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) { msg.textContent = j.error || `Error ${res.status}`; create.disabled = false; return; }
+        close();
+      } catch (e) {
+        msg.textContent = e.message;
+        create.disabled = false;
+      }
+    }
+  }
+
+  // ── small UI helpers (local) ────────────────────────────────────────────────
+  function mkBtn(text, onClick, primary) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = text;
+    b.style.cssText =
+      "padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;border:1px solid var(--border,#444);" +
+      (primary ? "background:var(--accent,#3a6df0);color:#fff;border-color:transparent" : "background:transparent;color:var(--text,#eee)");
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  function mkField(parent, label, kind, opts = {}) {
+    const wrap = document.createElement("label");
+    wrap.style.cssText = "display:block;margin:0 0 12px";
+    const cap = document.createElement("div");
+    cap.textContent = label;
+    cap.style.cssText = "font-size:13px;color:var(--text-muted,#aaa);margin-bottom:4px";
+    const el = document.createElement(kind === "textarea" ? "textarea" : "input");
+    el.style.cssText = "width:100%;box-sizing:border-box;background:var(--bg-elev,#26262b);color:var(--text,#eee);border:1px solid var(--border,#444);border-radius:6px;padding:8px;font-size:13px;font-family:inherit";
+    if (opts.placeholder) el.placeholder = opts.placeholder;
+    if (opts.rows) el.rows = opts.rows;
+    if (opts.value) el.value = opts.value;
+    wrap.appendChild(cap);
+    wrap.appendChild(el);
+    parent.appendChild(wrap);
+    return el;
+  }
+  function mkCheck(label) {
+    const wrap = document.createElement("label");
+    wrap.style.cssText = "display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted,#aaa);cursor:pointer";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    const span = document.createElement("span");
+    span.textContent = label;
+    wrap.appendChild(input);
+    wrap.appendChild(span);
+    return { wrap, input };
+  }
+
+  renderGuide();
 }
 
 bindUi();

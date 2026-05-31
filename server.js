@@ -1031,6 +1031,20 @@ async function router(req, res) {
       return sendJson(res, 200, publicState());
     }
 
+    // Phase 7: create a new discussion profile from the builder UI. Writes
+    // profiles/<id>.md and reloads the registry so it appears immediately.
+    if (method === "POST" && pathname === "/api/domains/create") {
+      const body = await readBody(req);
+      let newId;
+      try {
+        newId = domains.createProfile(body);
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+      broadcast();
+      return sendJson(res, 200, { ok: true, id: newId, domains: domains.options() });
+    }
+
     if (method === "POST" && pathname === "/api/questions/add") {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
