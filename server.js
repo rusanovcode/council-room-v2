@@ -22,6 +22,7 @@ const roles = require("./lib/roles");
 const providers = require("./lib/providers");
 const usage = require("./lib/usage");
 const validatedStore = require("./lib/validated");
+const domains = require("./lib/domains");
 
 const ROOT = __dirname;
 const ROOMS_DIR = path.join(ROOT, "rooms");
@@ -58,6 +59,7 @@ let state = {
     claudeMode: "auto",
     claudeAccount: 1,
     subscriptions: {}, // { "claude:acc1": { start, end } } — manual, no API source
+    discussionMode: "code",
   },
 };
 
@@ -187,11 +189,13 @@ function providersInfo() {
 
 function publicState() {
   if (!state.run) {
+    const globalDomain = domains.getProfile(state.settings.discussionMode ?? "code");
     return {
       activeRunId: null,
       busy: state.busy,
       status: state.status,
       run: null,
+      domain: { id: globalDomain.id, label: globalDomain.label, sections: globalDomain.sections },
       autopilot: state.autopilot,
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
       settings: state.settings,
@@ -209,15 +213,18 @@ function publicState() {
   if (active) ensureQuestionsMigrated(dir, active.id);
   const messages = store.readJsonl(transcriptPath(state.run.id));
   const activeQuestions = active ? questions.forSubtask(dir, active.id) : [];
+  const runDomainId = state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code";
+  const runDomain = domains.getProfile(runDomainId);
   return {
     activeRunId: state.run.id,
     busy: state.busy,
     status: state.status,
+    domain: { id: runDomain.id, label: runDomain.label, sections: runDomain.sections },
     run: {
       ...state.run,
       activeSubtask: active,
       subtasks: allSubtasks,
-      knowledge: knowledge.load(dir),
+      knowledge: knowledge.load(dir, runDomain.sections),
       questions: activeQuestions,
       documents: documents.listMeta(dir),
       messages,
@@ -314,7 +321,9 @@ async function runRound({ guidance = "" } = {}) {
     if (guidance) {
       addMessage({ role: "user", name: "User", kind: "guidance", text: guidance, subtaskId: active.id, round });
     }
-    const kbSnapshot = knowledge.snapshotForPrompt(dir);
+    const activeDomainId = state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code";
+    const domain = domains.getProfile(activeDomainId);
+    const kbSnapshot = knowledge.snapshotForPrompt(dir, domain.sections);
     const documentsSnapshot = documents.snapshotForPrompt(dir);
     const language = state.run.settings.language || "ru";
 
@@ -357,6 +366,7 @@ async function runRound({ guidance = "" } = {}) {
       language,
       subtask: active,
       kbSnapshot,
+      domain,
       documentsSnapshot,
       recentTurns: recent,
       guidance,
@@ -483,7 +493,7 @@ async function runRound({ guidance = "" } = {}) {
         if (patch.section === "open_questions") {
           questions.addQuestion(dir, active.id, patch.item, round);
         } else {
-          try { knowledge.addItem(dir, patch.section, patch.item); } catch {}
+          try { knowledge.addItem(dir, patch.section, patch.item, domain.sections); } catch {}
         }
       }
       // Record this participant's resolutions of existing questions.
@@ -985,7 +995,8 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
       const dir = runDir(state.run.id);
-      knowledge.addItem(dir, body.section, body.item);
+      const kbDomain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
+      knowledge.addItem(dir, body.section, body.item, kbDomain.sections);
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -994,7 +1005,8 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
       const dir = runDir(state.run.id);
-      knowledge.removeItem(dir, body.section, body.item);
+      const kbDomain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
+      knowledge.removeItem(dir, body.section, body.item, kbDomain.sections);
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -1369,6 +1381,24 @@ async function router(req, res) {
     if (method === "POST" && pathname === "/api/settings") {
       const body = await readBody(req);
       if (body.allowFilesystemScan === true) body.strictScope = false;
+      // Phase 7: validate and guard discussionMode changes.
+      if (body.discussionMode !== undefined) {
+        if (!domains.list().includes(body.discussionMode)) body.discussionMode = "code";
+        // Guard switching profile on a non-empty KB that contains sections foreign to the new profile.
+        if (state.run) {
+          const currentDomainId = state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code";
+          if (body.discussionMode !== currentDomainId) {
+            const newProfile = domains.getProfile(body.discussionMode);
+            const newKeys = new Set(newProfile.sections.map((s) => s.key));
+            const currentProfile = domains.getProfile(currentDomainId);
+            const kb = knowledge.load(runDir(state.run.id), currentProfile.sections);
+            const foreignSections = currentProfile.sections.filter((s) => !newKeys.has(s.key) && (kb.sections[s.key] || []).length > 0);
+            if (foreignSections.length > 0) {
+              return sendJson(res, 409, { error: `Cannot switch to "${body.discussionMode}": the KB contains items in sections not available in the new profile (${foreignSections.map((s) => s.key).join(", ")}). Clear those sections first.` });
+            }
+          }
+        }
+      }
       // Phase 5: validate provider profiles before persisting them.
       if (Array.isArray(body.profiles)) {
         for (const p of body.profiles) {

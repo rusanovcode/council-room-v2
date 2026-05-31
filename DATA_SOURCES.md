@@ -16,9 +16,10 @@ Council Room v2/
 ├── lib/
 │   ├── store.js              id/json/jsonl IO (readJson, appendJsonl, makeRunId…)
 │   ├── subtasks.js           подзадачи: open/resolve/freeze/edit/delete, bin (archive/trash), incrementRounds
-│   ├── knowledge.js          KB (7 секций markdown), near-dup дедуп, snapshotForPrompt (open_questions исключён)
+│   ├── knowledge.js          KB (секции по профилю домена), near-dup дедуп, snapshotForPrompt(dir, sections) — open_questions всегда исключён из снапшота. Набор секций = domains.getProfile(discussionMode).sections; старые вызовы без аргумента → code-профиль
 │   ├── questions.js          per-subtask вопросы (questions.jsonl): ID, priority, resolvedBy ([Phase 6] карта по ключам участников), verify, near-dup; recordResolve(...,requiredKeys) закрывает когда ВСЕ текущие участники отметили; reopen сбрасывает метки
-│   ├── prompt.js             buildDebatePrompt (otherAgentNames[] — [Phase 6] N оппонентов; documentsSnapshot — [6b] секция ATTACHED DOCUMENTS), parseAgentTail, STATIC_SYSTEM, NO_SCAN_GUARD (документы разрешены), STRICT_SCOPE_RULE
+│   ├── domains.js            [Phase 7] реестр доменных профилей (code/general/research/creative): {id,label,guards,systemLines,sections}; getProfile(id)/list()/DEFAULT. TAIL_CONTRACT (якоря хвоста) — единственный источник истины в prompt.js; профили меняют только systemLines и sections
+│   ├── prompt.js             TAIL_CONTRACT (якоря хвоста; единственный источник истины), QUESTIONS_PROTOCOL, tailPromptLines/availableSectionsLines, buildDebatePrompt(domain=getProfile("code")), parseAgentTail (на TAIL_CONTRACT), STATIC_SYSTEM (code-профиль; золотой снапшот — test/__snapshots__/code-debate.txt), NO_SCAN_GUARD/STRICT_SCOPE_RULE
 │   ├── cli.js                runCodex/runClaude (spawn, AbortSignal, killTree, accountEnv), spawnLogin
 │   ├── switcher.js           модуль свитч: gateway-клиент (7700) + файловый фолбэк; envForAccount; claude/codexPaths; токен-% (claude usage-cache+oauth/usage fetch, codex rollout rate_limits)
 │   ├── providers.js          [Phase 5] слой провайдеров: runProfile(profile,prompt,opts)→{ok,text,aborted,result}; openai-compatible + ollama; пресеты; credentialRef→env; mode() = PROVIDERS_MODE full|api
@@ -40,11 +41,11 @@ Council Room v2/
 ### rooms/<runId>/ — данные одного чата
 | Файл | Что |
 |---|---|
-| `state.json` | run: id, topic, createdAt, rounds, **archived**, settings (копия глобальных на момент) |
+| `state.json` | run: id, topic, createdAt, rounds, **archived**, settings (копия глобальных; [Phase 7] поле **discussionMode** = "code"\|"general"\|"research"\|"creative"; чат без поля → "code") |
 | `transcript.jsonl` | все сообщения (role/kind/text/subtaskId/round); `kind:process`/`subtask-*` → trace-лента |
 | `subtasks.jsonl` | подзадачи: status(open/pending/resolved/frozen), mode, rounds, **bin** ("" / archive / trash) |
 | `questions.jsonl` | вопросы: id(Q1…), subtaskId, text, status(open/resolved/verified), **priority**(critical/minor), resolvedBy{codex,claude}, answer |
-| `knowledge.md` | KB-секции: decisions, prohibitions, control_contract, files_in_scope, files_out_of_scope, verification_commands, open_questions(legacy→мигрирует в questions.jsonl) |
+| `knowledge.md` | KB-секции по активному домену (code по умолчанию: decisions, prohibitions, control_contract, files_in_scope, files_out_of_scope, verification_commands, open_questions). open_questions мигрирует в questions.jsonl |
 | `documents.jsonl` | [6b] приложенные текстовые документы чата: {id,name,text,chars,addedAt} → секция ATTACHED DOCUMENTS в промте |
 | `R{n}-{subtaskId}-{codex,claude}.log/.txt` | сырые логи раунда |
 

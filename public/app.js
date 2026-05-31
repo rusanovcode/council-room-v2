@@ -1668,17 +1668,18 @@ function renderKnowledge() {
     target.innerHTML = `<p class="muted small" style="padding:10px 14px">(${t("ui.noActiveSubtask")})</p>`;
     return;
   }
-  const sectionsDef = [
-    "decisions",
-    "prohibitions",
-    "control_contract",
-    "files_in_scope",
-    "files_out_of_scope",
-    "verification_commands",
-    "open_questions",
+  const domainSections = currentState.domain?.sections || [
+    { key: "decisions" }, { key: "prohibitions" }, { key: "control_contract" },
+    { key: "files_in_scope" }, { key: "files_out_of_scope" },
+    { key: "verification_commands" }, { key: "open_questions" },
   ];
-  for (const key of sectionsDef) {
-    const label = t(`kb.${key}`);
+  const lang = currentState.settings?.language || "ru";
+  const scopeApplies = currentState.domain?.guards?.scopeApplies ?? true;
+  for (const section of domainSections) {
+    const key = section.key;
+    // Use t() for label if translation exists; otherwise fall back to section.title.
+    const labelKey = `kb.${key}`;
+    const label = t(labelKey) !== labelKey ? t(labelKey) : (section.title || key);
     const items = kb.sections[key] || [];
     const block = document.createElement("div");
     block.className = "kb-section";
@@ -1689,7 +1690,7 @@ function renderKnowledge() {
     h3.appendChild(labelSpan);
     const tools = document.createElement("span");
     tools.className = "kb-section-tools";
-    if (key === "files_out_of_scope") {
+    if (key === "files_out_of_scope" && scopeApplies) {
       const on = Boolean(currentState.settings?.strictScope);
       const toggle = document.createElement("button");
       toggle.type = "button";
@@ -1700,10 +1701,13 @@ function renderKnowledge() {
       toggle.addEventListener("click", () => api("POST", "/api/settings", { strictScope: !on }));
       tools.appendChild(toggle);
     }
+    // Use section.tipRu/tipEn when provided (non-code profiles); fall back to t().
+    const tipKey = `tip.kb.${key}`;
+    const tipText = (lang === "ru" ? section.tipRu : section.tipEn) || (t(tipKey) !== tipKey ? t(tipKey) : "");
     const help = document.createElement("span");
     help.className = "help";
     help.dataset.tooltipKey = `t.kb.${key}`;
-    help.dataset.tooltipText = t(`tip.kb.${key}`);
+    help.dataset.tooltipText = tipText;
     help.textContent = "?";
     tools.appendChild(help);
     h3.appendChild(tools);
@@ -2216,7 +2220,42 @@ function renderSettings() {
   if (scan) {
     scan.checked = Boolean(s.allowFilesystemScan);
     scan.closest("label.toggle-row")?.classList.toggle("active", Boolean(s.allowFilesystemScan));
+    // Hide scan toggle for profiles where filesystem scanning is not applicable.
+    const scanApplies = currentState.domain?.guards?.scanApplies ?? true;
+    const scanRow = scan.closest("section.filescan-panel") || scan.closest("label.toggle-row");
+    if (scanRow) scanRow.style.display = scanApplies ? "" : "none";
   }
+  // Profile selector: inject once, then update value on each render.
+  let modeSelect = $("discussionModeSelect");
+  if (!modeSelect) {
+    const scanPanel = $("allowFilesystemScan")?.closest("section.filescan-panel");
+    if (scanPanel) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "providers-body";
+      wrapper.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 14px";
+      const lbl = document.createElement("label");
+      lbl.htmlFor = "discussionModeSelect";
+      lbl.style.cssText = "font-size:13px;color:var(--text-muted,#888);white-space:nowrap";
+      const uiLang = s.language || "ru";
+      lbl.textContent = uiLang === "en" ? "Mode:" : "Режим:";
+      modeSelect = document.createElement("select");
+      modeSelect.id = "discussionModeSelect";
+      modeSelect.style.cssText = "flex:1;min-width:0;font-size:13px";
+      const domainIds = ["code", "general", "research", "creative"];
+      const modeLabels = { ru: { code: "Разработка ПО", general: "Общий", research: "Исследование", creative: "Творческий" }, en: { code: "Software", general: "General", research: "Research", creative: "Creative" } };
+      for (const id of domainIds) {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = (modeLabels[uiLang] || modeLabels.ru)[id] || id;
+        modeSelect.appendChild(opt);
+      }
+      modeSelect.addEventListener("change", () => api("POST", "/api/settings", { discussionMode: modeSelect.value }));
+      wrapper.appendChild(lbl);
+      wrapper.appendChild(modeSelect);
+      scanPanel.insertAdjacentElement("beforebegin", wrapper);
+    }
+  }
+  if (modeSelect) modeSelect.value = s.discussionMode || "code";
   // Account / mode controls. The account dropdown is built from the switch
   // module's profiles (acc1 + registered acc2/api), so it auto-includes new
   // accounts. Values are profile ids ("acc1"/"acc2"/"apikey").

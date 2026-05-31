@@ -1,0 +1,127 @@
+[
+  {
+    "sample": 1,
+    "tail": {
+      "newFacts": [
+        "the DB has 7 tables"
+      ],
+      "newRisks": [
+        "migration cost"
+      ],
+      "newAlternatives": [],
+      "status": "continue",
+      "kbPatches": [
+        {
+          "section": "decisions",
+          "item": "use PostgreSQL"
+        }
+      ],
+      "resolved": [],
+      "verify": null,
+      "priority": []
+    }
+  },
+  {
+    "sample": 2,
+    "tail": {
+      "newFacts": [],
+      "newRisks": [
+        "no context"
+      ],
+      "newAlternatives": [],
+      "status": "block",
+      "kbPatches": [
+        {
+          "section": "open_questions",
+          "item": "clarify scope and target artifact"
+        }
+      ],
+      "resolved": [],
+      "verify": null,
+      "priority": []
+    }
+  },
+  {
+    "sample": 3,
+    "tail": {
+      "newFacts": [],
+      "newRisks": [],
+      "newAlternatives": [],
+      "status": "resolve",
+      "kbPatches": [],
+      "resolved": [],
+      "verify": null,
+      "priority": []
+    }
+  },
+  {
+    "sample": 4,
+    "tail": {
+      "newFacts": [
+        "found 3 edge cases"
+      ],
+      "newRisks": [
+        "performance hit"
+      ],
+      "newAlternatives": [
+        "use Redis instead"
+      ],
+      "status": "continue",
+      "kbPatches": [
+        {
+          "section": "files_in_scope",
+          "item": "src/db.js"
+        }
+      ],
+      "resolved": [
+        {
+          "id": "Q1",
+          "answer": "use PostgreSQL"
+        }
+      ],
+      "verify": null,
+      "priority": [
+        {
+          "id": "Q2",
+          "priority": "minor"
+        }
+      ]
+    }
+  },
+  {
+    "sample": 5,
+    "tail": {
+      "newFacts": [],
+      "newRisks": [],
+      "newAlternatives": [],
+      "status": "resolve",
+      "kbPatches": [],
+      "resolved": [],
+      "verify": {
+        "ok": true,
+        "reopen": []
+      },
+      "priority": []
+    }
+  },
+  {
+    "sample": 6,
+    "tail": {
+      "newFacts": [],
+      "newRisks": [
+        "Q3 still unclear"
+      ],
+      "newAlternatives": [],
+      "status": "continue",
+      "kbPatches": [],
+      "resolved": [],
+      "verify": {
+        "ok": false,
+        "reopen": [
+          "Q3"
+        ]
+      },
+      "priority": []
+    }
+  }
+]

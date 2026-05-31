@@ -468,3 +468,29 @@ v2 — отдельный репозиторий (`C:\AI\Council Room v2\.git`),
 `rooms/` — gitignored (пользовательские данные). `rooms/.keep` оставлен в репозитории чтобы папка существовала.
 
 `node_modules/` — gitignored.
+
+---
+
+## Phase 7 — Universal Council Room (2026-05-31, CLOSED)
+
+Агент стал универсальным: добавлены доменные профили (`code`, `general`, `research`, `creative`).
+Дебатная механика (subtask → rounds → questions → verify → resolve/block) **не изменилась**.
+
+**Ключевые инварианты:**
+- `TAIL_CONTRACT` в `lib/prompt.js` — единственный источник якорей хвоста (`New facts`, `New risks`, `New alternatives`, `Status`, `KB-patch`, `Resolved`, `Verify`, `Priority`). Профили не меняют якоря — только `systemLines` и `sections`.
+- Золотой снапшот `code`-профиля: `test/__snapshots__/code-debate.txt` (byte-for-byte) + `test/__snapshots__/parse-tail.json` (parity). Пересоздавать снапшот нельзя — это регрессия.
+- Чаты без поля `discussionMode` → `"code"` (без миграции).
+
+**Новые файлы:**
+| Файл | Назначение |
+|---|---|
+| `lib/domains.js` | Реестр профилей; `getProfile(id)`, `list()`, `DEFAULT="code"` |
+| `test/prompt.snapshot.test.js` | Золотой тест 7a; защита от регрессии промта и парсера |
+| `test/__snapshots__/code-debate.txt` | Снапшот `buildDebatePrompt` для `code`-профиля |
+| `test/__snapshots__/parse-tail.json` | Снапшот `parseAgentTail` на 6 типовых хвостах |
+
+**Изменённые файлы:**
+- `lib/prompt.js` — `TAIL_CONTRACT`, `tailPromptLines`, `QUESTIONS_PROTOCOL`, `buildDebatePrompt(domain=)`, `parseAgentTail` через TAIL_CONTRACT
+- `lib/knowledge.js` — `load/save/addItem/snapshotForPrompt` принимают `domainIdOrSections`
+- `server.js` — `discussionMode` в dual-store settings, валидация, guard смены профиля на непустом KB, `state.domain` в `publicState()`
+- `public/app.js` — `renderKnowledge()` из `state.domain.sections`; profile selector; scan/scope toggles скрыты для неприменимых профилей
