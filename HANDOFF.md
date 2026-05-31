@@ -2,6 +2,38 @@
 
 Документ для следующей сессии. Куда мы пришли, что проверено, что осталось.
 
+## Update 2026-05-31 — OpenRouter API backend, key pool, quota panel (token economy)
+
+Goal of this batch: a cheap network backend for debates (~850 tokens/turn vs the
+~7-8k-token CLI agent harness) and resilient use of free OpenRouter accounts.
+
+- **Anthropic native backend** (`lib/providers.js`): provider type `anthropic` +
+  preset → `/v1/messages`, `x-api-key`. Prompt caching via `splitForCache()` (stable
+  head as a `cache_control: ephemeral` system block, variable tail as the user msg).
+- **OpenRouter model failover**: a profile may carry `fallbackModels: [...]`; for
+  OpenRouter the adapter sends `models: [primary, ...fallbacks]` + `route: "fallback"`
+  so a 429 routes to the next model server-side, in one call.
+- **OpenRouter account failover (key pool)**: `openrouterPool()` in providers.js tries
+  a supplied `keyPool` of keys until one isn't 429-blocked; reports `result.usedRef`
+  (and `blockedRefs`). `server.js` builds the pool from EVERY `OPENROUTER_API_KEY*` env
+  var (each = a separate account = separate free daily quota), rotated by a cursor to
+  spread concurrent agents across accounts + sorted by most remaining quota. Scales to
+  any number of keys (2, 6, 20…). Keys live in `.env` (gitignored).
+- **Quota panel** (`lib/orquota.js` → `rooms/.or-quota.json`): OpenRouter exposes no
+  remaining-free-quota number, so we tally our own requests per key per day. The
+  Agents panel shows `K1 N/cap`, colour by remaining, plus `⚠N` (429s caught today).
+  Per-key cap auto-detected from `/api/v1/key` `is_free_tier` (50 free / 1000 with
+  ≥$10 credit), refreshed at startup + every 10 min.
+- **Debate presets** (`providers.debatePresets()`): cheap one-click backends
+  (Anthropic/Groq/DeepSeek), surfaced in publicState.
+- **Token-economy tooltip** `tip.tokenEconomy` (RU/EN) on each agent row in
+  `renderProviderStatsPanel`.
+
+Verified LIVE (not just unit): restarted the server on 8788, registered 4 OpenRouter
+debater profiles (`or-gptoss/or-kimi/or-nemotron/or-qwen`, in global-settings.json),
+ran a real Free-Debate round via the API — both agents argued in RU, the pool split
+them across K1/K2, and the quota panel ticked `K1 1/50, K2 1/50`. Unit suite green.
+
 ## Update 2026-05-31 — `free` profile reworked into "Free Debate"
 
 Context for the next agent using this folder:
