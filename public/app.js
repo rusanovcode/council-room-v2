@@ -2452,6 +2452,22 @@ function renderSettings() {
       }
     }
     modeSelect.value = s.discussionMode || "code";
+    // Hint for the "free" debate profile: explain that the machine-readable tail
+    // is NOT removed and that tokens are still spent — with the reasons.
+    modeSelect.title = modeSelect.value === "free"
+      ? [
+          "Free Debate drops domain rules only — it is not a zero-prompt mode.",
+          "The 5-line tail (New facts / New risks / New alternatives / Status / KB-patch) stays:",
+          "the app parses Status to detect consensus (all agents = resolve) and applies KB-patch,",
+          "so removing it would break round/consensus logic.",
+          "Expect ~7,900 tokens per Codex turn even for a trivial task, because:",
+          "- the Codex CLI backend injects its own ~7,000-token agent system prompt on every call,",
+          "  regardless of how short our prompt is;",
+          "- plus reasoning tokens (even at low effort).",
+          "Our debate prompt itself is only ~800 tokens of that total.",
+          "To cut tokens: fewer rounds (LIGHT + auto-resolve) or a leaner backend (Claude CLI / direct API).",
+        ].join("\n")
+      : "";
   }
   // Account / mode controls. The account dropdown is built from the switch
   // module's profiles (acc1 + registered acc2/api), so it auto-includes new

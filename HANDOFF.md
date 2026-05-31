@@ -2,31 +2,43 @@
 
 Документ для следующей сессии. Куда мы пришли, что проверено, что осталось.
 
-## Update 2026-05-31 — current main working tree, not committed yet
+## Update 2026-05-31 — `free` profile reworked into "Free Debate"
 
 Context for the next agent using this folder:
 - Active branch: `main`.
-- Current work is intentionally on `main`, not `public`.
-- Existing local commit before this work: `8968cff Add branch switch helper`.
-- Uncommitted files after the latest edits: `lib/domains.js`, `profiles/README.md`, `public/app.js`, `HANDOFF.md`.
+- The built-in profile id stays `free`; only its label and `systemLines` changed.
+- Label renamed: `Без правил` / `No Rules` → `Свободный спор` / `Free Debate` (`lib/domains.js`).
 
-What changed:
-- Added built-in discussion profile `free` / `Без правил` in `lib/domains.js`.
-- This profile has no filesystem-scan guard and no strict-scope guard: `scanApplies: false`, `scopeApplies: false`.
-- Its prompt is intentionally minimal: no domain-specific rules, constraints, tone, structure, or limits beyond the shared invariant prompt tail in `lib/prompt.js`.
-- Its KB sections are `notes`, `decisions`, `open_questions`.
-- Updated `profiles/README.md` so the built-in profile list includes `free`.
-- Moved the discussion mode selector row to the top of the right column in `public/app.js`; the row now has `id="discussionModeRow"` and is inserted before `#agentEditorPanel`.
+Why the rework:
+- The original `free` `systemLines` were passive ("no rules imposed"), which gave the
+  agents no convergence behavior — cheap models just rubber-stamped `Status: resolve`.
+- New `systemLines` actively drive a debate-to-consensus dynamic with minimal scaffolding:
+  defend your position with reasoning, concede only when the other is actually right,
+  drive open questions to answers, agree on the merits (not by splitting the difference),
+  end with `Status: resolve` only on genuine agreement, and stay brief (token economy).
+- Guards stay off (`scanApplies: false`, `scopeApplies: false`); KB sections unchanged
+  (`notes`, `decisions`, `open_questions`); `QUESTIONS_PROTOCOL` and the 5-line tail stay.
 
-Verification already done:
-- `node --check lib/domains.js`
-- `node --check public/app.js`
-- `npm test`
-- Restarted local server on `http://localhost:8788/`.
-- Browser verification confirmed the first right-column element is `#discussionModeRow` and its options include `Без правил`.
+UI hint:
+- `public/app.js` sets `modeSelect.title` when `free` is selected, explaining that the
+  tail is NOT removed and that ~7,900 tokens are still spent per Codex turn (reasons below).
 
-Important note:
-- `Без правил` removes only profile-level/domain-level rules. The global tail contract from `lib/prompt.js` still applies to every profile by design.
+Why tokens are still spent (the `free` ≠ free-of-cost note):
+- The 5-line machine-readable tail (`New facts / New risks / New alternatives / Status / KB-patch`)
+  stays on every profile by design — `lib/prompt.js` parses `Status` to detect consensus
+  (`server.js:560`, all participants = `resolve`) and applies `KB-patch`. Removing it would
+  break round/consensus logic.
+- The ~7,900-tokens-per-turn cost (seen in `R1-…-a2.log`) is dominated by the **Codex CLI
+  backend**, not our prompt: `codex exec` injects its own ~7,000-token agent system prompt on
+  every call regardless of how short our prompt is, plus low-effort reasoning tokens. Our
+  debate prompt is only ~800 tokens of that total.
+- Token levers, in order of impact: leaner backend (Claude CLI `-p` / direct API) ≫ fewer
+  rounds (LIGHT + auto-resolve, local summary on close, no synthesis call) ≫ prompt trimming.
+
+Verification done:
+- `node --check lib/domains.js`, `node --check public/app.js`
+- `npm test` (all suites pass; `code` golden snapshot unaffected).
+- Server restart required for the change to take effect (old process holds old code in memory).
 
 ## 1. Что это и почему v2
 
