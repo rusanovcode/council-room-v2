@@ -34,12 +34,25 @@ function listOpenrouterKeys() {
   return out.sort((a, b) => orRefIndex(a.ref) - orRefIndex(b.ref));
 }
 let orKeyCursor = 0;
+// Per-key daily cap, learned from OpenRouter: free-tier accounts get ~50/day,
+// accounts with >= $10 credit get 1000/day. Refreshed periodically (below).
+let orKeyCaps = {};
+async function refreshOrKeyCaps() {
+  for (const { ref, apiKey } of listOpenrouterKeys()) {
+    try {
+      const r = await fetch("https://openrouter.ai/api/v1/key", { headers: { Authorization: `Bearer ${apiKey}` } });
+      if (!r.ok) continue;
+      const d = (await r.json()).data || {};
+      orKeyCaps[ref] = d.is_free_tier === false ? 1000 : orquota.DEFAULT_CAP;
+    } catch { /* leave previous/default */ }
+  }
+}
 // Ordered pool for ONE OpenRouter call: rotate by a cursor (spreads concurrent
 // agents across accounts) then stable-sort by most remaining daily quota first.
 function openrouterKeyPool() {
   const keys = listOpenrouterKeys();
   if (keys.length <= 1) return keys;
-  const q = orquota.summary(ROOMS_DIR, { refs: keys.map((k) => k.ref) });
+  const q = orquota.summary(ROOMS_DIR, { refs: keys.map((k) => k.ref), caps: orKeyCaps });
   const rot = orKeyCursor++ % keys.length;
   const rotated = keys.slice(rot).concat(keys.slice(0, rot));
   rotated.sort((a, b) => q[b.ref].remaining - q[a.ref].remaining); // stable: equal remaining keeps rotation
@@ -215,7 +228,7 @@ function providersInfo() {
   // Quota panel shows every key in the OpenRouter pool (env), not just the ones a
   // profile pins — the pool draws from all of them.
   for (const k of listOpenrouterKeys()) orRefs.add(k.ref);
-  return { mode: providers.mode(), presets: providers.presets(), debatePresets: providers.debatePresets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR), orQuota: orquota.summary(ROOMS_DIR, { refs: [...orRefs] }) };
+  return { mode: providers.mode(), presets: providers.presets(), debatePresets: providers.debatePresets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR), orQuota: orquota.summary(ROOMS_DIR, { refs: [...orRefs], caps: orKeyCaps }) };
 }
 
 function publicState() {
@@ -507,6 +520,8 @@ async function runRound({ guidance = "" } = {}) {
         const c = providers.resolveProfile(r.profile);
         const usedRef = (r.result && r.result.usedRef) || c.credentialRef; // pool reports the key it actually used
         if (/openrouter\.ai/i.test(c.baseUrl) && usedRef) { orquota.bump(ROOMS_DIR, usedRef); usageRecorded = true; }
+        // Tally keys that hit a 429 (rate-limit / daily cap) during pool failover.
+        for (const bref of (r.result && r.result.blockedRefs) || []) { orquota.bump429(ROOMS_DIR, bref); usageRecorded = true; }
       }
     }
     if (usageRecorded) { statsCache = {}; statsVersion++; }
@@ -1682,6 +1697,11 @@ checkUpdateOnStartup();
 // Poll the switch-module gateway so the UI reflects profiles/active/tokens live.
 refreshSwitcher().then(broadcast);
 setInterval(() => { refreshSwitcher().then(broadcast); }, 15000).unref();
+
+// Learn each OpenRouter key's daily cap (free 50 vs credited 1000) at startup and
+// periodically — drives the quota panel's denominator.
+refreshOrKeyCaps().then(broadcast).catch(() => {});
+setInterval(() => { refreshOrKeyCaps().then(broadcast).catch(() => {}); }, 10 * 60 * 1000).unref();
 
 const server = http.createServer(router);
 server.on("error", (err) => {

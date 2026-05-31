@@ -185,7 +185,7 @@ const STRINGS = {
     "ui.tabSpend": "Расход",
     "ui.tabSub": "Подписка",
     "ui.orQuotaLabel": "OpenRouter сегодня:",
-    "ui.orQuotaTip": "Сделано запросов к бесплатному пулу OpenRouter за сегодня по каждому ключу (K1, K2…) — наш собственный счётчик, т.к. OpenRouter остаток не отдаёт. Потолок ~50/день на аккаунт (<$10 кредита) или 1000/день (≥$10). Зелёный/жёлтый/красный — по остатку.",
+    "ui.orQuotaTip": "Сделано запросов к бесплатному пулу OpenRouter за сегодня по каждому ключу (K1, K2…) — наш собственный счётчик, т.к. OpenRouter остаток не отдаёт. Потолок определяется автоматически: ~50/день на бесплатном аккаунте или 1000/день при кредите ≥$10. Зелёный/жёлтый/красный — по остатку. ⚠N — сколько раз ключ поймал 429 (упёрся в лимит) сегодня.",
     "ui.hourlyReset": "Часовой сброс",
     "ui.weeklyReset": "Недельный сброс",
     "ui.windowStart": "Начало окна",
@@ -591,7 +591,7 @@ const STRINGS = {
     "ui.tabSpend": "Spending",
     "ui.tabSub": "Subscription",
     "ui.orQuotaLabel": "OpenRouter today:",
-    "ui.orQuotaTip": "Requests made to the OpenRouter free pool today, per key (K1, K2…) — our own counter, since OpenRouter exposes no remaining number. Cap is ~50/day per account (<$10 credit) or 1000/day (≥$10). Green/yellow/red by remaining.",
+    "ui.orQuotaTip": "Requests made to the OpenRouter free pool today, per key (K1, K2…) — our own counter, since OpenRouter exposes no remaining number. The cap is detected automatically: ~50/day on a free account or 1000/day with >= $10 credit. Green/yellow/red by remaining. ⚠N = how many 429s (hit the limit) the key caught today.",
     "ui.hourlyReset": "Hourly reset",
     "ui.weeklyReset": "Weekly reset",
     "ui.windowStart": "Window start",
@@ -2154,8 +2154,9 @@ function renderProviderStatsPanel() {
     const cells = orRefs.map((ref) => {
       const q = orQuota[ref];
       const cls = q.remaining > 20 ? "tok-green" : (q.remaining > 5 ? "tok-yellow" : "tok-red");
+      const warn = q.blocked ? ` <span style="color:#e05252" title="429 / rate-limited">⚠${q.blocked}</span>` : "";
       return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap">`
-        + `<span class="psp-dot ${cls}"></span>${escapeHtml(orKeyShort(ref))} ${q.count}/${q.cap}</span>`;
+        + `<span class="psp-dot ${cls}"></span>${escapeHtml(orKeyShort(ref))} ${q.count}/${q.cap}${warn}</span>`;
     }).join("");
     html += `<div class="psp-row" style="flex-wrap:wrap;gap:6px" title="${escapeHtml(t("ui.orQuotaTip"))}">`
       + `<span class="psp-name" style="opacity:.7;flex:0 0 auto">${escapeHtml(t("ui.orQuotaLabel"))}</span>${cells}</div>`;
