@@ -2,6 +2,32 @@
 
 Документ для следующей сессии. Куда мы пришли, что проверено, что осталось.
 
+## Update 2026-05-31 — current main working tree, not committed yet
+
+Context for the next agent using this folder:
+- Active branch: `main`.
+- Current work is intentionally on `main`, not `public`.
+- Existing local commit before this work: `8968cff Add branch switch helper`.
+- Uncommitted files after the latest edits: `lib/domains.js`, `profiles/README.md`, `public/app.js`, `HANDOFF.md`.
+
+What changed:
+- Added built-in discussion profile `free` / `Без правил` in `lib/domains.js`.
+- This profile has no filesystem-scan guard and no strict-scope guard: `scanApplies: false`, `scopeApplies: false`.
+- Its prompt is intentionally minimal: no domain-specific rules, constraints, tone, structure, or limits beyond the shared invariant prompt tail in `lib/prompt.js`.
+- Its KB sections are `notes`, `decisions`, `open_questions`.
+- Updated `profiles/README.md` so the built-in profile list includes `free`.
+- Moved the discussion mode selector row to the top of the right column in `public/app.js`; the row now has `id="discussionModeRow"` and is inserted before `#agentEditorPanel`.
+
+Verification already done:
+- `node --check lib/domains.js`
+- `node --check public/app.js`
+- `npm test`
+- Restarted local server on `http://localhost:8788/`.
+- Browser verification confirmed the first right-column element is `#discussionModeRow` and its options include `Без правил`.
+
+Important note:
+- `Без правил` removes only profile-level/domain-level rules. The global tail contract from `lib/prompt.js` still applies to every profile by design.
+
 ## 1. Что это и почему v2
 
 Council Room v1 (`C:\AI\Council Room`, порт 8787) — рабочий, но к 30+ раунду шлёт ~100 КБ промт каждому агенту (вся история + документы каждый раз заново). 86% сообщений в чате — служебные «process» события, которые засоряют ленту.

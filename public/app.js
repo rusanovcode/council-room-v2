@@ -2379,6 +2379,7 @@ function renderSettings() {
     const scanPanel = $("allowFilesystemScan")?.closest("section.filescan-panel");
     if (scanPanel) {
       const wrapper = document.createElement("div");
+      wrapper.id = "discussionModeRow";
       wrapper.className = "providers-body";
       wrapper.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 14px";
       const lbl = document.createElement("label");
@@ -2428,7 +2429,9 @@ function renderSettings() {
       wrapper.appendChild(lbl);
       wrapper.appendChild(modeSelect);
       wrapper.appendChild(newBtn);
-      scanPanel.insertAdjacentElement("beforebegin", wrapper);
+      const rightCol = scanPanel.closest(".col.right");
+      if (rightCol) rightCol.insertBefore(wrapper, rightCol.firstElementChild);
+      else scanPanel.insertAdjacentElement("beforebegin", wrapper);
     }
   }
   if (modeSelect) {

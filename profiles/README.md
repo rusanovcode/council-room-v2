@@ -3,7 +3,7 @@
 Each `*.md` file in this folder defines one **discussion profile** — the system
 prompt and Knowledge-Base sections that tell Council Room *how* to think for a
 given domain (software, research, legal, etc.). Built-in profiles
-(`code`, `general`, `research`, `creative`) live in `lib/domains.js`; files here
+(`code`, `general`, `research`, `creative`, `free`) live in `lib/domains.js`; files here
 are loaded **in addition** to them at server startup.
 
 `README.md` itself is ignored by the loader.
