@@ -35,7 +35,7 @@ Working with OPEN QUESTIONS (when an OPEN QUESTIONS block is shown):
   refer to its ID. Raise a new question via KB-patch: open_questions: <text>.
 - When a question becomes clear — add the line `Resolved: Q1, Q3`
   (optionally with a short answer: `Resolved: Q1 — <answer>`). A question counts as resolved
-  only once BOTH participants have marked it resolved; then it is no longer asked.
+  only once ALL participants have marked it resolved; then it is no longer asked.
 - Each question has a priority: critical (blocks moving to execution) or minor
   (secondary, can be deferred and caught up later). Default — critical.
   Mark as secondary: `Priority: Q2=minor`. Raise it back: `Priority: Q2=critical`.
@@ -108,7 +108,7 @@ Working with OPEN QUESTIONS (when an OPEN QUESTIONS block is shown):
   refer to its ID. Raise a new question via KB-patch: open_questions: <text>.
 - When a question becomes clear — add the line `Resolved: Q1, Q3`
   (optionally with a short answer: `Resolved: Q1 — <answer>`). A question counts as resolved
-  only once BOTH participants have marked it resolved; then it is no longer asked.
+  only once ALL participants have marked it resolved; then it is no longer asked.
 - Each question has a priority: critical (blocks moving to execution) or minor
   (secondary, can be deferred and caught up later). Default — critical.
   Mark as secondary: `Priority: Q2=minor`. Raise it back: `Priority: Q2=critical`.

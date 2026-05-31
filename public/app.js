@@ -2241,15 +2241,34 @@ function renderSettings() {
       modeSelect = document.createElement("select");
       modeSelect.id = "discussionModeSelect";
       modeSelect.style.cssText = "flex:1;min-width:0;font-size:13px";
-      const domainIds = ["code", "general", "research", "creative"];
-      const modeLabels = { ru: { code: "Разработка ПО", general: "Общий", research: "Исследование", creative: "Творческий" }, en: { code: "Software", general: "General", research: "Research", creative: "Creative" } };
-      for (const id of domainIds) {
+      // Built from the server's profile registry (state.domains) — adding a
+      // profile in lib/domains.js makes it show up here with no frontend edit.
+      const profileOpts = currentState.domains || [{ id: "code", label: { ru: "Разработка ПО", en: "Software" } }];
+      for (const p of profileOpts) {
         const opt = document.createElement("option");
-        opt.value = id;
-        opt.textContent = (modeLabels[uiLang] || modeLabels.ru)[id] || id;
+        opt.value = p.id;
+        opt.textContent = (p.label && (p.label[uiLang] || p.label.ru)) || p.id;
         modeSelect.appendChild(opt);
       }
-      modeSelect.addEventListener("change", () => api("POST", "/api/settings", { discussionMode: modeSelect.value }));
+      modeSelect.addEventListener("change", async () => {
+        const prev = currentState.settings?.discussionMode || "code";
+        const next = modeSelect.value;
+        try {
+          const res = await fetch("/api/settings", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ discussionMode: next }),
+          });
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            modeSelect.value = prev; // server refused (e.g. 409: KB has foreign sections)
+            alert(j.error || `Could not switch mode (HTTP ${res.status}).`);
+          }
+        } catch (e) {
+          modeSelect.value = prev;
+          alert(e.message);
+        }
+      });
       wrapper.appendChild(lbl);
       wrapper.appendChild(modeSelect);
       scanPanel.insertAdjacentElement("beforebegin", wrapper);
