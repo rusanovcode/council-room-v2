@@ -1315,6 +1315,7 @@ async function router(req, res) {
         });
         const pingOk = {};
         await Promise.all(targets.map(async ({ tool, num }) => {
+          await new Promise((r) => setTimeout(r, Math.random() * 1000));
           const model = CHEAP_MODEL[tool];
           const runner = tool === "codex" ? cli.runCodex : cli.runClaude;
           const r = await runner(pingPrompt, {
@@ -1325,6 +1326,8 @@ async function router(req, res) {
             ...(tool === "codex" ? { ephemeral: false } : {}), // persist rollout → fresh rate_limits
           }).catch((e) => ({ ok: false, text: e?.message || "error" }));
           pingOk[`${tool}${num}`] = Boolean(r?.ok);
+          switcherPingResults = { ...pingOk }; // partial results — flash this chip immediately
+          broadcast();
           const secs = r?.result?.durationMs ? `, ${(r.result.durationMs / 1000).toFixed(1)}s` : "";
           const okEn = r?.ok ? `reply «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `error/limit (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
           const okRu = r?.ok ? `ответ «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `ошибка/лимит (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
@@ -1334,7 +1337,6 @@ async function router(req, res) {
             textRu: `Мониторинг токенов: ${tool} акк ${num} (${model})${secs} → ${okRu}.`,
           });
         }));
-        switcherPingResults = pingOk;
         await switcher.refreshUsage(); // force the displayed % to actually move
         statsCache = {}; // force recompute after fresh requests
         await refreshSwitcher();

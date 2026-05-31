@@ -1844,6 +1844,21 @@ let lastStatsVersion = null; // server statsVersion last applied (re-fetch on bu
 let switcherRefreshing = false;   // true while account-chip animation is running
 let switcherRefreshBaseVer = null; // statsVersion at the moment refresh was triggered
 
+// Per-account ping flash: key "tool+num" → { ok: bool, at: timestamp }.
+// Populated as each account result arrives; drives the green/red chip fade.
+const chipPingFlash = new Map();
+let chipFlashTimer = null;
+
+function startChipFlashTimer() {
+  if (chipFlashTimer) return;
+  chipFlashTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [k, f] of chipPingFlash) { if (now - f.at >= 5000) chipPingFlash.delete(k); }
+    if (chipPingFlash.size === 0) { clearInterval(chipFlashTimer); chipFlashTimer = null; }
+    renderSwitcher();
+  }, 80);
+}
+
 function stopSwitcherRefreshAnim() {
   if (!switcherRefreshing) return;
   switcherRefreshing = false;
@@ -2081,6 +2096,14 @@ function renderSwitcher() {
   if (switcherRefreshing && sw.statsVersion !== undefined && sw.statsVersion !== switcherRefreshBaseVer) {
     stopSwitcherRefreshAnim();
   }
+  // Register new per-account ping results (record arrival time once; don't overwrite).
+  if (sw.pingResults) {
+    let any = false;
+    for (const [key, ok] of Object.entries(sw.pingResults)) {
+      if (!chipPingFlash.has(key)) { chipPingFlash.set(key, { ok, at: Date.now() }); any = true; }
+    }
+    if (any) startChipFlashTimer();
+  }
   const connected = Boolean(sw.connected);
   const apiBuild = ((currentState.providers && currentState.providers.mode) || "full") === "api";
   const agents = connectedAgents();
@@ -2125,10 +2148,16 @@ function renderSwitcher() {
       btn.textContent = label;
       btn.dataset.tooltipText = t("tip.acctBtn", { tool, account: isApi ? "API" : accountNum, pct: a.tokensPct == null ? "—" : `${a.tokensPct}%` });
       btn.addEventListener("click", () => openLoginModal(tool, isApi ? "apikey" : `acc${accountNum}`, a.authorized, isApi));
-      if (!isApi && accountNum != null && sw.pingResults) {
-        const pr = sw.pingResults[`${tool}${accountNum}`];
-        if (pr === true) { btn.style.backgroundColor = "#43a047"; btn.style.color = "#000"; }
-        else if (pr === false) { btn.style.backgroundColor = "#e53935"; btn.style.color = "#000"; }
+      if (!isApi && accountNum != null) {
+        const flash = chipPingFlash.get(`${tool}${accountNum}`);
+        if (flash) {
+          const opacity = Math.max(0, 1 - (Date.now() - flash.at) / 5000);
+          if (opacity > 0) {
+            const [r, g, b] = flash.ok ? [67, 160, 71] : [229, 57, 53];
+            btn.style.backgroundColor = `rgba(${r},${g},${b},${opacity})`;
+            btn.style.color = "#000";
+          }
+        }
       }
       row.appendChild(btn);
     }
