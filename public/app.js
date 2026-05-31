@@ -1847,6 +1847,9 @@ let switcherRefreshBaseVer = null; // statsVersion at the moment refresh was tri
 // Per-account ping flash: key "tool+num" → { ok: bool, at: timestamp }.
 // Populated as each account result arrives; drives the green/red chip fade.
 const chipPingFlash = new Map();
+// Per-agent chip flash: key = profile id → { ok: bool, at: timestamp }.
+// Populated when a retest result arrives; drives the green/red agent-chip fade.
+const agentChipFlash = new Map();
 let chipFlashTimer = null;
 
 function startChipFlashTimer() {
@@ -1854,7 +1857,8 @@ function startChipFlashTimer() {
   chipFlashTimer = setInterval(() => {
     const now = Date.now();
     for (const [k, f] of chipPingFlash) { if (now - f.at >= 5000) chipPingFlash.delete(k); }
-    if (chipPingFlash.size === 0) { clearInterval(chipFlashTimer); chipFlashTimer = null; }
+    for (const [k, f] of agentChipFlash) { if (now - f.at >= 5000) agentChipFlash.delete(k); }
+    if (chipPingFlash.size === 0 && agentChipFlash.size === 0) { clearInterval(chipFlashTimer); chipFlashTimer = null; }
     renderSwitcher();
   }, 80);
 }
@@ -2070,6 +2074,15 @@ function renderConnectedAgents() {
     chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: statusText })
       + (a.spentK ? ` · ~${a.spentK.toFixed(1)}K tok` : "");
     chip.addEventListener("click", () => openProfilesPanel(a.id));
+    const af = agentChipFlash.get(a.id);
+    if (af) {
+      const opacity = Math.max(0, 1 - (Date.now() - af.at) / 5000);
+      if (opacity > 0) {
+        const [r, g, b] = af.ok ? [67, 160, 71] : [229, 57, 53];
+        chip.style.backgroundColor = `rgba(${r},${g},${b},${opacity})`;
+        chip.style.color = "#000";
+      }
+    }
     box.appendChild(chip);
   }
 }
@@ -2654,6 +2667,8 @@ async function retestRegisteredModel(id) {
     });
     const j = await r.json().catch(() => ({}));
     rmStatus[id] = { ok: Boolean(j.ok) };
+    agentChipFlash.set(id, { ok: Boolean(j.ok), at: Date.now() });
+    startChipFlashTimer();
     const lbl = p.label || p.model || id;
     if (j.ok) {
       provLogAdd(
@@ -2668,6 +2683,8 @@ async function retestRegisteredModel(id) {
     }
   } catch (e) {
     rmStatus[id] = { ok: false };
+    agentChipFlash.set(id, { ok: false, at: Date.now() });
+    startChipFlashTimer();
     provLogAdd(
       `✗ ${p.label || p.model || id} — ошибка: ${e.message}`,
       `✗ ${p.label || p.model || id} — error: ${e.message}`
