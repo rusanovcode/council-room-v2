@@ -981,6 +981,7 @@ function render() {
   renderNextStep();
   renderPinnedHint();
   renderSwitcher();
+  renderProviderStatsPanel();
   updateTerminalsVisibility();
 }
 
@@ -1013,7 +1014,7 @@ let subtaskStatementExpanded = false; // subtask-statement field: collapsed (2 l
 let coachPinned = localStorage.getItem("council-room-v2.coachPinned") === "true";
 const PANELS_KEY = "council-room-v2.panels";
 const panelOpen = (() => {
-  const def = { chatArchive: false, chatTrash: false, subtaskArchive: false, subtaskTrash: false, switcherStats: false };
+  const def = { chatArchive: false, chatTrash: false, subtaskArchive: false, subtaskTrash: false, switcherStats: false, providerStats: false };
   try { return { ...def, ...JSON.parse(localStorage.getItem(PANELS_KEY) || "{}") }; } catch { return def; }
 })();
 function savePanelOpen() { try { localStorage.setItem(PANELS_KEY, JSON.stringify(panelOpen)); } catch {} }
@@ -1894,6 +1895,7 @@ async function loadStats() {
   }
   statsLoading = false;
   renderStatsPanel();
+  renderProviderStatsPanel();
 }
 
 function fmtCountdown(iso) {
@@ -1939,11 +1941,6 @@ function renderStatsPanel() {
         <div>${escapeHtml(t("ui.weeklyReset"))}: <b>${sd ? fmtDateTime(sd.resetsAt) : "—"}</b> ${sd ? `(${escapeHtml(t("ui.used"))} ${sd.utilization}%)` : ""}</div>
         <div class="muted small">${escapeHtml(t("ui.windowStart"))}: ${fh ? fmtDateTime(fh.startsAt) : "—"}</div></div>`;
     }).join("");
-    // API-key profiles have no rolling-window limits — note them so the user
-    // knows where to look (Spending tab) instead of seeing nothing.
-    const prov = statsData?.providers || {};
-    body += Object.keys(prov).map((id) =>
-      `<div class="stats-acc"><b>${escapeHtml(prov[id].label || id)}</b> <span class="muted small">${escapeHtml(t("ui.apiNoLimit"))}</span></div>`).join("");
   } else if (statsTab === "spend") {
     const periods = [["today", t("ui.periodToday")], ["week", t("ui.periodWeek")], ["all", t("ui.periodAll")]];
     body = `<div class="stats-periods">${periods.map(([p, l]) => `<button class="stats-period${statsPeriod === p ? " active" : ""}" data-period="${p}">${escapeHtml(l)}</button>`).join("")}</div>`;
@@ -1954,19 +1951,6 @@ function renderStatsPanel() {
         <div>${escapeHtml(t("ui.spendIn"))}: ${s.inputK}K · ${escapeHtml(t("ui.spendOut"))}: ${s.outputK}K</div>
         <div class="muted small">cache R ${s.cacheReadK}K / W ${s.cacheWriteK}K · ${escapeHtml(t("ui.sessions"))}: ${s.sessions}</div></div>`;
     }).join("");
-    // API-key profiles: cumulative token spend (no per-period source) from the
-    // provider usage block. Shown after the windowed Claude/Codex accounts.
-    const prov = statsData?.providers || {};
-    const provIds = Object.keys(prov);
-    if (provIds.length) {
-      body += provIds.map((id) => {
-        const e = prov[id];
-        return `<div class="stats-acc"><b>${escapeHtml(e.label || id)}</b> <span class="muted small">${escapeHtml(t("ui.apiBadge"))}</span>
-          <div>${escapeHtml(t("ui.spendIn"))}: ${fmtTokK(e.inputTokens)} · ${escapeHtml(t("ui.spendOut"))}: ${fmtTokK(e.outputTokens)}</div>
-          <div class="muted small">${escapeHtml(t("ui.spendTotal"))}: ${fmtTokK(e.totalTokens)} · ${escapeHtml(t("ui.requests"))}: ${e.requests}</div></div>`;
-      }).join("");
-      body += `<button class="stats-reset" type="button">${escapeHtml(t("ui.resetSpend"))}</button>`;
-    }
   } else if (statsTab === "sub") {
     const subs = currentState?.settings?.subscriptions || {};
     body = accs.map((a) => {
@@ -1988,11 +1972,6 @@ function renderStatsPanel() {
   panel.querySelectorAll(".stats-tab").forEach((b) => b.addEventListener("click", () => { statsTab = b.dataset.tab; try { localStorage.setItem("council-room-v2.statsTab", statsTab); } catch {} renderStatsPanel(); }));
   panel.querySelector(".stats-close")?.addEventListener("click", () => { panelOpen.switcherStats = false; savePanelOpen(); renderSwitcher(); });
   panel.querySelectorAll(".stats-period").forEach((b) => b.addEventListener("click", () => { statsPeriod = b.dataset.period; loadStats(); }));
-  panel.querySelector(".stats-reset")?.addEventListener("click", async () => {
-    if (!confirm(t("ui.confirmResetSpend"))) return;
-    try { await api("POST", "/api/providers/usage/reset", {}); } catch {}
-    loadStats();
-  });
   panel.querySelectorAll("input[data-subkey]").forEach((inp) => inp.addEventListener("change", () => {
     const key = inp.dataset.subkey;
     const cur = (currentState?.settings?.subscriptions || {})[key] || {};
@@ -2000,6 +1979,55 @@ function renderStatsPanel() {
     const end = inp.dataset.field === "end" ? inp.value : (cur.end || "");
     api("POST", "/api/switcher/subscription", { key, start, end });
   }));
+}
+
+function renderProviderStatsPanel() {
+  const panel = $("providerStatsPanel");
+  if (!panel) return;
+  const profiles = (currentState?.settings?.profiles) || [];
+  const nonCli = profiles.filter((p) => !isCliProviderId(p.provider || ""));
+  const toggle = panel.querySelector(".psp-toggle");
+  const summaryText = panel.querySelector(".psp-summary-text");
+  const isOpen = panelOpen.providerStats;
+  panel.classList.toggle("psp-open", isOpen);
+  if (toggle) toggle.querySelector(".psp-arrow").textContent = isOpen ? "▴" : "▾";
+  if (summaryText) {
+    const cnt = nonCli.length;
+    summaryText.textContent = UI_LANG === "en" ? `Agents${cnt ? " · " + cnt : ""}` : `Агенты${cnt ? " · " + cnt : ""}`;
+  }
+  const body = panel.querySelector(".psp-body");
+  if (!body) return;
+  if (!nonCli.length) {
+    body.innerHTML = `<div class="muted small psp-empty">${UI_LANG === "en" ? "No registered agents" : "Нет зарегистрированных агентов"}</div>`;
+    return;
+  }
+  const usage = (currentState?.providers?.usage) || {};
+  const creds = (currentState?.providers?.credentials) || {};
+  const validated = (currentState?.providers?.validated) || {};
+  let html = nonCli.map((p) => {
+    const provLabel = regModelProviderLabel(p.provider);
+    const ok = Boolean(validated[p.id]);
+    const present = Boolean(creds[p.id]);
+    const tok = ok ? "tok-green" : (present ? "tok-yellow" : "tok-unknown");
+    const u = usage[p.id];
+    const k = u && u.totalTokens ? u.totalTokens / 1000 : 0;
+    const spentTxt = k ? ` · Σ${k >= 10 ? Math.round(k) : k.toFixed(1)}K` : "";
+    return `<div class="psp-row">
+      <span class="psp-dot ${tok}"></span>
+      <span class="psp-name">${escapeHtml(p.label || provLabel)}</span>
+      <span class="psp-prov">${escapeHtml(provLabel)}</span>
+      ${spentTxt ? `<span class="psp-spent">${escapeHtml(spentTxt)}</span>` : ""}
+    </div>`;
+  }).join("");
+  const hasUsage = Object.values(usage).some((u) => u && u.totalTokens > 0);
+  if (hasUsage) {
+    html += `<button class="psp-reset" type="button">${escapeHtml(t("ui.resetSpend"))}</button>`;
+  }
+  body.innerHTML = html;
+  panel.querySelector(".psp-reset")?.addEventListener("click", async () => {
+    if (!confirm(t("ui.confirmResetSpend"))) return;
+    try { await api("POST", "/api/providers/usage/reset", {}); } catch {}
+  });
 }
 
 function tokenClass(pct) {
@@ -2234,6 +2262,7 @@ function renderSettings() {
       wrapper.className = "providers-body";
       wrapper.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 14px";
       const lbl = document.createElement("label");
+      lbl.id = "discussionModeLabel";
       lbl.htmlFor = "discussionModeSelect";
       lbl.style.cssText = "font-size:13px;color:var(--text-muted,#888);white-space:nowrap";
       const uiLang = s.language || "ru";
@@ -2283,11 +2312,14 @@ function renderSettings() {
     }
   }
   if (modeSelect) {
-    // Reconcile options with the live registry so a freshly created profile
-    // (pushed via SSE) appears without a page reload.
+    const uiLang = s.language || "ru";
+    const lbl = $("discussionModeLabel");
+    if (lbl) lbl.textContent = uiLang === "en" ? "Mode:" : "Режим:";
+    const newBtn = $("newProfileBtn");
+    if (newBtn) newBtn.textContent = uiLang === "en" ? "+ New profile" : "+ Новый профиль";
+    // Always sync option labels so language changes and newly added profiles both apply.
     const opts = currentState.domains || [];
-    if (opts.length && modeSelect.options.length !== opts.length) {
-      const uiLang = s.language || "ru";
+    if (opts.length) {
       modeSelect.innerHTML = "";
       for (const p of opts) {
         const opt = document.createElement("option");
@@ -2608,7 +2640,7 @@ function renderRegisteredModelRow(p) {
   let effortField = "";
   if (effortLevels.length) {
     const opts = effortLevels.map((e) => `<option value="${e}"${e === (p.effort || "auto") ? " selected" : ""}>${e}</option>`).join("");
-    effortField = `<td class="rm-cell"><span class="rm-col-head">${escapeHtml(t("ui.regModelEffort"))}</span>${"<select class=\"rm-effort\">" + opts + "</select>"}</td>`;
+    effortField = `<td class="rm-cell"><select class="rm-effort">${opts}</select></td>`;
   }
 
   // Speed — currently no provider defines distinct speed levels; field reserved.
@@ -2629,18 +2661,18 @@ function renderRegisteredModelRow(p) {
       <button class="rm-retest ghost" type="button" title="${escapeHtml(btnTitle)}"${st.testing ? " disabled" : ""}>${btnIcon}</button>
     </td>
     <td class="rm-cell rm-cell-label">
-      <span class="rm-col-head">${escapeHtml(t("ui.regModelLabel"))}</span>
       <input class="rm-label" value="${escapeHtml(p.label || "")}" placeholder="${escapeHtml(provLabel)}">
     </td>
     <td class="rm-cell rm-cell-agent">
-      <span class="rm-col-head">${escapeHtml(t("ui.regModelAgent"))}</span>
       <span class="rm-prov-badge">${escapeHtml(provLabel)}</span>
     </td>
     <td class="rm-cell">
-      <span class="rm-col-head">${escapeHtml(t("ui.regModelModel"))}</span>
       ${modelField}
     </td>
     ${effortField}${speedField}
+    <td class="rm-cell rm-cell-del">
+      <button class="rm-delete ghost" type="button" title="${UI_LANG === "en" ? "Remove" : "Удалить"}">×</button>
+    </td>
   </tr>`;
 }
 
@@ -2737,12 +2769,25 @@ function bindRegisteredModels() {
     provLogSave([]);
     renderRegisteredModels();
   });
-  // Retest buttons.
-  document.querySelector("#registeredModelsList .rm-table")?.addEventListener("click", (e) => {
-    const btn = e.target.closest(".rm-retest");
-    if (!btn) return;
-    const id = btn.closest(".rm-row")?.dataset.id;
-    if (id) retestRegisteredModel(id);
+  // Retest / delete buttons.
+  document.querySelector("#registeredModelsList .rm-table")?.addEventListener("click", async (e) => {
+    if (e.target.closest(".rm-retest")) {
+      const id = e.target.closest(".rm-row")?.dataset.id;
+      if (id) retestRegisteredModel(id);
+      return;
+    }
+    if (e.target.closest(".rm-delete")) {
+      const id = e.target.closest(".rm-row")?.dataset.id;
+      if (!id) return;
+      const profs = JSON.parse(JSON.stringify((currentState.settings && currentState.settings.profiles) || []));
+      const updated = profs.filter((p) => p.id !== id);
+      try {
+        await fetch("/api/settings", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profiles: updated }),
+        });
+      } catch {}
+    }
   });
 }
 
@@ -2965,7 +3010,8 @@ async function applyProviders() {
       ? t("ui.ollamaConnectedModels", { models: (ollamaProfiles._testedModels || []).join(", ") })
       : (keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"));
     showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
-    providersDraft.profiles = [makeBlankProfile()]; // reset to one blank card
+    // Keep saved profiles in the draft so future applies include them. The
+    // "new profiles" panel empties naturally (savedIds covers them all).
     renderProviders();
   } catch (e) {
     showProvidersMsg(e.message, true);
@@ -3479,6 +3525,11 @@ function bindUi() {
     render();
     if (panelOpen.switcherStats) loadStats();
   });
+  $("toggleProviderStats")?.addEventListener("click", () => {
+    panelOpen.providerStats = !panelOpen.providerStats;
+    savePanelOpen();
+    renderProviderStatsPanel();
+  });
   $("refreshSwitcher")?.addEventListener("click", () => {
     if (confirm(t("ui.confirmRefresh"))) {
       // Animation runs until server broadcasts a new statsVersion (real work done).
@@ -3669,6 +3720,13 @@ function bindUi() {
     if (id) api("POST", "/api/documents/remove", { id });
   });
 
+  // Reset registration draft to a clean state every time the panel is opened.
+  $("providersDetails")?.addEventListener("toggle", () => {
+    if ($("providersDetails").open) {
+      providersForRunId = undefined; // force re-init on next renderProvidersInit
+    }
+  });
+
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.
   $("addProfileBtn")?.addEventListener("click", () => {
     addProfileDraft();
@@ -3733,9 +3791,45 @@ function bindUi() {
 }
 
 // ── Custom profile builder ─────────────────────────────────────────────────
-// A two-step modal: (1) a guide explaining what a profile is and what to fill in
-// and why, then (2) the form. All builder copy is intentionally English-only.
 function openProfileBuilder() {
+  const ru = UI_LANG === "ru";
+  const L = {
+    title: ru ? "Создать профиль обсуждения" : "Create a custom discussion profile",
+    sub: ru
+      ? "Профиль — это системный промпт, который определяет КАК агенты думают для данной области (разработка, исследование, юриспруденция и т.д.). Он отделён от прикреплённых документов, которые определяют О ЧЁМ думать."
+      : "A profile is the system prompt that defines HOW the agents think for a domain (software, research, legal, etc.). It is separate from attached documents, which are WHAT they think about.",
+    steps: ru ? [
+      ["1. ID профиля", "Короткое машинное имя — строчные буквы/цифры/подчёркивание (напр. legal, history_ru). Становится именем файла profiles/&lt;id&gt;.md; не должно совпадать с существующим."],
+      ["2. Названия", "Метка в селекторе Режима — английское (обязательно) и русское (опционально)."],
+      ["3. Системный промпт", "Контекст и правила для агентов. НЕ пишите завершающий хвост (New facts / New risks / ...) — он добавляется автоматически. Одно правило в строку."],
+      ["4. Секции базы знаний", "Разделы, которые заполняет дискуссия. Каждый с новой строки как <code>key | Заголовок | подсказка</code>. Раздел <code>open_questions</code> добавляется автоматически."],
+      ["5. Ограничения (доп.)", "Оставьте оба OFF для не-кодовых доменов. ON только для профилей в стиле разработки ПО."],
+    ] : [
+      ["1. Profile id", "A short machine name, lowercase letters/digits/underscore (e.g. legal, history_ru). It becomes the filename profiles/&lt;id&gt;.md and cannot collide with an existing profile."],
+      ["2. Display names", "The label shown in the Mode selector — English (required) and Russian (optional)."],
+      ["3. System prompt", "The framing and rules the agents must follow. Do NOT write the closing tail (New facts / New risks / New alternatives / Status / KB-patch) or the open-questions rules — those are shared and added automatically. Keep answers focused; one rule per line."],
+      ["4. Knowledge-Base sections", "The buckets the debate fills in. One per line as <code>key | Title | tip</code>. Keys must be lowercase letters/underscores. An <code>open_questions</code> section is required and is added for you if missing."],
+      ["5. Guards (advanced)", "Leave both OFF for non-code domains. Turn ON only for software-style profiles that should be isolated from the user's files (scan) or restricted to a declared file scope (scope)."],
+    ],
+    note: ru
+      ? "Новый профиль сохраняется в файл в папке <code>profiles/</code> и сразу появляется в селекторе Режима. Вы также можете отредактировать этот файл вручную позже."
+      : "The new profile is saved as a file in <code>profiles/</code> and appears in the Mode selector immediately. You can also edit that file by hand later.",
+    cancel: ru ? "Отмена" : "Cancel",
+    cont: ru ? "Продолжить →" : "Continue →",
+    formTitle: ru ? "Новый профиль" : "New profile",
+    fieldId: ru ? "ID профиля" : "Profile id",
+    fieldIdPh: ru ? "напр. legal" : "e.g. legal",
+    fieldEn: ru ? "Название (английское)" : "Display name (English)",
+    fieldEnPh: ru ? "напр. Legal" : "e.g. Legal",
+    fieldRu: ru ? "Название (русское, опц.)" : "Display name (Russian, optional)",
+    fieldRuPh: "напр. Юридический",
+    fieldPrompt: ru ? "Системный промпт (одно правило в строку)" : "System prompt (one rule per line)",
+    fieldSections: ru ? "Секции базы знаний (key | Заголовок | подсказка)" : "Knowledge-Base sections (key | Title | tip)",
+    guardScan: ru ? "Изолировать от файлов пользователя (NO-FILESYSTEM-SCAN)" : "Isolate from the user's files (NO-FILESYSTEM-SCAN guard)",
+    guardScope: ru ? "Ограничить объявленной областью файлов (STRICT-SCOPE)" : "Restrict to a declared file scope (STRICT-SCOPE guard)",
+    back: ru ? "← Назад" : "← Back",
+    create: ru ? "Создать профиль" : "Create profile",
+  };
   const existing = document.getElementById("profileBuilderOverlay");
   if (existing) existing.remove();
 
@@ -3756,43 +3850,32 @@ function openProfileBuilder() {
   function renderGuide() {
     card.innerHTML = "";
     const h = document.createElement("h2");
-    h.textContent = "Create a custom discussion profile";
+    h.textContent = L.title;
     h.style.cssText = "margin:0 0 6px;font-size:19px";
     const sub = document.createElement("p");
     sub.style.cssText = "margin:0 0 14px;color:var(--text-muted,#aaa)";
-    sub.textContent =
-      "A profile is the system prompt that defines HOW the agents think for a domain " +
-      "(software, research, legal, etc.). It is separate from attached documents, which are WHAT they think about.";
+    sub.textContent = L.sub;
     card.appendChild(h);
     card.appendChild(sub);
 
-    const steps = [
-      ["1. Profile id", "A short machine name, lowercase letters/digits/underscore (e.g. legal, history_ru). It becomes the filename profiles/&lt;id&gt;.md and cannot collide with an existing profile."],
-      ["2. Display names", "The label shown in the Mode selector — English (required) and Russian (optional)."],
-      ["3. System prompt", "The framing and rules the agents must follow. Do NOT write the closing tail (New facts / New risks / New alternatives / Status / KB-patch) or the open-questions rules — those are shared and added automatically. Keep answers focused; one rule per line."],
-      ["4. Knowledge-Base sections", "The buckets the debate fills in. One per line as <code>key | Title | tip</code>. Keys must be lowercase letters/underscores. An <code>open_questions</code> section is required and is added for you if missing."],
-      ["5. Guards (advanced)", "Leave both OFF for non-code domains. Turn ON only for software-style profiles that should be isolated from the user's files (scan) or restricted to a declared file scope (scope)."],
-    ];
     const ol = document.createElement("div");
-    for (const [t, d] of steps) {
+    for (const [st, d] of L.steps) {
       const row = document.createElement("div");
       row.style.cssText = "margin:0 0 10px";
-      row.innerHTML = `<strong>${t}</strong><br><span style="color:var(--text-muted,#aaa)">${d}</span>`;
+      row.innerHTML = `<strong>${st}</strong><br><span style="color:var(--text-muted,#aaa)">${d}</span>`;
       ol.appendChild(row);
     }
     card.appendChild(ol);
 
     const note = document.createElement("p");
     note.style.cssText = "margin:6px 0 16px;color:var(--text-muted,#aaa);font-size:13px";
-    note.innerHTML =
-      "The new profile is saved as a file in <code>profiles/</code> and appears in the Mode selector immediately. " +
-      "You can also edit that file by hand later.";
+    note.innerHTML = L.note;
     card.appendChild(note);
 
     const bar = document.createElement("div");
     bar.style.cssText = "display:flex;gap:10px;justify-content:flex-end";
-    const cancel = mkBtn("Cancel", close, false);
-    const cont = mkBtn("Continue →", renderForm, true);
+    const cancel = mkBtn(L.cancel, close, false);
+    const cont = mkBtn(L.cont, renderForm, true);
     bar.appendChild(cancel);
     bar.appendChild(cont);
     card.appendChild(bar);
@@ -3802,14 +3885,14 @@ function openProfileBuilder() {
   function renderForm() {
     card.innerHTML = "";
     const h = document.createElement("h2");
-    h.textContent = "New profile";
+    h.textContent = L.formTitle;
     h.style.cssText = "margin:0 0 14px;font-size:19px";
     card.appendChild(h);
 
-    const id = mkField(card, "Profile id", "input", { placeholder: "e.g. legal" });
-    const labelEn = mkField(card, "Display name (English)", "input", { placeholder: "e.g. Legal" });
-    const labelRu = mkField(card, "Display name (Russian, optional)", "input", { placeholder: "e.g. Юридический" });
-    const prompt = mkField(card, "System prompt (one rule per line)", "textarea", {
+    const id = mkField(card, L.fieldId, "input", { placeholder: L.fieldIdPh });
+    const labelEn = mkField(card, L.fieldEn, "input", { placeholder: L.fieldEnPh });
+    const labelRu = mkField(card, L.fieldRu, "input", { placeholder: L.fieldRuPh });
+    const prompt = mkField(card, L.fieldPrompt, "textarea", {
       rows: 10,
       value:
         "You are a participant in Council Room — a closed room of 2 to 5 AI agents.\n" +
@@ -3821,7 +3904,7 @@ function openProfileBuilder() {
         "- Ground every claim in the Knowledge Base or attached documents; if something is missing, ask via `QUESTION:`.\n" +
         "- Each answer <= 12 sentences.",
     });
-    const sections = mkField(card, "Knowledge-Base sections (key | Title | tip)", "textarea", {
+    const sections = mkField(card, L.fieldSections, "textarea", {
       rows: 5,
       value: "thesis | Thesis | The question under analysis\nevidence | Evidence | Facts and sources\nopen_questions | Open Questions",
     });
@@ -3829,8 +3912,8 @@ function openProfileBuilder() {
     // Guards
     const gWrap = document.createElement("div");
     gWrap.style.cssText = "margin:8px 0 14px;display:flex;flex-direction:column;gap:6px";
-    const scan = mkCheck("Isolate from the user's files (NO-FILESYSTEM-SCAN guard)");
-    const scope = mkCheck("Restrict to a declared file scope (STRICT-SCOPE guard)");
+    const scan = mkCheck(L.guardScan);
+    const scope = mkCheck(L.guardScope);
     gWrap.appendChild(scan.wrap);
     gWrap.appendChild(scope.wrap);
     card.appendChild(gWrap);
@@ -3841,8 +3924,8 @@ function openProfileBuilder() {
 
     const bar = document.createElement("div");
     bar.style.cssText = "display:flex;gap:10px;justify-content:flex-end";
-    const back = mkBtn("← Back", renderGuide, false);
-    const create = mkBtn("Create profile", onCreate, true);
+    const back = mkBtn(L.back, renderGuide, false);
+    const create = mkBtn(L.create, onCreate, true);
     bar.appendChild(back);
     bar.appendChild(create);
     card.appendChild(bar);

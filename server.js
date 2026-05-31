@@ -1269,6 +1269,8 @@ async function router(req, res) {
       subs[body.key] = { start: String(body.start || ""), end: String(body.end || "") };
       state.settings.subscriptions = subs;
       if (state.run) { state.run.settings = { ...state.run.settings, subscriptions: subs }; saveRun(state.run); }
+      const curGs = store.readJson(GLOBAL_SETTINGS_PATH) || {};
+      store.writeJson(GLOBAL_SETTINGS_PATH, { ...curGs, subscriptions: subs });
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -1517,7 +1519,8 @@ async function router(req, res) {
         saveRun(state.run);
       }
       if ("profiles" in body) {
-        store.writeJson(GLOBAL_SETTINGS_PATH, { profiles: state.settings.profiles || [] });
+        const curGs2 = store.readJson(GLOBAL_SETTINGS_PATH) || {};
+        store.writeJson(GLOBAL_SETTINGS_PATH, { ...curGs2, profiles: state.settings.profiles || [] });
       }
       broadcast();
       return sendJson(res, 200, publicState());
@@ -1608,10 +1611,11 @@ function selectLastRunOnStartup() {
 // Intentionally NOT called — clean start screen on every server start (see above).
 void selectLastRunOnStartup;
 
-// Load globally-persisted profiles (saved independently of any run).
+// Load globally-persisted profiles and subscriptions (saved independently of any run).
 {
   const gs = store.readJson(GLOBAL_SETTINGS_PATH) || {};
   if (Array.isArray(gs.profiles)) state.settings.profiles = gs.profiles;
+  if (gs.subscriptions && typeof gs.subscriptions === "object") state.settings.subscriptions = gs.subscriptions;
 }
 
 // Background update check on every server start — result broadcast via SSE.
