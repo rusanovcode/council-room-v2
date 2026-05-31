@@ -35,7 +35,11 @@ frontend (`public/`). No build step.
   `C:\AI\CLAUDE.md`. Unique per call → race-free for parallel participants.
 - `lib/providers.js` — network/API backends: `anthropic` (native `/v1/messages`, prompt
   caching), `openai-compatible` (OpenAI/DeepSeek/Groq/OpenRouter/Mistral/Together), `ollama`.
-  `runProfile(profile, prompt, opts)` is the uniform contract shared with `cli.js`.
+  `runProfile(profile, prompt, opts)` is the uniform contract shared with `cli.js`. OpenRouter
+  gets two failover layers: `fallbackModels` → `models:[...]` (model-level) and `openrouterPool`
+  (account-level, across a `keyPool` of every `OPENROUTER_API_KEY*` key; reports `usedRef`).
+- `lib/orquota.js` → `rooms/.or-quota.json` — per-key daily request tally for the OpenRouter
+  free pool (it exposes no remaining number); drives the Agents-panel quota readout.
 - `lib/roles.js` — dispatches a resolved role to its backend (CLI vs network) with failover.
 - `public/app.js` — i18n (RU/EN dicts ~line 90 and ~line 490), `render*`, tooltips
   (`helpIcon(tipKey)` → `tip.<key>` in both dicts — keep RU/EN in parity).
@@ -44,9 +48,10 @@ frontend (`public/`). No build step.
 ## Conventions
 - **Prompt scaffolding is English** as the single source of truth; the agent's *response*
   language is set separately by the `LANGUAGE:` directive. Tail tokens are English literals.
-- **Backends — token economy:** CLI backends carry a ~6–7k-token agent harness on every call;
-  the network/API path is ~850 tokens (no harness). For minimal-token debates prefer an API
-  backend. See the `tip.tokenEconomy` tooltip text for the full rationale.
+- **Backends — token economy:** CLI backends carry a ~6–7k-token agent harness on every call
+  (one Codex turn ≈ 8k, measured); the network/API path is ~1–2k (no harness). For minimal-token
+  debates prefer an API backend — OpenRouter `:free` models cost $0; add several keys for a pooled,
+  failover'd, load-spread setup. See the `tip.tokenEconomy` tooltip for the full rationale.
 - **Settings dual-store:** `state.settings` (global UI) vs `state.run.settings` (per-chat);
   `applyRunSettings` syncs them on chat activation. Global UI prefs go to `localStorage`.
 - **Windows / PowerShell** shell. Non-ASCII (Cyrillic) POST bodies via inline `curl -d` get
