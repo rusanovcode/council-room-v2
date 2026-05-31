@@ -1335,8 +1335,8 @@ function renderRuns() {
       + `<button class="archive-run" title="${escapeHtml(t("ui.toArchive"))}">🗄</button>`
       + `<button class="trash-run" title="${escapeHtml(t("ui.toTrash"))}">×</button></span>`;
     li.addEventListener("click", (event) => {
-      if (event.target.classList.contains("archive-run")) { api("POST", "/api/runs/archive", { runId: run.id }); return; }
-      if (event.target.classList.contains("trash-run")) { api("POST", "/api/runs/trash", { runId: run.id }); return; }
+      if (event.target.classList.contains("archive-run")) { flashThenAct(li, "rgba(255,202,40,0.5)", () => api("POST", "/api/runs/archive", { runId: run.id })); return; }
+      if (event.target.classList.contains("trash-run")) { flashThenAct(li, "rgba(239,83,80,0.45)", () => api("POST", "/api/runs/trash", { runId: run.id })); return; }
       api("POST", "/api/runs/switch", { runId: run.id });
     });
     list.appendChild(li);
@@ -1379,7 +1379,7 @@ function fillRunBin(listEl, runs, { trash: withTrash }) {
     const trashBtn = li.querySelector(".trash-run");
     if (trashBtn) trashBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      api("POST", "/api/runs/trash", { runId: run.id });
+      flashThenAct(li, "rgba(239,83,80,0.45)", () => api("POST", "/api/runs/trash", { runId: run.id }));
     });
     listEl.appendChild(li);
   }
@@ -1401,6 +1401,17 @@ function renderStatus() {
   $("busyIndicator").textContent = currentState.autopilot?.running
     ? t("ui.autopilotStartedHint")
     : (busy ? t("ui.runInProgress") : "");
+}
+
+// Flash el with color, fade to transparent over 1s, then call action.
+function flashThenAct(el, color, action) {
+  el.style.transition = "none";
+  el.style.backgroundColor = color;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.style.transition = "background-color 1s ease-out";
+    el.style.backgroundColor = "transparent";
+    setTimeout(action, 1000);
+  }));
 }
 
 function makeIconBtn(cls, glyph, title, handler) {
@@ -1430,8 +1441,8 @@ function renderSubtaskRow(st, context) {
     if (st.rounds === 0 && st.status !== "resolved") {
       right.appendChild(makeIconBtn("subtask-edit", "✎", t("ui.editIcon"), () => openSubtaskModal({ editId: st.id, title: st.title, mode: st.mode })));
     }
-    right.appendChild(makeIconBtn("subtask-archive", "🗄", t("ui.toArchive"), () => api("POST", "/api/subtasks/archive", { id: st.id })));
-    right.appendChild(makeIconBtn("subtask-delete", "×", t("ui.toTrash"), () => api("POST", "/api/subtasks/trash", { id: st.id })));
+    right.appendChild(makeIconBtn("subtask-archive", "🗄", t("ui.toArchive"), () => flashThenAct(li, "rgba(255,202,40,0.5)", () => api("POST", "/api/subtasks/archive", { id: st.id }))));
+    right.appendChild(makeIconBtn("subtask-delete", "×", t("ui.toTrash"), () => flashThenAct(li, "rgba(239,83,80,0.45)", () => api("POST", "/api/subtasks/trash", { id: st.id }))));
   } else {
     right.appendChild(makeIconBtn("subtask-restore", "↩", t("ui.restore"), () => api("POST", "/api/subtasks/restore", { id: st.id })));
   }
