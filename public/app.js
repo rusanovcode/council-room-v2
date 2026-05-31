@@ -319,16 +319,17 @@ const STRINGS = {
     "ui.noRegisteredAgents": "Агенты не<br>зарегистрированы",
     "tip.noRegisteredAgents": "Нет зарегистрированных бэкендов. Добавь профиль в панели «Регистрация агентов» (правая колонка).",
     "ui.agentMin2": "Нужно минимум 2 агента, чтобы запустить раунд.",
-    "ui.agentMax": "Максимум 5 агентов.",
+    "ui.agentMax": "Максимум 6 агентов.",
     "ui.agentNoneYet": "Агенты не выбраны",
     "ui.agentChipHint": "Клик — настроить · ×: убрать",
     "ui.tokenWarnTitle": "Расход токенов",
     "ui.tokenWarn2": "2 агента — базовый дебат, расход умеренный.",
     "ui.tokenWarn3": "3 агента: каждый видит ПОЛНЫЙ контекст двух других — расход заметно растёт (≈×1.5 к раунду).",
     "ui.tokenWarn4": "4 агента: полный контекст ×4 без сжатия — дорого. Это 4 бэкенда/подписки за каждый раунд.",
-    "ui.tokenWarn5": "5 агентов — максимум. Очень дорого: полный контекст ×5 каждому, без сжатия промта.",
+    "ui.tokenWarn5": "5 агентов: полный контекст ×5 — очень дорого. Добавить ещё одного?",
+    "ui.tokenWarn6": "6 агентов — максимум. Очень дорого: полный контекст ×6 каждому, без сжатия промта.",
     "coach.agents.title": "Шаг 3: выбери агентов",
-    "coach.agents.body": "Сверху по центру нажми «Добавить агента». Можно «Авто» (2 разных бэкенда подберутся сами) или «Вручную». Нужно минимум 2, максимум 5. Чем больше агентов — тем дороже раунд (промт не сжимается).",
+    "coach.agents.body": "Сверху по центру нажми «Добавить агента». Можно «Авто» (2 разных бэкенда подберутся сами) или «Вручную». Нужно минимум 2, максимум 6. Чем больше агентов — тем дороже раунд (промт не сжимается).",
     "coach.agents.action": "Добавить агента",
     "coach.ollamaReg.title": "Нужно зарегистрировать Ollama",
     "coach.ollamaReg.body": "Ты выбрал Ollama как бэкенд, но профиль ещё не зарегистрирован. Открой панель «Регистрация агентов» справа → нажми «+ Профиль» → выбери Ollama → укажи модель (например llama3.2) → «Применить». После этого модель появится в списке бэкендов.",
@@ -336,7 +337,7 @@ const STRINGS = {
     "coach.agentsConfig.title": "Шаг 4: проверь модели агентов",
     "coach.agentsConfig.body": "По умолчанию подставлены слабые модели и низкое усилие — дёшево. Кликни по чипу агента сверху, чтобы сменить бэкенд/модель/усилие. Готово — запусти раунд.",
     "coach.agentsConfig.action": "Запустить раунд",
-    "tip.addAgent": "Добавляет спорщика в обсуждение (от 2 до 5). «Авто» подберёт 2 разных доступных бэкенда с дешёвыми моделями; «Вручную» добавит одного, которого ты настроишь. Каждый агент видит полный контекст всех остальных — поэтому каждый добавленный заметно увеличивает расход токенов.|||2 агента — базовый дебат. 4–5 — дорого: полный контекст ×N за раунд.",
+    "tip.addAgent": "Добавляет спорщика в обсуждение (от 2 до 6). «Авто» подберёт 2 разных доступных бэкенда с дешёвыми моделями; «Вручную» добавит одного, которого ты настроишь. Каждый агент видит полный контекст всех остальных — поэтому каждый добавленный заметно увеличивает расход токенов.|||2 агента — базовый дебат. 4–6 — дорого: полный контекст ×N за раунд.",
     "tip.agentBackend": "Какой бэкенд отвечает за этого агента: подписочный CLI (Codex/Claude, по аккаунтам), сетевой API-провайдер или локальная Ollama. Список — из доступного: авторизованные аккаунты + зарегистрированные провайдеры.|||«Codex · акк 1», «Claude · акк 2», «DeepSeek», «Ollama (локально)».",
     "tip.agentModel2": "Модель выбранного бэкенда. По умолчанию — самая дешёвая (экономия токенов). Для CLI — из списка; для сетевого провайдера — точная строка модели.|||Codex: gpt-5.4-mini (дёшево) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
     "tip.agentEffort2": "Усилие рассуждения (только для подписочных CLI). По умолчанию low — дёшево и быстро. Выше — дороже и медленнее, но тщательнее. У сетевых провайдеров такой ручки нет.|||low — быстрый черновой проход; high/xhigh/max — для сложных спорных мест.",
@@ -668,16 +669,17 @@ const STRINGS = {
     "ui.noRegisteredAgents": "No agents<br>registered",
     "tip.noRegisteredAgents": "No backends registered yet. Add a profile in the «Agent registration» panel (right column).",
     "ui.agentMin2": "At least 2 agents are required to run a round.",
-    "ui.agentMax": "Maximum 5 agents.",
+    "ui.agentMax": "Maximum 6 agents.",
     "ui.agentNoneYet": "No agents selected",
     "ui.agentChipHint": "Click — configure · ×: remove",
     "ui.tokenWarnTitle": "Token spend",
     "ui.tokenWarn2": "2 agents — basic debate, moderate spend.",
     "ui.tokenWarn3": "3 agents: each sees the FULL context of the other two — spend grows noticeably (≈×1.5 per round).",
     "ui.tokenWarn4": "4 agents: full context ×4, no compression — expensive. That's 4 backends/subscriptions per round.",
-    "ui.tokenWarn5": "5 agents — the maximum. Very expensive: full context ×5 for each, no prompt compression.",
+    "ui.tokenWarn5": "5 agents: full context ×5 — very expensive. Add one more?",
+    "ui.tokenWarn6": "6 agents — the maximum. Very expensive: full context ×6 for each, no prompt compression.",
     "coach.agents.title": "Step 3: pick your agents",
-    "coach.agents.body": "At the top center click «Add agent». Use «Auto» (2 distinct backends are picked for you) or «Manually». Minimum 2, maximum 5. More agents = a pricier round (prompts are not compressed).",
+    "coach.agents.body": "At the top center click «Add agent». Use «Auto» (2 distinct backends are picked for you) or «Manually». Minimum 2, maximum 6. More agents = a pricier round (prompts are not compressed).",
     "coach.agents.action": "Add agent",
     "coach.ollamaReg.title": "Register Ollama first",
     "coach.ollamaReg.body": "You picked Ollama as backend but no profile is registered yet. Open «Agent registration» panel on the right → click «+ Profile» → select Ollama → enter a model name (e.g. llama3.2) → click «Apply». The model will then appear in the backend list.",
@@ -685,7 +687,7 @@ const STRINGS = {
     "coach.agentsConfig.title": "Step 4: check the agents' models",
     "coach.agentsConfig.body": "Weak models and low effort are pre-filled by default — cheap. Click an agent chip at the top to change its backend/model/effort. When ready, run the round.",
     "coach.agentsConfig.action": "Run round",
-    "tip.addAgent": "Adds a debater (2 to 5). «Auto» picks 2 distinct available backends with cheap models; «Manually» adds one for you to configure. Every agent sees the full context of all the others — so each added agent noticeably raises token spend.|||2 agents — a basic debate. 4–5 — expensive: full context ×N per round.",
+    "tip.addAgent": "Adds a debater (2 to 6). «Auto» picks 2 distinct available backends with cheap models; «Manually» adds one for you to configure. Every agent sees the full context of all the others — so each added agent noticeably raises token spend.|||2 agents — a basic debate. 4–6 — expensive: full context ×N per round.",
     "tip.agentBackend": "Which backend powers this agent: a subscription CLI (Codex/Claude, per account), a network API provider, or local Ollama. The list comes from what's available: authorized accounts + registered providers.|||«Codex · acc 1», «Claude · acc 2», «DeepSeek», «Ollama (local)».",
     "tip.agentModel2": "The chosen backend's model. Defaults to the cheapest (token economy). For CLI — from a list; for a network provider — the exact model string.|||Codex: gpt-5.4-mini (cheap) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
     "tip.agentEffort2": "Reasoning effort (subscription CLI only). Defaults to low — cheap and fast. Higher = pricier and slower but more thorough. Network providers have no such knob.|||low — a quick draft pass; high/xhigh/max — for hard contested points.",
@@ -3158,7 +3160,7 @@ function renderAgentChips() {
     box.appendChild(chip);
   }
   const addBtn = $("addAgent");
-  if (addBtn) addBtn.disabled = !currentState.activeRunId || list.length >= 5;
+  if (addBtn) addBtn.disabled = !currentState.activeRunId || list.length >= 6;
 }
 
 function renderAgentEditor() {
@@ -3166,7 +3168,7 @@ function renderAgentEditor() {
   if (!body) return;
   const list = participantsDraft || [];
   let warnHtml = "";
-  if (list.length >= 2) warnHtml = `<div class="token-warn lvl${Math.min(5, list.length)}">${escapeHtml(t(`ui.tokenWarn${Math.min(5, list.length)}`))}</div>`;
+  if (list.length >= 2) warnHtml = `<div class="token-warn lvl${Math.min(6, list.length)}">${escapeHtml(t(`ui.tokenWarn${Math.min(6, list.length)}`))}</div>`;
   else if (list.length === 1) warnHtml = `<div class="token-warn muted">${escapeHtml(t("ui.agentMin2"))}</div>`;
   if (!list.length) {
     body.innerHTML = `<div class="muted small">${escapeHtml(t("ui.agentEditorEmpty"))}</div>`;
@@ -3291,12 +3293,12 @@ function addAgentAuto() {
   applyParticipants();
 }
 
-// Manual: append one agent (a distinct backend if available), up to 5.
+// Manual: append one agent (a distinct backend if available), up to 6.
 function addAgentManual() {
   const cat = agentCatalog();
   if (!cat.length) { showAddAgentMsg(t("ui.agentNoBackends"), true); return; }
   const list = participantsDraft || [];
-  if (list.length >= 5) { showAddAgentMsg(t("ui.agentMax"), true); return; }
+  if (list.length >= 6) { showAddAgentMsg(t("ui.agentMax"), true); return; }
   // Unique by catalog id for network providers, by provider+account for CLI.
   const usedIds = new Set(list.map((p) => {
     const match = agentCatalog().find((c) => {
@@ -3838,7 +3840,7 @@ function openProfileBuilder() {
     fieldPrompt: ru ? "Системный промпт (одно правило в строку)" : "System prompt (one rule per line)",
     fieldSections: ru ? "Секции базы знаний (key | Заголовок | подсказка)" : "Knowledge-Base sections (key | Title | tip)",
     promptValue: ru
-      ? "Вы — участник Council Room — закрытой комнаты из 2–5 ИИ-агентов.\n" +
+      ? "Вы — участник Council Room — закрытой комнаты из 2–6 ИИ-агентов.\n" +
         "Цель: закрывать каждую открытую подзадачу через структурированную дискуссию.\n" +
         "\n" +
         "Правила (фиксированные, не нужно повторять):\n" +
@@ -3846,7 +3848,7 @@ function openProfileBuilder() {
         "- Отвечайте только по ОДНОЙ активной подзадаче.\n" +
         "- Обосновывайте каждое утверждение через Базу знаний или прикреплённые документы; если чего-то не хватает — задайте вопрос через `QUESTION:`.\n" +
         "- Каждый ответ ≤ 12 предложений."
-      : "You are a participant in Council Room — a closed room of 2 to 5 AI agents.\n" +
+      : "You are a participant in Council Room — a closed room of 2 to 6 AI agents.\n" +
         "Room goal: drive every open subtask to a closed state through structured debate.\n" +
         "\n" +
         "Rules (fixed, no need to repeat):\n" +

@@ -1562,7 +1562,7 @@ button.square {
   border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
 }
 .token-warn.lvl3 { color: var(--amber); border-color: var(--amber); }
-.token-warn.lvl4, .token-warn.lvl5 { color: var(--red); border-color: var(--red); }
+.token-warn.lvl4, .token-warn.lvl5, .token-warn.lvl6 { color: var(--red); border-color: var(--red); }
 /* Orange outline marks a still-default (cheap) field the navigator suggests changing. */
 .hl-default { border-color: var(--orange) !important; box-shadow: 0 0 0 1px var(--orange) inset; }
 
