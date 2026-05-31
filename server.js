@@ -88,6 +88,9 @@ const validatedRefs = validatedStore.validatedSet(ROOMS_DIR, (ref) => process.en
 // Bumped whenever the token-usage sources are force-refreshed (the ↻ button), so
 // the client knows to re-fetch the stats panel (Limits tab) once it lands.
 let statsVersion = 0;
+// Per-account ping results from the last ↻ refresh: key "tool+num" → bool (ok/fail).
+// Cleared ~5s after the refresh completes so the UI can flash chips green/red.
+let switcherPingResults = null;
 async function refreshSwitcher() {
   try { switcherStatus = await switcher.status(); } catch { switcherStatus = switcher.detect(); }
 }
@@ -192,7 +195,7 @@ function publicState() {
       autopilot: state.autopilot,
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
       settings: state.settings,
-      switcher: { ...switcherStatus, statsVersion },
+      switcher: { ...switcherStatus, statsVersion, pingResults: switcherPingResults },
       providers: providersInfo(),
       workdir: WORKDIR,
       port: PORT,
@@ -222,7 +225,7 @@ function publicState() {
     autopilot: state.autopilot,
     runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
     settings: state.settings,
-    switcher: { ...switcherStatus, statsVersion },
+    switcher: { ...switcherStatus, statsVersion, pingResults: switcherPingResults },
     providers: providersInfo(),
     workdir: WORKDIR,
     port: PORT,
@@ -1261,6 +1264,17 @@ async function router(req, res) {
       // rollout with fresh rate_limits; Claude → its usage cache), then re-poll.
       // Each ping is logged to the Process trace so the spend is visible.
       const CHEAP_MODEL = { codex: "gpt-5.4-mini", claude: "haiku" };
+      const PING_PROMPTS = [
+        "What is 1+3? Reply with just the number.",
+        "What is 2+2? Reply with just the number.",
+        "What is 5+5? Reply with just the number.",
+        "What is 3+1? Reply with just the number.",
+        "What is 6+2? Reply with just the number.",
+        "What is 4+3? Reply with just the number.",
+        "What is 1+7? Reply with just the number.",
+        "What is 2+6? Reply with just the number.",
+      ];
+      const pingPrompt = PING_PROMPTS[Math.floor(Math.random() * PING_PROMPTS.length)];
       const sw = switcherStatus.accounts || {};
       const connected = Boolean(switcherStatus.connected);
       const targets = [];
@@ -1296,19 +1310,21 @@ async function router(req, res) {
         }).join(", ");
         addMessage({
           role: "system", name: "Council Room", kind: "process", subtaskId: sid,
-          text: `Token monitor: tiny request («What is 1+3?») to ${targets.length} account(s) on the cheapest model — ${list}.`,
-          textRu: `Мониторинг токенов: мини-запрос («What is 1+3?») к ${targets.length} аккаунт(ам) самой дешёвой моделью — ${list}.`,
+          text: `Token monitor: tiny request («${pingPrompt}») to ${targets.length} account(s) on the cheapest model — ${list}.`,
+          textRu: `Мониторинг токенов: мини-запрос («${pingPrompt}») к ${targets.length} аккаунт(ам) самой дешёвой моделью — ${list}.`,
         });
+        const pingOk = {};
         await Promise.all(targets.map(async ({ tool, num }) => {
           const model = CHEAP_MODEL[tool];
           const runner = tool === "codex" ? cli.runCodex : cli.runClaude;
-          const r = await runner("What is 1+3? Reply with just the number.", {
+          const r = await runner(pingPrompt, {
             workdir: WORKDIR,
             isolated: true,
             model,
             accountEnv: switcher.envForAccount(tool, num),
             ...(tool === "codex" ? { ephemeral: false } : {}), // persist rollout → fresh rate_limits
           }).catch((e) => ({ ok: false, text: e?.message || "error" }));
+          pingOk[`${tool}${num}`] = Boolean(r?.ok);
           const secs = r?.result?.durationMs ? `, ${(r.result.durationMs / 1000).toFixed(1)}s` : "";
           const okEn = r?.ok ? `reply «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `error/limit (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
           const okRu = r?.ok ? `ответ «${String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 40)}»` : `ошибка/лимит (${String(r?.text || "").split("\n")[0].slice(0, 80)})`;
@@ -1318,6 +1334,7 @@ async function router(req, res) {
             textRu: `Мониторинг токенов: ${tool} акк ${num} (${model})${secs} → ${okRu}.`,
           });
         }));
+        switcherPingResults = pingOk;
         await switcher.refreshUsage(); // force the displayed % to actually move
         statsCache = {}; // force recompute after fresh requests
         await refreshSwitcher();
@@ -1341,6 +1358,8 @@ async function router(req, res) {
           });
         }
         broadcast();
+        // Clear chip flash after 5 seconds.
+        setTimeout(() => { switcherPingResults = null; broadcast(); }, 5000);
       })();
       return sendJson(res, 202, { accepted: true });
     }

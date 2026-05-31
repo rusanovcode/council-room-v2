@@ -176,8 +176,8 @@ const STRINGS = {
     "ui.updateError": "Ошибка: {error}",
     "ui.updateDirtyNote": "⚠️ Есть незакоммиченные локальные изменения — обновление может не примениться.",
     "ui.switcherStats": "Подробная статистика",
-    "ui.refreshTokens": "Обновить остаток токенов (мини-запрос самой дешёвой моделью к каждому аккаунту)",
-    "ui.confirmRefresh": "Обновить остаток токенов?\n\nК каждому авторизованному аккаунту (Codex и Claude) будет отправлен крошечный запрос («What is 1+3?») самой дешёвой моделью (Codex gpt-5.4-mini / Claude haiku), чтобы обновить данные по использованию. Виден в логе «Служебные события». Тратит немного подписки.",
+    "ui.refreshTokens": "Обновить остаток токенов (случайный мини-запрос самой дешёвой моделью к каждому аккаунту)",
+    "ui.confirmRefresh": "Обновить остаток токенов?\n\nК каждому авторизованному аккаунту (Codex и Claude) будет отправлен случайный простой вопрос самой дешёвой моделью (Codex gpt-5.4-mini / Claude haiku), чтобы обновить данные по использованию. Виден в логе «Служебные события». Тратит немного подписки.",
     "ui.apiTitle": "{tool}: API-ключ",
     "ui.apiSteps": "Это профиль с API-ключом, а не OAuth-аккаунт.|Ключ задаётся в ai-switcher (profiles / api-keys), не через это окно.|Вход через терминал тут не нужен.",
     "ui.tabLimits": "Лимиты",
@@ -525,8 +525,8 @@ const STRINGS = {
     "ui.updateError": "Error: {error}",
     "ui.updateDirtyNote": "⚠️ There are uncommitted local changes — the update may not apply.",
     "ui.switcherStats": "Detailed stats",
-    "ui.refreshTokens": "Refresh remaining tokens (tiny request on the cheapest model to each account)",
-    "ui.confirmRefresh": "Refresh remaining tokens?\n\nA tiny request («What is 1+3?») is sent to every authorized account (Codex and Claude) on the cheapest model (Codex gpt-5.4-mini / Claude haiku) to update usage data. Shown in the Process trace. Spends a little subscription.",
+    "ui.refreshTokens": "Refresh remaining tokens (random short request on the cheapest model to each account)",
+    "ui.confirmRefresh": "Refresh remaining tokens?\n\nA random simple question is sent to every authorized account (Codex and Claude) on the cheapest model (Codex gpt-5.4-mini / Claude haiku) to update usage data. Shown in the Process trace. Spends a little subscription.",
     "ui.apiTitle": "{tool}: API key",
     "ui.apiSteps": "This is an API-key profile, not an OAuth account.|The key is configured in ai-switcher (profiles / api-keys), not here.|No terminal login is needed.",
     "ui.tabLimits": "Limits",
@@ -2125,6 +2125,11 @@ function renderSwitcher() {
       btn.textContent = label;
       btn.dataset.tooltipText = t("tip.acctBtn", { tool, account: isApi ? "API" : accountNum, pct: a.tokensPct == null ? "—" : `${a.tokensPct}%` });
       btn.addEventListener("click", () => openLoginModal(tool, isApi ? "apikey" : `acc${accountNum}`, a.authorized, isApi));
+      if (!isApi && accountNum != null && sw.pingResults) {
+        const pr = sw.pingResults[`${tool}${accountNum}`];
+        if (pr === true) { btn.style.backgroundColor = "#43a047"; btn.style.color = "#000"; }
+        else if (pr === false) { btn.style.backgroundColor = "#e53935"; btn.style.color = "#000"; }
+      }
       row.appendChild(btn);
     }
     box.appendChild(row);
