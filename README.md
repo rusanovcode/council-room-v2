@@ -1,5 +1,7 @@
 # Council Room v2
 
+![Council Room v2 screenshot](docs/screenshot.png)
+
 **[English](#english) · [Русский](#русский)**
 
 ---
