@@ -184,6 +184,8 @@ const STRINGS = {
     "ui.tabLimits": "Лимиты",
     "ui.tabSpend": "Расход",
     "ui.tabSub": "Подписка",
+    "ui.orQuotaLabel": "OpenRouter сегодня:",
+    "ui.orQuotaTip": "Сделано запросов к бесплатному пулу OpenRouter за сегодня по каждому ключу (K1, K2…) — наш собственный счётчик, т.к. OpenRouter остаток не отдаёт. Потолок ~50/день на аккаунт (<$10 кредита) или 1000/день (≥$10). Зелёный/жёлтый/красный — по остатку.",
     "ui.hourlyReset": "Часовой сброс",
     "ui.weeklyReset": "Недельный сброс",
     "ui.windowStart": "Начало окна",
@@ -588,6 +590,8 @@ const STRINGS = {
     "ui.tabLimits": "Limits",
     "ui.tabSpend": "Spending",
     "ui.tabSub": "Subscription",
+    "ui.orQuotaLabel": "OpenRouter today:",
+    "ui.orQuotaTip": "Requests made to the OpenRouter free pool today, per key (K1, K2…) — our own counter, since OpenRouter exposes no remaining number. Cap is ~50/day per account (<$10 credit) or 1000/day (≥$10). Green/yellow/red by remaining.",
     "ui.hourlyReset": "Hourly reset",
     "ui.weeklyReset": "Weekly reset",
     "ui.windowStart": "Window start",
@@ -2097,6 +2101,13 @@ function renderStatsPanel() {
   }));
 }
 
+// "OPENROUTER_API_KEY" -> "K1", "OPENROUTER_API_KEY_2" -> "K2", etc.
+function orKeyShort(ref) {
+  if (ref === "OPENROUTER_API_KEY") return "K1";
+  const m = ref.match(/_(\d+)$/);
+  return m ? "K" + m[1] : ref;
+}
+
 function renderProviderStatsPanel() {
   const panel = $("providerStatsPanel");
   if (!panel) return;
@@ -2135,6 +2146,20 @@ function renderProviderStatsPanel() {
       ${spentTxt ? `<span class="psp-spent">${escapeHtml(spentTxt)}</span>` : ""}
     </div>`;
   }).join("");
+  // OpenRouter free-pool quota: our own daily request tally per key (OpenRouter
+  // exposes no remaining number). Green/yellow/red by remaining requests.
+  const orQuota = (currentState?.providers?.orQuota) || {};
+  const orRefs = Object.keys(orQuota).sort();
+  if (orRefs.length) {
+    const cells = orRefs.map((ref) => {
+      const q = orQuota[ref];
+      const cls = q.remaining > 20 ? "tok-green" : (q.remaining > 5 ? "tok-yellow" : "tok-red");
+      return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap">`
+        + `<span class="psp-dot ${cls}"></span>${escapeHtml(orKeyShort(ref))} ${q.count}/${q.cap}</span>`;
+    }).join("");
+    html += `<div class="psp-row" style="flex-wrap:wrap;gap:6px" title="${escapeHtml(t("ui.orQuotaTip"))}">`
+      + `<span class="psp-name" style="opacity:.7;flex:0 0 auto">${escapeHtml(t("ui.orQuotaLabel"))}</span>${cells}</div>`;
+  }
   const hasUsage = Object.values(usage).some((u) => u && u.totalTokens > 0);
   if (hasUsage) {
     html += `<button class="psp-reset" type="button">${escapeHtml(t("ui.resetSpend"))}</button>`;

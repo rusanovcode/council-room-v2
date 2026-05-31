@@ -21,6 +21,7 @@ const profiles = require("./lib/profiles");
 const roles = require("./lib/roles");
 const providers = require("./lib/providers");
 const usage = require("./lib/usage");
+const orquota = require("./lib/orquota");
 const validatedStore = require("./lib/validated");
 const domains = require("./lib/domains");
 
@@ -175,16 +176,20 @@ function providersInfo() {
   const cfg = (state.run && state.run.settings && state.run.settings.profiles) || state.settings.profiles || [];
   const credentials = {};
   const validated = {};
+  const orRefs = new Set();
   for (const p of cfg) if (p && p.id) {
     credentials[p.id] = providers.credentialPresent(p);
     // "validated" = the key passed a live test request this session. Keyless
     // providers (Ollama) need no key, so they count as validated when present.
-    const ref = p.credentialRef || (providers.resolveProfile(p).credentialRef);
+    const resolved = providers.resolveProfile(p);
+    const ref = p.credentialRef || resolved.credentialRef;
     validated[p.id] = ref ? validatedRefs.has(ref) : Boolean(credentials[p.id]);
+    if (/openrouter\.ai/i.test(resolved.baseUrl) && resolved.credentialRef) orRefs.add(resolved.credentialRef);
   }
   // Per-profile cumulative token spend (API keys have no remaining %, only spend)
   // so the connected-agent chips can show how much each backend has used.
-  return { mode: providers.mode(), presets: providers.presets(), debatePresets: providers.debatePresets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR) };
+  // orQuota = our own daily request tally per OpenRouter key (the pool has no API number).
+  return { mode: providers.mode(), presets: providers.presets(), debatePresets: providers.debatePresets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR), orQuota: orquota.summary(ROOMS_DIR, { refs: [...orRefs] }) };
 }
 
 function publicState() {
@@ -469,6 +474,12 @@ async function runRound({ guidance = "" } = {}) {
     for (const r of results) {
       const u = r && r.result && r.result.usage;
       if (u && r.profile) { usage.record(ROOMS_DIR, r.profile, u); usageRecorded = true; }
+      // Count one OpenRouter request per agent turn against its account's daily
+      // free-pool quota (OpenRouter exposes no remaining number — we tally our own).
+      if (r && r.profile) {
+        const c = providers.resolveProfile(r.profile);
+        if (/openrouter\.ai/i.test(c.baseUrl) && c.credentialRef) { orquota.bump(ROOMS_DIR, c.credentialRef); usageRecorded = true; }
+      }
     }
     if (usageRecorded) { statsCache = {}; statsVersion++; }
 
