@@ -195,7 +195,7 @@ function publicState() {
       busy: state.busy,
       status: state.status,
       run: null,
-      domain: { id: globalDomain.id, label: globalDomain.label, sections: globalDomain.sections },
+      domain: { id: globalDomain.id, label: globalDomain.label, guards: globalDomain.guards, sections: globalDomain.sections },
       autopilot: state.autopilot,
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
       settings: state.settings,
@@ -219,7 +219,7 @@ function publicState() {
     activeRunId: state.run.id,
     busy: state.busy,
     status: state.status,
-    domain: { id: runDomain.id, label: runDomain.label, sections: runDomain.sections },
+    domain: { id: runDomain.id, label: runDomain.label, guards: runDomain.guards, sections: runDomain.sections },
     run: {
       ...state.run,
       activeSubtask: active,
