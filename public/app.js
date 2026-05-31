@@ -3118,7 +3118,7 @@ function makeAgentFromCatalog(entry, idx) {
   if (entry.account) backend.account = entry.account;
   if (entry.baseUrl) backend.baseUrl = entry.baseUrl;
   if (entry.credentialRef) backend.credentialRef = entry.credentialRef;
-  return { key: `a${idx + 1}`, label: entry.label, mode: "manual", backend, _confirmed: false };
+  return { key: `a${idx + 1}`, label: entry.label, mode: "manual", backend, _confirmed: false, _backendPicked: false };
 }
 
 function rekeyAgents(list) {
@@ -3214,7 +3214,7 @@ function renderOneAgentEditor(p) {
   const canApply = cli ? (b.model !== "" && b.effort !== "") : b.model !== "";
   return `<div class="agent-edit-card" data-key="${escapeHtml(p.key)}">
     <div class="agent-edit-name">${escapeHtml(p.label || p.key)}</div>
-    <label class="p-field"><span>${t("ui.agentBackend")} ${helpIcon("agentBackend")}</span><select class="ag-backend">${backendOpts}</select></label>
+    <label class="p-field"><span>${t("ui.agentBackend")} ${helpIcon("agentBackend")}</span><select class="ag-backend${hl && !p._backendPicked ? " hl-default" : ""}">${backendOpts}</select></label>
     <label class="p-field"><span>${t("ui.agentModel")} ${helpIcon("agentModel2")}</span>${modelField}</label>
     ${effortField}
     <div class="agent-edit-actions">
@@ -3239,6 +3239,7 @@ function bindAgentEditor() {
     p.backend = fresh.backend;
     p.label = fresh.label;
     p._confirmed = false;
+    p._backendPicked = true;
     // Show navigator hint when fallback Ollama (no registered profile) is picked.
     pendingOllamaRegistration = (entry.id === "ollama-local" && !hasRegisteredOllamaProfile());
     renderAgentChips();
