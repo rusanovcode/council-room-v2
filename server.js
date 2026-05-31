@@ -22,6 +22,29 @@ const roles = require("./lib/roles");
 const providers = require("./lib/providers");
 const usage = require("./lib/usage");
 const orquota = require("./lib/orquota");
+
+// OpenRouter key pool: every OPENROUTER_API_KEY* env var that is set (a key = a
+// separate account = a separate free daily quota). Scales to any number of keys.
+function orRefIndex(ref) { return ref === "OPENROUTER_API_KEY" ? 1 : (Number(ref.split("_").pop()) || 0); }
+function listOpenrouterKeys() {
+  const out = [];
+  for (const [k, v] of Object.entries(process.env)) {
+    if (/^OPENROUTER_API_KEY(_\d+)?$/.test(k) && v) out.push({ ref: k, apiKey: v });
+  }
+  return out.sort((a, b) => orRefIndex(a.ref) - orRefIndex(b.ref));
+}
+let orKeyCursor = 0;
+// Ordered pool for ONE OpenRouter call: rotate by a cursor (spreads concurrent
+// agents across accounts) then stable-sort by most remaining daily quota first.
+function openrouterKeyPool() {
+  const keys = listOpenrouterKeys();
+  if (keys.length <= 1) return keys;
+  const q = orquota.summary(ROOMS_DIR, { refs: keys.map((k) => k.ref) });
+  const rot = orKeyCursor++ % keys.length;
+  const rotated = keys.slice(rot).concat(keys.slice(0, rot));
+  rotated.sort((a, b) => q[b.ref].remaining - q[a.ref].remaining); // stable: equal remaining keeps rotation
+  return rotated;
+}
 const validatedStore = require("./lib/validated");
 const domains = require("./lib/domains");
 
@@ -189,6 +212,9 @@ function providersInfo() {
   // Per-profile cumulative token spend (API keys have no remaining %, only spend)
   // so the connected-agent chips can show how much each backend has used.
   // orQuota = our own daily request tally per OpenRouter key (the pool has no API number).
+  // Quota panel shows every key in the OpenRouter pool (env), not just the ones a
+  // profile pins — the pool draws from all of them.
+  for (const k of listOpenrouterKeys()) orRefs.add(k.ref);
   return { mode: providers.mode(), presets: providers.presets(), debatePresets: providers.debatePresets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR), orQuota: orquota.summary(ROOMS_DIR, { refs: [...orRefs] }) };
 }
 
@@ -423,6 +449,7 @@ async function runRound({ guidance = "" } = {}) {
     const runSlot = (role, agentPrompt) => roles.runRole(role, agentPrompt, {
       workdir: WORKDIR,
       isolated: !allowScan,
+      keyPool: openrouterKeyPool(), // account-failover pool, rotated per call to spread agents across keys
       signal: ac.signal,
       onStream: (chunk) => broadcastStream(role.slot, chunk, { subtaskId: active.id, round, label: role.label }),
       onChild: trackChild,
@@ -478,7 +505,8 @@ async function runRound({ guidance = "" } = {}) {
       // free-pool quota (OpenRouter exposes no remaining number — we tally our own).
       if (r && r.profile) {
         const c = providers.resolveProfile(r.profile);
-        if (/openrouter\.ai/i.test(c.baseUrl) && c.credentialRef) { orquota.bump(ROOMS_DIR, c.credentialRef); usageRecorded = true; }
+        const usedRef = (r.result && r.result.usedRef) || c.credentialRef; // pool reports the key it actually used
+        if (/openrouter\.ai/i.test(c.baseUrl) && usedRef) { orquota.bump(ROOMS_DIR, usedRef); usageRecorded = true; }
       }
     }
     if (usageRecorded) { statsCache = {}; statsVersion++; }

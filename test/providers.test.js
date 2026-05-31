@@ -21,6 +21,11 @@ const server = http.createServer((req, res) => {
     if (req.url === "/slow/chat/completions") {
       return; // never respond -> exercises timeout/abort; keep socket open
     }
+    if (req.headers.authorization === "Bearer sk-exhausted") { // simulate a quota-blocked key
+      res.writeHead(429, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: "rate-limited" } }));
+      return;
+    }
     if (req.url.endsWith("/messages")) { // native Anthropic Messages shape
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ content: [{ type: "text", text: "Hello world" }], usage: { input_tokens: 8, cache_read_input_tokens: 10, cache_creation_input_tokens: 2, output_tokens: 5 } }));
@@ -124,6 +129,21 @@ function run() {
         assert.deepStrictEqual(ra.result.usage, { promptTokens: 20, completionTokens: 5, totalTokens: 25 }, "anthropic usage = fresh+cache_read+cache_creation inputs");
         delete process.env.ANTHROPIC_SELFTEST;
         console.log("PASS anthropic native adapter (cache split + usage)");
+
+        // --- OpenRouter account-failover key pool ---
+        const pool = { id: "pool", provider: "openrouter", model: "mock-1", baseUrl: base };
+        const rpool = await providers.runProfile(pool, "ping", {
+          keyPool: [{ ref: "OR_K1", apiKey: "sk-exhausted" }, { ref: "OR_K2", apiKey: "sk-good" }],
+        });
+        assert.strictEqual(rpool.ok, true, "pool fell over to a working key");
+        assert.strictEqual(rpool.result.usedRef, "OR_K2", "usedRef = the key that served (after K1 429)");
+        assert.strictEqual(rpool.text, "Hello world", "pool returned the answer");
+        // non-429 error must NOT burn the whole pool: bad model on first key stops early.
+        const rpoolStop = await providers.runProfile(pool, "ping", {
+          keyPool: [{ ref: "OR_K2", apiKey: "sk-good" }, { ref: "OR_K3", apiKey: "sk-exhausted" }],
+        });
+        assert.strictEqual(rpoolStop.result.usedRef, "OR_K2", "first key succeeds → no needless failover");
+        console.log("PASS openrouter account-failover key pool");
 
         // --- usage store: accumulate, summarize, reset ---
         const usage = require(path.resolve(__dirname, "../lib/usage.js"));
