@@ -184,7 +184,7 @@ function providersInfo() {
   }
   // Per-profile cumulative token spend (API keys have no remaining %, only spend)
   // so the connected-agent chips can show how much each backend has used.
-  return { mode: providers.mode(), presets: providers.presets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR) };
+  return { mode: providers.mode(), presets: providers.presets(), debatePresets: providers.debatePresets(), types: providers.providerTypes(), credentials, validated, usage: usage.summary(ROOMS_DIR) };
 }
 
 function publicState() {

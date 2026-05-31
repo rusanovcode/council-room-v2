@@ -17,9 +17,14 @@ const server = http.createServer((req, res) => {
   req.on("data", (c) => { body += c; });
   req.on("end", () => {
     const parsed = JSON.parse(body);
-    lastRequest = { url: req.url, auth: req.headers.authorization || "", body: parsed };
+    lastRequest = { url: req.url, auth: req.headers.authorization || "", apiKeyHeader: req.headers["x-api-key"] || "", body: parsed };
     if (req.url === "/slow/chat/completions") {
       return; // never respond -> exercises timeout/abort; keep socket open
+    }
+    if (req.url.endsWith("/messages")) { // native Anthropic Messages shape
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ content: [{ type: "text", text: "Hello world" }], usage: { input_tokens: 8, cache_read_input_tokens: 10, cache_creation_input_tokens: 2, output_tokens: 5 } }));
+      return;
     }
     if (parsed.stream) {
       res.writeHead(200, { "Content-Type": "text/event-stream" });
@@ -100,7 +105,25 @@ function run() {
         assert.ok(providers.presets().some((p) => p.id === "deepseek"), "deepseek preset present");
         assert.ok(providers.presets().some((p) => p.id === "ollama" && p.needsKey === false), "ollama preset keyless");
         assert.strictEqual(providers.mode(), "full", "default mode full");
+        assert.ok(providers.presets().some((p) => p.id === "anthropic"), "anthropic preset present");
+        assert.ok(providers.providerTypes().includes("anthropic"), "anthropic provider type registered");
+        assert.ok(providers.debatePresets().some((d) => d.preset === "anthropic"), "anthropic in debate presets");
         console.log("PASS presets + default mode=full");
+
+        // --- anthropic native adapter: /messages shape, cache split, usage ---
+        process.env.ANTHROPIC_SELFTEST = "sk-ant-xyz";
+        const pa = { id: "ta", provider: "anthropic", model: "claude-mock", baseUrl: base, credentialRef: "ANTHROPIC_SELFTEST" };
+        const ra = await providers.runProfile(pa, "head\n=== KNOWLEDGE BASE ===\ntail");
+        assert.strictEqual(ra.ok, true, "anthropic ok");
+        assert.strictEqual(ra.text, "Hello world", "anthropic text from content blocks");
+        assert.strictEqual(lastRequest.url, "/messages", "posts to /messages");
+        assert.strictEqual(lastRequest.apiKeyHeader, "sk-ant-xyz", "x-api-key from env (not Bearer)");
+        assert.ok(lastRequest.body.system && lastRequest.body.system[0].cache_control.type === "ephemeral", "stable head sent as cached system block");
+        assert.strictEqual(lastRequest.body.system[0].text, "head", "head -> system");
+        assert.strictEqual(lastRequest.body.messages[0].content, "=== KNOWLEDGE BASE ===\ntail", "variable tail -> user message");
+        assert.deepStrictEqual(ra.result.usage, { promptTokens: 20, completionTokens: 5, totalTokens: 25 }, "anthropic usage = fresh+cache_read+cache_creation inputs");
+        delete process.env.ANTHROPIC_SELFTEST;
+        console.log("PASS anthropic native adapter (cache split + usage)");
 
         // --- usage store: accumulate, summarize, reset ---
         const usage = require(path.resolve(__dirname, "../lib/usage.js"));
