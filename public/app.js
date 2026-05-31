@@ -1857,6 +1857,7 @@ let statsPeriod = "today";
 let statsTab = localStorage.getItem("council-room-v2.statsTab") || "limits";
 let statsLoading = false;
 let lastStatsVersion = null; // server statsVersion last applied (re-fetch on bump)
+let lastSubsKey = null;     // JSON snapshot of subscriptions for change detection
 let switcherRefreshing = false;   // true while account-chip animation is running
 let switcherRefreshBaseVer = null; // statsVersion at the moment refresh was triggered
 
@@ -1977,6 +1978,11 @@ function renderStatsPanel() {
     const cur = (currentState?.settings?.subscriptions || {})[key] || {};
     const start = inp.dataset.field === "start" ? inp.value : (cur.start || "");
     const end = inp.dataset.field === "end" ? inp.value : (cur.end || "");
+    // Optimistic local update — panel re-render will pick it up without waiting for SSE.
+    if (currentState?.settings) {
+      if (!currentState.settings.subscriptions) currentState.settings.subscriptions = {};
+      currentState.settings.subscriptions[key] = { start, end };
+    }
     api("POST", "/api/switcher/subscription", { key, start, end });
   }));
 }
@@ -2232,6 +2238,12 @@ function renderSwitcher() {
   if (panelOpen.switcherStats && !statsLoading) {
     if (statsData === null) loadStats();
     else if (lastStatsVersion !== null && ver !== undefined && ver !== lastStatsVersion) loadStats();
+    // Sub tab reads subscriptions directly from currentState — re-render it when
+    // the server broadcasts a new subscriptions object (no statsVersion bump needed).
+    else if (statsTab === "sub") {
+      const newSubsKey = JSON.stringify(currentState?.settings?.subscriptions || {});
+      if (newSubsKey !== lastSubsKey) { lastSubsKey = newSubsKey; renderStatsPanel(); }
+    }
   }
   if (ver !== undefined) lastStatsVersion = ver;
 }

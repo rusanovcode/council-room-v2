@@ -1591,6 +1591,13 @@ function applyRunSettings(run) {
   // Agent selection is strictly per-chat: mirror it exactly (clearing it when the
   // chat has none), so a fresh/blank chat never shows the previous chat's agents.
   state.settings.participants = run.settings.participants || null;
+  // Migrate subscriptions from run settings into global-settings.json so they
+  // survive a server restart even when no run is active.
+  if (run.settings.subscriptions && typeof run.settings.subscriptions === "object") {
+    const curGs = store.readJson(GLOBAL_SETTINGS_PATH) || {};
+    const merged = { ...curGs.subscriptions, ...run.settings.subscriptions };
+    store.writeJson(GLOBAL_SETTINGS_PATH, { ...curGs, subscriptions: merged });
+  }
 }
 
 // Phase 6b+: a server restart intentionally lands on a CLEAN start screen — no
