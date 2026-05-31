@@ -3837,6 +3837,26 @@ function openProfileBuilder() {
     fieldRuPh: "напр. Юридический",
     fieldPrompt: ru ? "Системный промпт (одно правило в строку)" : "System prompt (one rule per line)",
     fieldSections: ru ? "Секции базы знаний (key | Заголовок | подсказка)" : "Knowledge-Base sections (key | Title | tip)",
+    promptValue: ru
+      ? "Вы — участник Council Room — закрытой комнаты из 2–5 ИИ-агентов.\n" +
+        "Цель: закрывать каждую открытую подзадачу через структурированную дискуссию.\n" +
+        "\n" +
+        "Правила (фиксированные, не нужно повторять):\n" +
+        "- <опишите, как должна рассуждать эта область>\n" +
+        "- Отвечайте только по ОДНОЙ активной подзадаче.\n" +
+        "- Обосновывайте каждое утверждение через Базу знаний или прикреплённые документы; если чего-то не хватает — задайте вопрос через `QUESTION:`.\n" +
+        "- Каждый ответ ≤ 12 предложений."
+      : "You are a participant in Council Room — a closed room of 2 to 5 AI agents.\n" +
+        "Room goal: drive every open subtask to a closed state through structured debate.\n" +
+        "\n" +
+        "Rules (fixed, no need to repeat):\n" +
+        "- <describe how this domain should reason>\n" +
+        "- Answer about THE ONE active subtask only.\n" +
+        "- Ground every claim in the Knowledge Base or attached documents; if something is missing, ask via `QUESTION:`.\n" +
+        "- Each answer <= 12 sentences.",
+    sectionsValue: ru
+      ? "thesis | Тезис | Анализируемый вопрос\nevidence | Доказательства | Факты и источники\nopen_questions | Открытые вопросы"
+      : "thesis | Thesis | The question under analysis\nevidence | Evidence | Facts and sources\nopen_questions | Open Questions",
     guardScan: ru ? "Изолировать от файлов пользователя (NO-FILESYSTEM-SCAN)" : "Isolate from the user's files (NO-FILESYSTEM-SCAN guard)",
     guardScope: ru ? "Ограничить объявленной областью файлов (STRICT-SCOPE)" : "Restrict to a declared file scope (STRICT-SCOPE guard)",
     back: ru ? "← Назад" : "← Back",
@@ -3906,19 +3926,11 @@ function openProfileBuilder() {
     const labelRu = mkField(card, L.fieldRu, "input", { placeholder: L.fieldRuPh });
     const prompt = mkField(card, L.fieldPrompt, "textarea", {
       rows: 10,
-      value:
-        "You are a participant in Council Room — a closed room of 2 to 5 AI agents.\n" +
-        "Room goal: drive every open subtask to a closed state through structured debate.\n" +
-        "\n" +
-        "Rules (fixed, no need to repeat):\n" +
-        "- <describe how this domain should reason>\n" +
-        "- Answer about THE ONE active subtask only.\n" +
-        "- Ground every claim in the Knowledge Base or attached documents; if something is missing, ask via `QUESTION:`.\n" +
-        "- Each answer <= 12 sentences.",
+      value: L.promptValue,
     });
     const sections = mkField(card, L.fieldSections, "textarea", {
       rows: 5,
-      value: "thesis | Thesis | The question under analysis\nevidence | Evidence | Facts and sources\nopen_questions | Open Questions",
+      value: L.sectionsValue,
     });
 
     // Guards
