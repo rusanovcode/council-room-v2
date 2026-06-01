@@ -2,6 +2,14 @@
 
 Документ для следующей сессии. Куда мы пришли, что проверено, что осталось.
 
+## Update 2026-06-01 — Phase 8 design-doc: post-consensus authoring
+
+Спроектирована (НЕ реализована) следующая фаза — **Phase 8: выработка
+deliverable-файлов по итогам консенсуса**. Полный дизайн: `PHASE8_AUTHORING.md`,
+в ROADMAP — `## Phase 8`. Решения зафиксированы (overwrite=настройка пользователя,
+двойной гейт разблокировки исполнения, автор≠ревьюер, closure-review встроенный
+тип, артефакт+review-gate парой). Реализацию не начинали — по решению пользователя.
+
 ## Update 2026-05-31 — OpenRouter API backend, key pool, quota panel (token economy)
 
 Goal of this batch: a cheap network backend for debates (~850 tokens/turn vs the

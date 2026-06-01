@@ -313,6 +313,44 @@ Gate-экран: чек-лист зелёных галок («все critarian m
 
 ---
 
+## Phase 8 — Post-Consensus Authoring (выработка deliverable-файлов)
+
+Статус: **design-doc готов, не реализовано**. Полный дизайн → `PHASE8_AUTHORING.md`.
+
+### Цель
+Добавить к совещанию исполнительный слой: по итогам консенсуса выработать готовый
+файл-deliverable (summary / checklist / **closure-review** / report) выбранным
+агентом и доставить (copy / handoff-packet / gated-write). Механика дебатов не меняется.
+Закрывает разрыв **decision → artifact** (сейчас файл копируется из чата руками).
+
+### Зафиксированные решения
+- **Overwrite — настройка пользователя** (не «только новые»); перезапись через тяжёлый гейт (превью + diff + `.bak` + confirm). Создание новых файлов — безопасный дефолт.
+- **Две кнопки автопилота**: совещание (текущий) и **исполнение** (новый).
+- **Разблокировка исполнения — двойной гейт**: подзадача `resolved` + разовый явный опт-ин.
+- **Петля draft→review→revise — настраиваемая** (итерации + budget-cap).
+- **Автор ≠ ревьюер** (self-review запрещён); пользователь выбирает обоих.
+- **closure-review — обязательный встроенный тип шаблона**; **артефакт + его review-gate производятся парой**.
+- **Дёшево/дорого**: local summary (0 токенов) дефолтом; агент на максималках (`VERIFY_AGENTS`) по кнопке.
+- **Версионирование** артефакта (`{sourceRound, kbDigest}`, `stale` → перегенерация).
+
+### Поэтапно
+A1 — `lib/templates.js` + `/api/deliverables/create` → артефакт как chat-документ (copy).
+A2 — панель Deliverables + версионирование.
+B — write-примитив (new + gated-диалог; overwrite-настройка; handoff-packet).
+C — execution-autopilot (петля + двойной гейт + budget/iteration limits).
+
+### Файлы для правки
+| Файл | Что |
+|---|---|
+| `lib/templates.js` (новый) | реестр шаблонов (по образцу `lib/domains.js`) |
+| `lib/deliverables.js` (новый) | хранение/версионирование (`deliverables.jsonl`) |
+| `server.js` | эндпойнты `/api/deliverables/*`, `/api/exec-autopilot/*`, `/api/deliverables/write`; хук на resolve |
+| `lib/profiles.js` | `VERIFY_AGENTS` как пресет «максималки»; резолв автор/ревьюер |
+| `lib/knowledge.js` | `snapshotForPrompt` как вход; digest для `stale` |
+| `public/app.js` / `index.html` / `styles.css` | кнопки, панель Deliverables, gated-write диалог (bilingual + `?`) |
+
+---
+
 ## Сводка приоритетов
 
 | Phase | Стоимость работы | Польза | Зависимости |
