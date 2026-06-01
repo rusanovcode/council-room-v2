@@ -1,0 +1,9 @@
+{
+  "name": "ai-switcher",
+  "version": "1.0.0",
+  "description": "Local operator-gateway for Claude Code / Codex via isolated profiles",
+  "main": "server.js",
+  "dependencies": {
+    "node-pty": "^1.1.0"
+  }
+}

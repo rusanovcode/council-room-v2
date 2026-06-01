@@ -1,4 +1,13 @@
 node_modules/
+ai-switcher/node_modules/
+ai-switcher/auth/
+ai-switcher/locks/
+ai-switcher/handoff/
+ai-switcher/*.log
+ai-switcher/*.tmp.*
+ai-switcher/audit.ndjson
+ai-switcher/limits.ndjson
+ai-switcher/tokens.json
 rooms/
 !rooms/.keep
 .env

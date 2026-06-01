@@ -60,12 +60,12 @@ Launchers (free the port from an old instance and open the browser):
 | `COUNCIL_ROOM_V2_WORKDIR` | parent of the project dir | Working dir for "opened" (non-isolated) runs |
 | `COUNCIL_ROOM_V2_TIMEOUT_MS` | `300000` | CLI-agent call timeout |
 | `CODEX_CMD` / `CLAUDE_CMD` | auto-detect | Explicit path to the agent binary |
-| `COUNCIL_ROOM_V2_SWITCHER_ROOT` | `C:\AI\ai-switcher\auth` | Root of the switch-module auth folders |
+| `COUNCIL_ROOM_V2_SWITCHER_ROOT` | `<repo>\ai-switcher\auth` | Root of the switch-module auth folders |
 | `AI_SWITCHER_HOST` / `GATEWAY_PORT` | `127.0.0.1` / `7700` | Switch-module gateway address |
 
 ### Switch module
 
-If **ai-switcher** is installed alongside (HTTP gateway on `7700` + auth folders), the app picks up multi-account support: a second account, auto-failover, and token monitoring. Without it everything runs in standard single-account mode (acc2/API hidden in the UI). Token data sources are documented in [`DATA_SOURCES.md`](DATA_SOURCES.md).
+The repo now bundles **ai-switcher** under [`ai-switcher/`](./ai-switcher). If its HTTP gateway is running on `7700` and the local `auth/` folders are present, the app picks up multi-account support: a second account, auto-failover, and token monitoring. Without it everything runs in standard single-account mode (acc2/API hidden in the UI). Token data sources are documented in [`DATA_SOURCES.md`](DATA_SOURCES.md).
 
 ### Structure
 
@@ -153,12 +153,12 @@ node server.js          # или: npm start
 | `COUNCIL_ROOM_V2_WORKDIR` | родитель папки проекта | Рабочая директория для «открытых» (не изолированных) запусков |
 | `COUNCIL_ROOM_V2_TIMEOUT_MS` | `300000` | Таймаут вызова CLI-агента |
 | `CODEX_CMD` / `CLAUDE_CMD` | автопоиск | Явный путь к бинарю агента |
-| `COUNCIL_ROOM_V2_SWITCHER_ROOT` | `C:\AI\ai-switcher\auth` | Корень auth-папок switch-модуля |
+| `COUNCIL_ROOM_V2_SWITCHER_ROOT` | `<repo>\ai-switcher\auth` | Корень auth-папок switch-модуля |
 | `AI_SWITCHER_HOST` / `GATEWAY_PORT` | `127.0.0.1` / `7700` | Адрес gateway switch-модуля |
 
 ### Switch-module (опционально)
 
-Если рядом установлен **ai-switcher** (HTTP-gateway на `7700` + auth-папки), приложение подхватывает мульти-аккаунт: второй аккаунт, авто-failover и мониторинг токенов. Без него всё работает в обычном одно-аккаунтном режиме (acc2/API в интерфейсе скрыты). Источники данных по токенам подробно описаны в [`DATA_SOURCES.md`](DATA_SOURCES.md).
+Теперь **ai-switcher** лежит прямо в репозитории: [`ai-switcher/`](./ai-switcher). Если его HTTP-gateway запущен на `7700` и локальные `auth/`-папки присутствуют, приложение подхватывает мульти-аккаунт: второй аккаунт, авто-failover и мониторинг токенов. Без него всё работает в обычном одно-аккаунтном режиме (acc2/API в интерфейсе скрыты). Источники данных по токенам подробно описаны в [`DATA_SOURCES.md`](DATA_SOURCES.md).
 
 ### Структура
 

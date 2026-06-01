@@ -1,0 +1,9 @@
+audit.ndjson
+limits.ndjson
+tokens.json
+locks/
+handoff/
+auth/
+node_modules/
+*.tmp.*
+*.log

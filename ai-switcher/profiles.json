@@ -1,0 +1,45 @@
+{
+  "claude": {
+    "active": "acc1",
+    "profiles": {
+      "acc1": {
+        "label": "Claude acc1 (default)",
+        "configDir": null,
+        "env": {}
+      },
+      "acc2": {
+        "label": "Claude acc2",
+        "configDir": "C:\\AI\\ai-switcher\\auth\\claude-acc2",
+        "env": {}
+      },
+      "apikey": {
+        "label": "Claude API Key",
+        "mode": "api",
+        "configDir": null,
+        "env": {}
+      }
+    }
+  },
+  "codex": {
+    "active": "acc1",
+    "failoverEnabled": false,
+    "profiles": {
+      "acc1": {
+        "label": "Codex acc1 (default)",
+        "configDir": null,
+        "env": {}
+      },
+      "acc2": {
+        "label": "Codex acc2",
+        "configDir": "C:\\AI\\ai-switcher\\auth\\codex-acc2",
+        "env": {}
+      },
+      "apikey": {
+        "label": "Codex API Key",
+        "mode": "api",
+        "configDir": null,
+        "env": {}
+      }
+    }
+  }
+}

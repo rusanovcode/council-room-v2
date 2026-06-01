@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "match": "adaptive_systems_lab",
+      "policy": "protected"
+    },
+    {
+      "match": "game_agent",
+      "policy": "protected"
+    },
+    {
+      "match": "AI_Bot",
+      "policy": "client-allowed"
+    },
+    {
+      "match": "Council Room",
+      "policy": "client-allowed"
+    },
+    {
+      "match": "codeburn",
+      "policy": "client-allowed"
+    },
+    {
+      "match": "Work",
+      "policy": "client-allowed"
+    },
+    {
+      "match": "codeburn-pr",
+      "policy": "ignore"
+    },
+    {
+      "match": "OpenCode",
+      "policy": "ignore"
+    },
+    {
+      "match": "cvat",
+      "policy": "ignore"
+    },
+    {
+      "match": "worktrees",
+      "policy": "ignore"
+    },
+    {
+      "match": "models",
+      "policy": "ignore"
+    },
+    {
+      "match": "archive",
+      "policy": "ignore"
+    },
+    {
+      "match": "nodejs",
+      "policy": "ignore"
+    },
+    {
+      "match": "nvm",
+      "policy": "ignore"
+    },
+    {
+      "match": "Docker",
+      "policy": "ignore"
+    },
+    {
+      "match": "configs",
+      "policy": "ignore"
+    },
+    {
+      "match": "patches",
+      "policy": "ignore"
+    }
+  ],
+  "defaultPolicy": "unclassified"
+}

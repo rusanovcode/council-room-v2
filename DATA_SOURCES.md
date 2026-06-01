@@ -54,7 +54,7 @@ Council Room v2/
 
 ## 2. Модуль свитч (мультиаккаунт) — `lib/switcher.js`
 
-**Это ai-switcher (`C:\AI\ai-switcher`).** Источник истины — его **HTTP-gateway**, фолбэк — файлы.
+**Это ai-switcher (`<repo>/ai-switcher`).** Источник истины — его **HTTP-gateway**, фолбэк — файлы.
 
 ### Gateway (первичный источник)
 - URL: `http://127.0.0.1:7700/status` (`GATEWAY_PORT`, `AI_SWITCHER_HOST`). Поднимается отдельно (трей/демон ai-switcher).
@@ -64,8 +64,8 @@ Council Room v2/
 
 ### Файловый фолбэк (если gateway не отвечает)
 - «Подключён» = есть auth-папки acc2. Аккаунт 2 выбирается переменными окружения:
-  - Claude acc2: `CLAUDE_CONFIG_DIR` + `CLAUDE_USAGE_CACHE` = `C:\AI\ai-switcher\auth\claude-acc2`
-  - Codex acc2: `CODEX_HOME` = `C:\AI\ai-switcher\auth\codex-acc2`
+  - Claude acc2: `CLAUDE_CONFIG_DIR` + `CLAUDE_USAGE_CACHE` = `<repo>/ai-switcher/auth/claude-acc2`
+  - Codex acc2: `CODEX_HOME` = `<repo>/ai-switcher/auth/codex-acc2`
   - acc1 = переменные НЕ заданы → дефолт (`%USERPROFILE%\.claude`, `%USERPROFILE%\.codex`)
 - `envForAccount(tool, account)` возвращает эти overrides; `cli.runCodex/runClaude` прокидывают их в дочерний процесс.
 - Авторизация по кнопке: `cli.spawnLogin` открывает терминал в env аккаунта и запускает `codex login` / `claude /login`.
