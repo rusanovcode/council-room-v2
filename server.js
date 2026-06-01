@@ -13,6 +13,8 @@ const subtasks = require("./lib/subtasks");
 const knowledge = require("./lib/knowledge");
 const questions = require("./lib/questions");
 const documents = require("./lib/documents");
+const templates = require("./lib/templates");
+const deliverables = require("./lib/deliverables");
 const prompt = require("./lib/prompt");
 const cli = require("./lib/cli");
 const switcher = require("./lib/switcher");
@@ -148,6 +150,7 @@ let state = {
   status: "idle",
   run: null,
   autopilot: { running: false, subtaskId: null, reason: "", startedAt: null, round: 0 },
+  execAutopilot: { running: false, subtaskId: null, reason: "", startedAt: null, template: "", iteration: 0 },
   updateStatus: { checked: false, updateAvailable: false },
   settings: {
     language: "ru",
@@ -313,6 +316,7 @@ function publicState() {
       domain: { id: globalDomain.id, label: globalDomain.label, guards: globalDomain.guards, sections: globalDomain.sections },
       domains: domains.options(),
       autopilot: state.autopilot,
+      execAutopilot: state.execAutopilot,
       runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
       settings: state.settings,
       switcher: { ...switcherStatus, statsVersion, pingResults: switcherPingResults },
@@ -321,6 +325,7 @@ function publicState() {
       port: PORT,
       cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
       updateStatus: state.updateStatus,
+      deliverableTemplates: templates.list(),
     };
   }
   const dir = runDir(state.run.id);
@@ -331,6 +336,8 @@ function publicState() {
   const activeQuestions = active ? questions.forSubtask(dir, active.id) : [];
   const runDomainId = state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code";
   const runDomain = domains.getProfile(runDomainId);
+  const kb = knowledge.load(dir, runDomain.sections);
+  const currentKbDigest = deliverables.kbDigest(kb);
   return {
     activeRunId: state.run.id,
     busy: state.busy,
@@ -341,16 +348,19 @@ function publicState() {
       ...state.run,
       activeSubtask: active,
       subtasks: allSubtasks,
-      knowledge: knowledge.load(dir, runDomain.sections),
+      knowledge: kb,
       questions: activeQuestions,
       documents: documents.listMeta(dir),
+      deliverables: deliverables.loadAll(dir, currentKbDigest),
       messages,
     },
     autopilot: state.autopilot,
+    execAutopilot: state.execAutopilot,
     runs: listRuns().map((r) => ({ id: r.id, topic: r.topic, createdAt: r.createdAt, rounds: r.rounds, archived: Boolean(r.archived), trashed: Boolean(r.trashed) })),
     settings: state.settings,
     switcher: { ...switcherStatus, statsVersion, pingResults: switcherPingResults },
     providers: providersInfo(),
+    deliverableTemplates: templates.list(),
     workdir: WORKDIR,
     port: PORT,
     cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
@@ -752,6 +762,304 @@ function buildLocalSummary(dir, subtask) {
   return lines.join("\n");
 }
 
+function currentParticipants() {
+  const sw = switcher.detect();
+  return profiles.effectiveConfig(state.run.settings, {
+    connected: sw.connected,
+    codexAcc2: switcher.accountAvailable("codex", "acc2"),
+    claudeAcc2: switcher.accountAvailable("claude", "acc2"),
+  }).participants;
+}
+
+function pickParticipant(participants, slot, fallbackIndex = 0) {
+  if (slot) {
+    const found = participants.find((p) => p.slot === slot);
+    if (!found) throw new Error(`Unknown participant: ${slot}`);
+    return found;
+  }
+  return participants[fallbackIndex] || participants[0] || null;
+}
+
+function deliverableContext(dir, subtask, participants, customPrompt = "", extra = {}) {
+  const domain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
+  const kb = knowledge.load(dir, domain.sections);
+  return {
+    run: state.run,
+    subtask,
+    kb,
+    kbDigest: deliverables.kbDigest(kb),
+    kbSnapshot: knowledge.snapshotForPrompt(dir, domain.sections),
+    documentsSnapshot: documents.snapshotForPrompt(dir),
+    recentTurns: recentTurnsForSubtask(state.run.id, subtask.id, Math.max(4, participants.length * 2)),
+    language: state.run.settings.language || "ru",
+    customPrompt,
+    ...extra,
+  };
+}
+
+async function runAuthoringRole(role, agentPrompt, subtask, stamp, label) {
+  const result = await roles.runRole(role, agentPrompt, {
+    workdir: WORKDIR,
+    isolated: true,
+    keyPool: openrouterKeyPool(),
+    signal: activeAbort ? activeAbort.signal : undefined,
+    onStream: (chunk) => broadcastStream(role.slot, chunk, { subtaskId: subtask.id, round: 0, label: role.label }),
+    onChild: (child) => {
+      activeChildren.add(child);
+      child.on("close", () => activeChildren.delete(child));
+    },
+    outFile: path.join(runDir(state.run.id), `${stamp}-${role.slot}.txt`),
+    logFile: path.join(runDir(state.run.id), `${stamp}-${role.slot}.log`),
+  });
+  if (!result.ok) throw new Error(result.text || `${label || role.label} failed`);
+  let usageRecorded = false;
+  if (result.result && result.result.usage && result.profile) {
+    usage.record(ROOMS_DIR, result.profile, result.result.usage);
+    usageRecorded = true;
+  }
+  if (result.profile) {
+    const c = providers.resolveProfile(result.profile);
+    const usedRef = (result.result && result.result.usedRef) || c.credentialRef;
+    if (/openrouter\.ai/i.test(c.baseUrl) && usedRef) { orquota.bump(ROOMS_DIR, usedRef); usageRecorded = true; }
+    for (const bref of (result.result && result.result.blockedRefs) || []) { orquota.bump429(ROOMS_DIR, bref); usageRecorded = true; }
+  }
+  if (usageRecorded) { statsCache = {}; statsVersion++; }
+  return String(result.text || "").trim();
+}
+
+function storeDeliverable({ dir, tpl, subtask, text, author, reviewer, status = "ready", ctx }) {
+  if (!String(text || "").trim()) throw new Error("Generated deliverable is empty");
+  const item = deliverables.create(dir, {
+    template: tpl.id,
+    subtaskId: subtask.id,
+    sourceRound: subtask.rounds,
+    kbDigest: ctx.kbDigest,
+    author: author ? author.slot : "local",
+    reviewer: reviewer ? reviewer.slot : "",
+    status,
+    text,
+  });
+  const doc = documents.add(dir, item.name, text);
+  addMessage({
+    role: author ? "agent" : "system",
+    name: author ? `${author.label} · deliverable` : "Council Room",
+    kind: "deliverable",
+    text,
+    subtaskId: subtask.id,
+    slot: author ? author.slot : "",
+  });
+  addMessage({
+    role: "system",
+    name: "Council Room",
+    kind: "process",
+    text: `Deliverable ${item.id} created: ${item.name} (${item.chars} chars).`,
+    textRu: `Deliverable ${item.id} created: ${item.name} (${item.chars} chars).`,
+    subtaskId: subtask.id,
+  });
+  return { item, doc };
+}
+
+async function createDeliverable(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  const dir = runDir(state.run.id);
+  const all = subtasks.loadAll(dir);
+  const subtaskId = body.subtaskId || (subtasks.activeSubtask(dir) || {}).id;
+  const subtask = all.find((s) => s.id === subtaskId);
+  if (!subtask) throw new Error("Subtask not found");
+  if (subtask.status !== "resolved") throw new Error("Deliverables can only be generated for resolved subtasks");
+
+  const tpl = templates.get(body.template || body.templateId || "summary");
+  const participants = currentParticipants();
+  const localOnly = (body.authorSlot || body.author) === "local" || (tpl.defaultAuthor === "local" && !body.authorSlot && !body.author);
+  const author = localOnly ? null : pickParticipant(participants, body.authorSlot || body.author, 0);
+  const reviewerSlot = body.reviewerSlot || body.reviewer;
+  const reviewer = reviewerSlot
+    ? pickParticipant(participants, reviewerSlot, 1)
+    : (participants.find((p) => !author || p.slot !== author.slot) || null);
+  if (author && reviewer && author.slot === reviewer.slot) throw new Error("Author and reviewer must be different");
+
+  const ctx = deliverableContext(dir, subtask, participants, body.customPrompt || "");
+
+  let text;
+  if (localOnly) {
+    if (!tpl.localBuilder) throw new Error(`Template "${tpl.id}" requires an agent author`);
+    text = tpl.localBuilder(ctx);
+  } else {
+    if (state.busy) throw new Error("Busy");
+    if (!author) throw new Error("No author participant configured");
+    const agentPrompt = tpl.promptBuilder(ctx);
+    const ac = new AbortController();
+    activeAbort = ac;
+    state.busy = true;
+    state.status = "authoring";
+    addMessage({
+      role: "system",
+      name: "Council Room",
+      kind: "process",
+      text: `Generating ${tpl.id} deliverable for subtask ${subtask.id}: author ${author.label}, reviewer ${reviewer ? reviewer.label : "not selected"}.`,
+      textRu: `Generating ${tpl.id} deliverable for subtask ${subtask.id}: author ${author.label}, reviewer ${reviewer ? reviewer.label : "not selected"}.`,
+      subtaskId: subtask.id,
+    });
+    broadcastStream(author.slot, "", { subtaskId: subtask.id, round: 0, reset: true, label: author.label });
+    try {
+      const stamp = `D-${tpl.id}-${subtask.id}`;
+      text = await runAuthoringRole(author, agentPrompt, subtask, stamp, "authoring");
+    } finally {
+      state.busy = false;
+      state.status = "idle";
+      activeAbort = null;
+      broadcast();
+    }
+  }
+
+  const { item, doc } = storeDeliverable({ dir, tpl, subtask, text, author, reviewer, ctx });
+  return { ok: true, template: tpl.id, deliverable: item, document: { id: doc.id, name: doc.name, chars: doc.chars }, author: author ? author.slot : "local", reviewer: reviewer ? reviewer.slot : "" };
+}
+
+function deliveryRoots() {
+  return { root: ROOT, workdir: WORKDIR };
+}
+
+function createHandoffPacket(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  const dir = runDir(state.run.id);
+  const packet = deliverables.makePacket(dir, body.id, body.targetPath, deliveryRoots());
+  const text = deliverables.readContent(dir, packet.id);
+  documents.add(dir, packet.name, text);
+  addMessage({
+    role: "system",
+    name: "Council Room",
+    kind: "deliverable",
+    text,
+    subtaskId: packet.subtaskId,
+  });
+  addMessage({
+    role: "system",
+    name: "Council Room",
+    kind: "process",
+    text: `Handoff packet ${packet.id} created for deliverable ${body.id}.`,
+    textRu: `Handoff packet ${packet.id} created for deliverable ${body.id}.`,
+    subtaskId: packet.subtaskId,
+  });
+  return { ok: true, packet };
+}
+
+function previewDeliverableWrite(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  return deliverables.previewWrite(runDir(state.run.id), body.id, body.targetPath, deliveryRoots());
+}
+
+function writeDeliverable(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  if (body.confirm !== true && body.confirm !== "I understand what and where") {
+    throw new Error("Explicit write confirmation required");
+  }
+  const result = deliverables.write(runDir(state.run.id), body.id, body.targetPath, {
+    roots: deliveryRoots(),
+    allowOverwrite: Boolean(body.allowOverwrite),
+  });
+  addMessage({
+    role: "system",
+    name: "Council Room",
+    kind: "write",
+    text: `Wrote: ${result.deliverable.name} -> ${result.targetPath} (${result.mode}${result.backupPath ? `, backup ${result.backupPath}` : ""}).`,
+    textRu: `Wrote: ${result.deliverable.name} -> ${result.targetPath} (${result.mode}${result.backupPath ? `, backup ${result.backupPath}` : ""}).`,
+    subtaskId: result.deliverable.subtaskId,
+  });
+  return { ok: true, result };
+}
+
+async function runExecutionAutopilot(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  if (state.busy) throw new Error("Busy");
+  if (state.execAutopilot.running) throw new Error("Execution autopilot already running");
+  if (!body.optIn) throw new Error("Execution autopilot requires explicit opt-in");
+
+  const dir = runDir(state.run.id);
+  const subtaskId = body.subtaskId || (subtasks.activeSubtask(dir) || {}).id;
+  const subtask = subtasks.loadAll(dir).find((s) => s.id === subtaskId);
+  if (!subtask) throw new Error("Subtask not found");
+  if (subtask.status !== "resolved") throw new Error("Execution autopilot requires a resolved subtask");
+
+  const tpl = templates.get(body.template || "checklist");
+  const participants = currentParticipants();
+  const author = pickParticipant(participants, body.authorSlot || body.author, 0);
+  const reviewer = pickParticipant(participants, body.reviewerSlot || body.reviewer, 1);
+  if (!author || !reviewer) throw new Error("Author and reviewer participants are required");
+  if (author.slot === reviewer.slot) throw new Error("Author and reviewer must be different");
+  const maxIterations = Math.max(1, Math.min(5, Number(body.maxIterations || 2)));
+
+  const ac = new AbortController();
+  activeAbort = ac;
+  state.busy = true;
+  state.status = "exec-autopilot";
+  state.execAutopilot = { running: true, subtaskId: subtask.id, reason: "", startedAt: store.now(), template: tpl.id, iteration: 0 };
+  addMessage({
+    role: "system",
+    name: "Council Room",
+    kind: "process",
+    text: `Execution autopilot started: ${tpl.id}, author ${author.label}, reviewer ${reviewer.label}, max iterations ${maxIterations}.`,
+    textRu: `Execution autopilot started: ${tpl.id}, author ${author.label}, reviewer ${reviewer.label}, max iterations ${maxIterations}.`,
+    subtaskId: subtask.id,
+  });
+  broadcast();
+
+  let draft = "";
+  let reviewText = "";
+  let lastReview = null;
+  try {
+    for (let i = 1; i <= maxIterations; i++) {
+      if (ac.signal.aborted || !state.execAutopilot.running) throw new Error("user-stop");
+      state.execAutopilot.iteration = i;
+      const guidance = [body.customPrompt || "", reviewText ? `Previous review findings to fix:\n${reviewText}` : ""].filter(Boolean).join("\n\n");
+      const ctx = deliverableContext(dir, subtask, participants, guidance);
+      broadcastStream(author.slot, "", { subtaskId: subtask.id, round: 0, reset: true, label: author.label });
+      draft = await runAuthoringRole(author, tpl.promptBuilder(ctx), subtask, `EXEC-${tpl.id}-${subtask.id}-draft${i}`, "draft");
+      if (!draft.trim()) throw new Error("Execution draft is empty");
+
+      broadcastStream(reviewer.slot, "", { subtaskId: subtask.id, round: 0, reset: true, label: reviewer.label });
+      reviewText = await runAuthoringRole(
+        reviewer,
+        templates.buildReviewPrompt(deliverableContext(dir, subtask, participants, "", { draft })),
+        subtask,
+        `EXEC-${tpl.id}-${subtask.id}-review${i}`,
+        "review",
+      );
+      lastReview = templates.parseReview(reviewText);
+      addMessage({
+        role: "agent",
+        name: `${reviewer.label} · review`,
+        kind: "deliverable-review",
+        text: reviewText,
+        subtaskId: subtask.id,
+        slot: reviewer.slot,
+      });
+      if (lastReview.pass) {
+        const ctx = deliverableContext(dir, subtask, participants, body.customPrompt || "");
+        const { item, doc } = storeDeliverable({ dir, tpl, subtask, text: draft, author, reviewer, status: "ready", ctx });
+        state.execAutopilot.reason = "review-pass";
+        return { ok: true, status: "ready", deliverable: item, document: { id: doc.id, name: doc.name, chars: doc.chars }, review: reviewText };
+      }
+    }
+    const ctx = deliverableContext(dir, subtask, participants, body.customPrompt || "");
+    const halted = [
+      draft,
+      "",
+      "## Execution Autopilot Halted Review",
+      reviewText || "Review did not return PASS.",
+    ].join("\n");
+    const { item, doc } = storeDeliverable({ dir, tpl, subtask, text: halted, author, reviewer, status: "halted", ctx });
+    state.execAutopilot.reason = "review-fail-budget";
+    return { ok: false, status: "halted", deliverable: item, document: { id: doc.id, name: doc.name, chars: doc.chars }, review: reviewText, parsedReview: lastReview };
+  } finally {
+    state.execAutopilot.running = false;
+    state.busy = false;
+    state.status = "idle";
+    activeAbort = null;
+    broadcast();
+  }
+}
+
 async function runAutopilot({ autoResolve = false, guidance = "" } = {}) {
   if (!state.run) throw new Error("No active run");
   if (state.busy) throw new Error("Busy");
@@ -1134,6 +1442,97 @@ async function router(req, res) {
       const dir = runDir(state.run.id);
       const kbDomain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
       knowledge.removeItem(dir, body.section, body.item, kbDomain.sections);
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/deliverables/create") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        const result = await createDeliverable(body);
+        broadcast();
+        return sendJson(res, 200, { ...result, state: publicState() });
+      } catch (error) {
+        state.busy = false;
+        state.status = "idle";
+        activeAbort = null;
+        broadcast();
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/deliverables/preview-write") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        return sendJson(res, 200, { ok: true, preview: previewDeliverableWrite(body) });
+      } catch (error) {
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/deliverables/content") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        return sendJson(res, 200, { ok: true, text: deliverables.readContent(runDir(state.run.id), body.id) });
+      } catch (error) {
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/deliverables/write") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        const result = writeDeliverable(body);
+        broadcast();
+        return sendJson(res, 200, { ...result, state: publicState() });
+      } catch (error) {
+        broadcast();
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/deliverables/packet") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        const result = createHandoffPacket(body);
+        broadcast();
+        return sendJson(res, 200, { ...result, state: publicState() });
+      } catch (error) {
+        broadcast();
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/exec-autopilot/start") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      runExecutionAutopilot(body).catch((error) => {
+        state.execAutopilot.reason = `error: ${error.message}`;
+        state.execAutopilot.running = false;
+        state.busy = false;
+        state.status = "idle";
+        activeAbort = null;
+        addMessage({ role: "system", name: "Council Room", kind: "error", text: `Execution autopilot failed: ${error.message}`, textRu: `Execution autopilot failed: ${error.message}`, subtaskId: body.subtaskId || "" });
+        broadcast();
+      });
+      return sendJson(res, 202, { accepted: true });
+    }
+
+    if (method === "POST" && pathname === "/api/exec-autopilot/stop") {
+      const wasRunning = state.execAutopilot.running;
+      state.execAutopilot.running = false;
+      if (wasRunning) {
+        state.execAutopilot.reason = "user-stop";
+        addMessage({ role: "system", name: "Council Room", kind: "process", text: "Execution autopilot stopped: user-stop.", textRu: "Execution autopilot stopped: user-stop.", subtaskId: state.execAutopilot.subtaskId || "" });
+      }
+      try { activeAbort?.abort(); } catch {}
+      for (const child of activeChildren) cli.killTree(child);
+      activeChildren.clear();
       broadcast();
       return sendJson(res, 200, publicState());
     }

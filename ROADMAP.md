@@ -315,7 +315,7 @@ Gate-экран: чек-лист зелёных галок («все critarian m
 
 ## Phase 8 — Post-Consensus Authoring (выработка deliverable-файлов)
 
-Статус: **design-doc готов, не реализовано**. Полный дизайн → `PHASE8_AUTHORING.md`.
+Статус: **A1/A2/B/C реализованы 2026-06-01**. Полный дизайн → `PHASE8_AUTHORING.md`.
 
 ### Цель
 Добавить к совещанию исполнительный слой: по итогам консенсуса выработать готовый
@@ -334,10 +334,10 @@ Gate-экран: чек-лист зелёных галок («все critarian m
 - **Версионирование** артефакта (`{sourceRound, kbDigest}`, `stale` → перегенерация).
 
 ### Поэтапно
-A1 — `lib/templates.js` + `/api/deliverables/create` → артефакт как chat-документ (copy).
-A2 — панель Deliverables + версионирование.
-B — write-примитив (new + gated-диалог; overwrite-настройка; handoff-packet).
-C — execution-autopilot (петля + двойной гейт + budget/iteration limits).
+A1 — **DONE 2026-06-01**: `lib/templates.js` + `/api/deliverables/create` → артефакт как chat-документ (copy).
+A2 — **DONE 2026-06-01**: панель Deliverables + версионирование.
+B — **DONE 2026-06-01**: write-примитив (new + gated-диалог; overwrite-настройка; handoff-packet).
+C — **DONE 2026-06-01**: execution-autopilot (петля + двойной гейт + budget/iteration limits).
 
 ### Файлы для правки
 | Файл | Что |

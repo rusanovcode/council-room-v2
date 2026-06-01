@@ -19,6 +19,28 @@ const STRINGS = {
     "ui.trashedEmpty": "Корзина ответов пуста.",
     "ui.traceSummary": "Служебные события",
     "ui.runRound": "▶ Запустить раунд",
+    "ui.generateDoc": "Док",
+    "ui.generateDocPrompt": "Шаблон: summary, checklist или closure-review",
+    "ui.generateDocAuthorPrompt": "Автор (slot) или пусто для дефолта:",
+    "ui.deliverableCreated": "Документ создан: {name}",
+    "ui.deliverableFailed": "Не удалось создать документ: {error}",
+    "ui.deliverables": "Deliverables",
+    "ui.deliverablesEmpty": "Пока нет deliverable-документов.",
+    "ui.deliverableBadge": "{n}",
+    "ui.deliverableStale": "stale",
+    "ui.copy": "Копировать",
+    "ui.packet": "Packet",
+    "ui.write": "Write",
+    "ui.targetPathPrompt": "Путь для записи внутри рабочей папки:",
+    "ui.confirmWriteNew": "Создать новый файл?\n\n{path}\n\nБудет записано ровно содержимое deliverable.",
+    "ui.confirmOverwrite": "Файл уже существует. Разрешить overwrite?\n\n{path}\n\nБудет создан .bak backup. Diff preview:\n{diff}",
+    "ui.writeDone": "Записано: {path}",
+    "ui.packetDone": "Handoff packet создан: {name}",
+    "ui.execAutopilot": "Execution autopilot",
+    "ui.execTemplatePrompt": "Шаблон execution-autopilot: checklist или closure-review",
+    "ui.execAuthorPrompt": "Author slot:",
+    "ui.execReviewerPrompt": "Reviewer slot (должен отличаться):",
+    "ui.execConfirm": "Запустить execution-autopilot?\n\nПодзадача должна быть resolved. Будут вызваны author и reviewer агенты, это может тратить токены.",
     "ui.guidancePlaceholder": "Направление на следующий раунд (опц.)",
     "ui.knowledgeBase": "База знаний",
     "ui.settings": "Настройки модуль свитчера",
@@ -82,6 +104,8 @@ const STRINGS = {
     "tip.resolve": "Закрыть активную подзадачу. Она исчезает из ленты, остаётся в стеке как закрытая (resolved).|||оба агента сообщили Статус: готова к закрытию (Status: resolve), KB пополнен 3 пунктами — жмёшь «Закрыть», вводишь короткое резюме («stop = stale×2 OR token<25%»).",
     "tip.freeze": "Заморозить подзадачу с причиной. Не закрыта, но временно не дебатируется.|||подзадача «выбор UI-библиотеки» — ждёт пока пользователь сравнит варианты. Причина: «жду решения пользователя по vanilla vs preact».",
     "tip.runRound": "Один синхронный раунд: Codex и Claude отвечают параллельно ПО АКТИВНОЙ подзадаче.\nРеализацию не запускает, файлы не меняет (read-only debate).|||жмёшь «▶ Запустить раунд». Через 30-90 секунд в ленте два новых сообщения: Codex и Claude, каждое заканчивается хвостом «New facts / risks / alternatives / Status / KB-patch».",
+    "tip.generateDoc": "Сгенерировать deliverable по закрытой подзадаче. A1 не пишет файлы вне чата: текст появляется в ленте и добавляется как chat-document.|||После консенсуса нажимаешь Doc на resolved-строке, выбираешь checklist — получаешь markdown-чеклист для копирования.",
+    "tip.deliverables": "Версии deliverable-документов по закрытым подзадачам. Copy копирует текст, Packet создаёт handoff-пакет, Write пишет файл только после явного подтверждения.|||Создал checklist v1, KB изменилась — бейдж stale подсказывает regenerate перед записью.",
     "tip.trace": "Служебные сообщения (запуск CLI, KB-патчи и т.п.).\nСкрыты из обычной ленты, чтобы не засорять её.|||«Раунд 3 (subtask st_5a625327): запуск Codex и Claude параллельно. Codex prompt 1842 chars, Claude prompt 1842 chars.» — техническая запись, не для чтения.",
     "tip.msgTrash": "Показать/скрыть удалённые ответы агентов.\nОтвет в корзине скрыт из ленты и не передаётся агентам в контекст следующего раунда — но не удаляется, его можно восстановить.|||ошибочный или шумный ответ убираешь в корзину кнопкой 🗑 на карточке; передумал — открываешь корзину и жмёшь «Восстановить».",
     "tip.mode": "LIGHT — хотфикс ≤3 файлов, без дебатов.\nSTANDARD — обычная фича, 2–4 раунда.\nSTRICT — критичные системы, 4–8 раундов.\nCRITICAL — прод/финансы, 6–10 раундов + независимый аудит.|||смена цвета кнопки → LIGHT. Новый эндпоинт API → STANDARD. Переезд auth-логики → STRICT. Миграция платёжной БД → CRITICAL.",
@@ -427,6 +451,28 @@ const STRINGS = {
     "ui.trashedEmpty": "Response bin is empty.",
     "ui.traceSummary": "Process trace (system events)",
     "ui.runRound": "▶ Run round",
+    "ui.generateDoc": "Doc",
+    "ui.generateDocPrompt": "Template: summary, checklist, or closure-review",
+    "ui.generateDocAuthorPrompt": "Author slot, or blank for the default:",
+    "ui.deliverableCreated": "Document created: {name}",
+    "ui.deliverableFailed": "Could not create document: {error}",
+    "ui.deliverables": "Deliverables",
+    "ui.deliverablesEmpty": "No deliverables yet.",
+    "ui.deliverableBadge": "{n}",
+    "ui.deliverableStale": "stale",
+    "ui.copy": "Copy",
+    "ui.packet": "Packet",
+    "ui.write": "Write",
+    "ui.targetPathPrompt": "Write path inside the workspace:",
+    "ui.confirmWriteNew": "Create a new file?\n\n{path}\n\nExactly the deliverable content will be written.",
+    "ui.confirmOverwrite": "The file already exists. Allow overwrite?\n\n{path}\n\nA .bak backup will be created. Diff preview:\n{diff}",
+    "ui.writeDone": "Wrote: {path}",
+    "ui.packetDone": "Handoff packet created: {name}",
+    "ui.execAutopilot": "Execution autopilot",
+    "ui.execTemplatePrompt": "Execution-autopilot template: checklist or closure-review",
+    "ui.execAuthorPrompt": "Author slot:",
+    "ui.execReviewerPrompt": "Reviewer slot (must be different):",
+    "ui.execConfirm": "Start execution autopilot?\n\nThe subtask must be resolved. Author and reviewer agents will run, which may spend tokens.",
     "ui.guidancePlaceholder": "Steer the next round (optional)",
     "ui.knowledgeBase": "Knowledge Base",
     "ui.settings": "Switcher module settings",
@@ -490,6 +536,8 @@ const STRINGS = {
     "tip.resolve": "Resolve the active subtask. It disappears from the feed, stays in the stack as resolved.|||both agents returned Status: resolve, KB got 3 new items — you click Resolve and type a short summary (“stop = stale×2 OR token<25%”).",
     "tip.freeze": "Freeze the subtask with a reason. Not closed, but paused from debate.|||subtask “pick UI library” — waiting for the user to compare options. Reason: “awaiting user decision on vanilla vs preact”.",
     "tip.runRound": "One synchronous round: Codex and Claude answer in parallel ON THE ACTIVE subtask.\nDoes not run implementation, does not modify files (read-only debate).|||click ▶ Run round. After 30-90 seconds, two new messages appear: Codex and Claude, each ending with “New facts / risks / alternatives / Status / KB-patch”.",
+    "tip.generateDoc": "Generate a deliverable from a resolved subtask. A1 does not write files outside the chat: the text appears in the feed and is attached as a chat document.|||After consensus, click Doc on a resolved row, choose checklist, and get a markdown checklist ready to copy.",
+    "tip.deliverables": "Versioned deliverables for resolved subtasks. Copy copies text, Packet creates a handoff packet, Write writes a file only after explicit confirmation.|||Created checklist v1, then KB changed — the stale badge tells you to regenerate before writing.",
     "tip.trace": "System messages (CLI launch, KB patches, etc.).\nHidden from the main feed to keep it clean.|||“Round 3 (subtask st_5a625327): Codex and Claude launched in parallel. Codex prompt 1842 chars, Claude prompt 1842 chars.” — a technical record, not for reading.",
     "tip.msgTrash": "Show/hide trashed agent responses.\nA trashed response is hidden from the feed and excluded from the context sent to the agents next round — but not deleted, it can be restored.|||trash a wrong or noisy answer with the 🗑 button on its card; changed your mind — open the bin and hit «Restore».",
     "tip.mode": "LIGHT — hotfix ≤3 files, no debate.\nSTANDARD — normal feature, 2–4 rounds.\nSTRICT — critical systems, 4–8 rounds.\nCRITICAL — production/finance, 6–10 rounds + independent audit.|||recoloring a button → LIGHT. New API endpoint → STANDARD. Moving auth logic → STRICT. Migrating the payments DB → CRITICAL.",
@@ -1016,7 +1064,14 @@ async function api(method, path, body) {
   const opts = { method, headers: { "content-type": "application/json" } };
   if (body) opts.body = JSON.stringify(body);
   const response = await fetch(path, opts);
-  if (!response.ok) throw new Error(`${method} ${path} -> ${response.status}`);
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const data = await response.json();
+      detail = data && data.error ? `: ${data.error}` : "";
+    } catch {}
+    throw new Error(`${method} ${path} -> ${response.status}${detail}`);
+  }
   if (response.headers.get("content-type")?.includes("application/json")) return response.json();
   return null;
 }
@@ -1118,6 +1173,7 @@ function render() {
   renderActiveSubtask();
   renderConversation();
   renderKnowledge();
+  renderDeliverables();
   renderDocuments();
   renderSettings();
   renderAgentsInit();
@@ -1622,6 +1678,26 @@ function makeIconBtn(cls, glyph, title, handler) {
   return b;
 }
 
+async function generateDeliverableForSubtask(st) {
+  const ids = (currentState.deliverableTemplates || []).map((tpl) => tpl.id).join(", ") || "summary, checklist, closure-review";
+  const template = (prompt(`${t("ui.generateDocPrompt")} (${ids})`, "summary") || "").trim();
+  if (!template) return;
+  let authorSlot = "";
+  if (template !== "summary") {
+    authorSlot = (prompt(t("ui.generateDocAuthorPrompt"), "") || "").trim();
+  }
+  try {
+    const result = await api("POST", "/api/deliverables/create", {
+      subtaskId: st.id,
+      template,
+      ...(authorSlot ? { authorSlot } : {}),
+    });
+    if (result && result.document) alert(t("ui.deliverableCreated", { name: result.document.name }));
+  } catch (error) {
+    alert(t("ui.deliverableFailed", { error: error.message }));
+  }
+}
+
 function renderSubtaskRow(st, context) {
   const li = document.createElement("li");
   li.classList.add(st.status);
@@ -1638,6 +1714,9 @@ function renderSubtaskRow(st, context) {
   if (context === "stack") {
     if (st.rounds === 0 && st.status !== "resolved") {
       right.appendChild(makeIconBtn("subtask-edit", "✎", t("ui.editIcon"), () => openSubtaskModal({ editId: st.id, title: st.title, mode: st.mode })));
+    }
+    if (st.status === "resolved") {
+      right.appendChild(makeIconBtn("subtask-doc", t("ui.generateDoc"), t("tip.generateDoc").split("|||")[0], () => generateDeliverableForSubtask(st)));
     }
     right.appendChild(makeIconBtn("subtask-archive", "🗄", t("ui.toArchive"), () => flashThenAct(li, "rgba(255,202,40,0.5)", () => api("POST", "/api/subtasks/archive", { id: st.id }))));
     right.appendChild(makeIconBtn("subtask-delete", "×", t("ui.toTrash"), () => flashThenAct(li, "rgba(239,83,80,0.45)", () => api("POST", "/api/subtasks/trash", { id: st.id }))));
@@ -4149,6 +4228,99 @@ function renderDocuments() {
   </div>`).join("");
 }
 
+function showDeliverablesMsg(text, isError) {
+  const el = $("deliverablesMsg");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `providers-msg ${text ? (isError ? "err" : "ok") : ""}`;
+  clearTimeout(showDeliverablesMsg._t);
+  showDeliverablesMsg._t = setTimeout(() => { el.textContent = ""; el.className = "providers-msg"; }, 5000);
+}
+
+function deliverableLabel(d) {
+  return `${d.template} v${d.version}${d.stale ? ` · ${t("ui.deliverableStale")}` : ""}`;
+}
+
+function renderDeliverables() {
+  const list = $("deliverablesList");
+  if (!list) return;
+  const items = (currentState.run && currentState.run.deliverables) || [];
+  const execBtn = $("execAutopilot");
+  if (execBtn) {
+    const running = Boolean(currentState.execAutopilot?.running);
+    execBtn.textContent = running ? t("ui.autopilotStop") : t("ui.execAutopilot");
+    execBtn.disabled = currentState.busy && !running;
+    execBtn.classList.toggle("primary", running);
+    execBtn.classList.toggle("ghost", !running);
+  }
+  const badge = $("deliverablesCount");
+  if (badge) badge.textContent = items.length ? t("ui.deliverableBadge", { n: items.length }) : "";
+  if (!items.length) {
+    list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.deliverablesEmpty"))}</div>`;
+    return;
+  }
+  list.innerHTML = items.map((d) => `<div class="doc-row deliverable-row${d.stale ? " stale" : ""}" data-id="${escapeHtml(d.id)}">
+    <span class="doc-name" title="${escapeHtml(d.name)}">${escapeHtml(deliverableLabel(d))}</span>
+    <span class="doc-chars">${escapeHtml(d.status)} · ${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
+    <button class="del-copy" type="button">${escapeHtml(t("ui.copy"))}</button>
+    <button class="del-packet" type="button">${escapeHtml(t("ui.packet"))}</button>
+    <button class="del-write" type="button">${escapeHtml(t("ui.write"))}</button>
+  </div>`).join("");
+}
+
+async function copyDeliverable(id) {
+  const result = await api("POST", "/api/deliverables/content", { id });
+  await navigator.clipboard.writeText(result.text || "");
+  showDeliverablesMsg(t("ui.copy"), false);
+}
+
+async function packetDeliverable(id) {
+  const targetPath = (prompt(t("ui.targetPathPrompt"), "") || "").trim();
+  if (!targetPath) return;
+  const result = await api("POST", "/api/deliverables/packet", { id, targetPath });
+  showDeliverablesMsg(t("ui.packetDone", { name: result.packet.name }), false);
+}
+
+async function writeDeliverable(id) {
+  const targetPath = (prompt(t("ui.targetPathPrompt"), "") || "").trim();
+  if (!targetPath) return;
+  const preview = (await api("POST", "/api/deliverables/preview-write", { id, targetPath })).preview;
+  const ok = preview.exists
+    ? confirm(t("ui.confirmOverwrite", { path: preview.targetPath, diff: preview.diff || "(no diff)" }))
+    : confirm(t("ui.confirmWriteNew", { path: preview.targetPath }));
+  if (!ok) return;
+  const result = await api("POST", "/api/deliverables/write", {
+    id,
+    targetPath,
+    allowOverwrite: Boolean(preview.exists),
+    confirm: true,
+  });
+  showDeliverablesMsg(t("ui.writeDone", { path: result.result.targetPath }), false);
+}
+
+async function startExecutionAutopilot() {
+  const subtasks = currentState.run?.subtasks || [];
+  const fallback = [...subtasks].reverse().find((s) => s.status === "resolved");
+  if (!fallback) return showDeliverablesMsg("No resolved subtask", true);
+  const subtaskId = (prompt("Subtask id:", fallback.id) || "").trim();
+  if (!subtaskId) return;
+  const template = (prompt(t("ui.execTemplatePrompt"), "checklist") || "").trim();
+  if (!template) return;
+  const authorSlot = (prompt(t("ui.execAuthorPrompt"), "") || "").trim();
+  if (!authorSlot) return;
+  const reviewerSlot = (prompt(t("ui.execReviewerPrompt"), "") || "").trim();
+  if (!reviewerSlot) return;
+  if (!confirm(t("ui.execConfirm"))) return;
+  await api("POST", "/api/exec-autopilot/start", {
+    subtaskId,
+    template,
+    authorSlot,
+    reviewerSlot,
+    optIn: true,
+  });
+  showDeliverablesMsg("Execution autopilot started", false);
+}
+
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
@@ -4391,7 +4563,8 @@ function bindUi() {
   $("status").addEventListener("click", () => {
     if (!currentState?.busy) return;
     hideTooltip();
-    api("POST", "/api/autopilot/stop", {});
+    if (currentState.execAutopilot?.running) api("POST", "/api/exec-autopilot/stop", {});
+    else api("POST", "/api/autopilot/stop", {});
   });
 
   const TERMINALS_KEY = "council-room-v2.terminalsCollapsed";
@@ -4517,6 +4690,22 @@ function bindUi() {
     if (!rm) return;
     const id = rm.closest(".doc-row")?.dataset.id;
     if (id) api("POST", "/api/documents/remove", { id });
+  });
+  $("deliverablesList")?.addEventListener("click", async (event) => {
+    const row = event.target.closest(".deliverable-row");
+    if (!row) return;
+    const id = row.dataset.id;
+    try {
+      if (event.target.closest(".del-copy")) await copyDeliverable(id);
+      else if (event.target.closest(".del-packet")) await packetDeliverable(id);
+      else if (event.target.closest(".del-write")) await writeDeliverable(id);
+    } catch (error) {
+      showDeliverablesMsg(error.message, true);
+    }
+  });
+  $("execAutopilot")?.addEventListener("click", () => {
+    if (currentState.execAutopilot?.running) api("POST", "/api/exec-autopilot/stop", {});
+    else startExecutionAutopilot().catch((error) => showDeliverablesMsg(error.message, true));
   });
 
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.

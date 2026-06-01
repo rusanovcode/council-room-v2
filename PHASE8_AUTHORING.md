@@ -11,7 +11,8 @@ change.
 
 > Document for step-by-step execution **by another agent in small steps**. Each
 > step ends with a verification block. After all steps — return to the lead agent
-> for a joint review (see "Phased plan"). Status: **design only, not implemented**.
+> for a joint review (see "Phased plan"). Status: **A1/A2/B/C implemented
+> 2026-06-01**.
 
 ---
 
@@ -146,13 +147,13 @@ A single primitive `applyDeliverable(files[], mode)`:
   now, not auto-merge.
 
 ## 12. Phased plan
-1. **A1** — `lib/templates.js` (summary, checklist, closure-review) + endpoint
+1. **A1 — DONE 2026-06-01** — `lib/templates.js` (summary, checklist, closure-review) + endpoint
    `/api/deliverables/create` (agent of choice) → artifact as a chat document.
    Copy delivery.
-2. **A2** — Deliverables panel + versioning + `stale`.
-3. **B** — write primitive (§6): new files + gated dialog; overwrite setting;
+2. **A2 — DONE 2026-06-01** — Deliverables panel + versioning + `stale`.
+3. **B — DONE 2026-06-01** — write primitive (§6): new files + gated dialog; overwrite setting;
    handoff-packet.
-4. **C** — execution autopilot (§7): draft→review→revise loop, D4 double gate,
+4. **C — DONE 2026-06-01** — execution autopilot (§7): draft→review→revise loop, D4 double gate,
    budget/iteration limits.
 
 Rules kept across all phases (per ROADMAP): isolation by default, token economy,

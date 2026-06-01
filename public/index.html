@@ -326,6 +326,21 @@
           </div><!-- /.providers-body -->
         </details>
 
+        <details id="deliverablesPanel" class="providers-panel">
+          <summary>
+            <span data-i18n="ui.deliverables">Deliverables</span>
+            <span class="help" data-tooltip-key="t.deliverables">?</span>
+            <span id="deliverablesCount" class="mode-badge"></span>
+          </summary>
+          <div class="providers-body">
+            <div id="deliverablesList"></div>
+            <div class="doc-add-actions">
+              <button id="execAutopilot" class="ghost small" type="button" data-i18n="ui.execAutopilot">Execution autopilot</button>
+              <span id="deliverablesMsg" class="providers-msg"></span>
+            </div>
+          </div>
+        </details>
+
         <!-- Phase 6b: per-chat attached reference documents (fed into the prompt). -->
         <details id="documentsPanel" class="providers-panel">
           <summary>

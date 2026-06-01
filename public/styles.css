@@ -1893,11 +1893,18 @@ button.square {
 .doc-row:last-child { border-bottom: none; }
 .doc-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-chars { color: var(--muted); font-size: 11px; white-space: nowrap; }
-.doc-remove {
+.doc-remove,
+.del-copy,
+.del-packet,
+.del-write {
   background: none; border: none; color: var(--muted);
-  cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px;
+  cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px;
 }
 .doc-remove:hover { color: var(--red); }
+.del-copy:hover { color: var(--green); }
+.del-packet:hover { color: var(--amber); }
+.del-write:hover { color: var(--accent); }
+.deliverable-row.stale .doc-name { color: var(--amber); }
 .doc-add { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .doc-add-row { display: flex; gap: 6px; align-items: center; }
 .doc-add-row #docName { flex: 1 1 auto; min-width: 0; }

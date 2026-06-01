@@ -2,13 +2,38 @@
 
 Документ для следующей сессии. Куда мы пришли, что проверено, что осталось.
 
+## Update 2026-06-01 — Phase 8 A2/B/C implemented
+
+Закрыты оставшиеся инкременты Phase 8:
+- **A2**: `lib/deliverables.js`, versioned storage `deliverables.jsonl` +
+  `deliverables/*.md`, `kbDigest`/`stale`, панель Deliverables.
+- **B**: `content`/`preview-write`/`write`/`packet` endpoints, запись только в
+  разрешённые roots (`ROOT`/`WORKDIR`), explicit confirm, overwrite через backup
+  `.bak-*`, audit message `kind:"write"`, handoff-packet как deliverable.
+- **C**: `execAutopilot` state, `/api/exec-autopilot/start|stop`, double gate
+  (`resolved` + `optIn:true`), author≠reviewer, draft→review loop,
+  `Review: PASS|FAIL`, ready/halted deliverable.
+
+Отчёты: `PHASE8_A2_REPORT.md`, `PHASE8_B_REPORT.md`, `PHASE8_C_REPORT.md`.
+Проверено: `node --check ...`, `npm test`, интеграционный smoke A2/B/C на
+временном сервере с mock OpenAI-compatible backend.
+
+## Update 2026-06-01 — Phase 8 A1 implemented: in-chat deliverables
+
+Реализован первый безопасный инкремент Phase 8: `lib/templates.js` + endpoint
+`POST /api/deliverables/create` + кнопка `Doc` на resolved-подзадачах. Поддержаны
+шаблоны `summary` (local/0 токенов), `checklist`, `closure-review`; результат
+попадает в ленту (`kind:"deliverable"`) и в chat-documents (`documents.jsonl`).
+Записи файлов наружу нет: gated-write, versioning/stale и execution-autopilot
+остаются на A2/B/C. Отчёт: `PHASE8_A1_REPORT.md`.
+
 ## Update 2026-06-01 — Phase 8 design-doc: post-consensus authoring
 
-Спроектирована (НЕ реализована) следующая фаза — **Phase 8: выработка
+На тот момент была спроектирована (ещё НЕ реализована) следующая фаза — **Phase 8: выработка
 deliverable-файлов по итогам консенсуса**. Полный дизайн: `PHASE8_AUTHORING.md`,
 в ROADMAP — `## Phase 8`. Решения зафиксированы (overwrite=настройка пользователя,
 двойной гейт разблокировки исполнения, автор≠ревьюер, closure-review встроенный
-тип, артефакт+review-gate парой). Реализацию не начинали — по решению пользователя.
+тип, артефакт+review-gate парой). Реализацию тогда не начинали — по решению пользователя.
 
 ## Update 2026-05-31 — OpenRouter API backend, key pool, quota panel (token economy)
 
