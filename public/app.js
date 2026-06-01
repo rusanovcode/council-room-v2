@@ -43,6 +43,7 @@ const STRINGS = {
     "ui.targetPathPrompt": "Путь для записи внутри рабочей папки:",
     "ui.applyTargetPathPrompt": "Абсолютный путь для Apply:",
     "ui.applyAbsoluteRequired": "Для Apply нужен абсолютный путь.",
+    "ui.targetPathFileRequired": "Путь должен указывать на файл, а не папку; добавьте имя файла, например phase13_checklist.md.",
     "ui.targetPathUnset": "путь не задан",
     "ui.confirmWriteNew": "Создать новый файл?\n\n{path}\n\nБудет записано ровно содержимое deliverable.",
     "ui.confirmOverwrite": "Файл уже существует. Разрешить overwrite?\n\n{path}\n\nБудет создан .bak backup. Diff preview:\n{diff}",
@@ -519,6 +520,7 @@ const STRINGS = {
     "ui.targetPathPrompt": "Write path inside the workspace:",
     "ui.applyTargetPathPrompt": "Absolute target path for Apply:",
     "ui.applyAbsoluteRequired": "Apply requires an absolute target path.",
+    "ui.targetPathFileRequired": "Target must be a file path, not a folder; add a filename, e.g. phase13_checklist.md.",
     "ui.targetPathUnset": "target path not set",
     "ui.confirmWriteNew": "Create a new file?\n\n{path}\n\nExactly the deliverable content will be written.",
     "ui.confirmOverwrite": "The file already exists. Allow overwrite?\n\n{path}\n\nA .bak backup will be created. Diff preview:\n{diff}",
@@ -4644,6 +4646,7 @@ let deliverablesForm = null;
 let deliverablesFormForRunId = undefined;
 let deliverablesActorPool = [];
 let deliverableTargetPathHints = {};
+let deliverableLastTargetDirByRunId = {};
 let deliverablesFieldTouched = {};
 let deliverablesFieldArmed = {};
 
@@ -4792,6 +4795,75 @@ function deliverableById(id) {
   return deliverablesItemsList().find((item) => item.id === id) || null;
 }
 
+function deliverableTargetRunKey() {
+  return currentState?.activeRunId || "__none__";
+}
+
+function templateFileToken(template) {
+  return String(template || "deliverable")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    || "deliverable";
+}
+
+function slugFileToken(value, maxLen = 40) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0400-\u04FF]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, maxLen)
+    .replace(/_+$/g, "");
+}
+
+function subtaskTitleForDeliverable(deliverable) {
+  const subtaskId = deliverable?.subtaskId || "";
+  const subtask = (currentState?.run?.subtasks || []).find((item) => item.id === subtaskId);
+  return String(subtask?.title || "");
+}
+
+function defaultDeliverableFileName(deliverable) {
+  const template = templateFileToken(deliverable?.template || "deliverable");
+  const title = subtaskTitleForDeliverable(deliverable);
+  const phaseMatch = title.match(/(?:\bphase|\u0444\u0430\u0437\u0430)\s*(\d+)/i);
+  if (phaseMatch) return `phase${phaseMatch[1]}_${template}.md`;
+  const slug = slugFileToken(title);
+  return `${slug ? `${slug}_` : ""}${template}.md`;
+}
+
+function targetPathDirectoryPart(targetPath) {
+  const clean = String(targetPath || "").trim().replace(/[\\/]+$/g, "");
+  if (!clean) return "";
+  const slash = Math.max(clean.lastIndexOf("/"), clean.lastIndexOf("\\"));
+  if (slash < 0) return "";
+  if (slash === 0) return clean.slice(0, 1);
+  return clean.slice(0, slash);
+}
+
+function pathJoinForPrompt(dir, filename) {
+  const base = String(dir || "").trim();
+  const leaf = String(filename || "").trim();
+  if (!base) return leaf;
+  if (!leaf) return base;
+  const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
+  return /[\\/]$/.test(base) ? `${base}${leaf}` : `${base}${sep}${leaf}`;
+}
+
+function lastDeliverableTargetDir() {
+  return String(deliverableLastTargetDirByRunId[deliverableTargetRunKey()] || "");
+}
+
+function rememberDeliverableTargetDir(targetPath) {
+  const dir = targetPathDirectoryPart(targetPath);
+  if (dir) deliverableLastTargetDirByRunId[deliverableTargetRunKey()] = dir;
+}
+
+function derivedDeliverableTargetPath(id) {
+  const item = deliverableById(id);
+  if (!item) return "";
+  return pathJoinForPrompt(lastDeliverableTargetDir(), defaultDeliverableFileName(item));
+}
+
 function knownDeliverableTargetPath(id) {
   const cached = deliverableTargetPathHints[id];
   if (cached) return cached;
@@ -4803,15 +4875,26 @@ function rememberDeliverableTargetPath(id, targetPath) {
   const clean = String(targetPath || "").trim();
   if (!id || !clean) return;
   deliverableTargetPathHints[id] = clean;
+  rememberDeliverableTargetDir(clean);
+}
+
+function isLikelyFileTargetPath(targetPath) {
+  const clean = String(targetPath || "").trim();
+  if (!clean || /[\\/]$/.test(clean)) return false;
+  const leaf = clean.split(/[\\/]/).pop() || "";
+  return /^[^.].*\.[^.]+$/.test(leaf);
 }
 
 function promptDeliverableTargetPath(id, { requireAbsolute = false } = {}) {
-  const initial = knownDeliverableTargetPath(id);
+  const initial = knownDeliverableTargetPath(id) || derivedDeliverableTargetPath(id);
   const promptText = requireAbsolute ? t("ui.applyTargetPathPrompt") : t("ui.targetPathPrompt");
   const input = (prompt(promptText, initial) || "").trim();
   if (!input) return "";
   if (requireAbsolute && !isAbsoluteTargetPath(input)) {
     throw new Error(t("ui.applyAbsoluteRequired"));
+  }
+  if (!isLikelyFileTargetPath(input)) {
+    throw new Error(t("ui.targetPathFileRequired"));
   }
   rememberDeliverableTargetPath(id, input);
   return input;
