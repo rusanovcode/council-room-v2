@@ -334,10 +334,65 @@
           </summary>
           <div class="providers-body">
             <div id="deliverablesList"></div>
-            <div class="doc-add-actions">
+            <div id="deliverablesExecForm" class="deliverables-form">
+              <label class="deliverables-field">
+                <span data-i18n="ui.execSubtaskLabel">Resolved subtask</span>
+                <select id="execSubtask"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.execTemplateLabel">Template</span>
+                <select id="execTemplate"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.execAuthorLabel">Author</span>
+                <select id="execAuthor"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.agentModel">Model</span>
+                <select id="execAuthorModel"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.agentEffort">Effort</span>
+                <select id="execAuthorEffort"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.execReviewerLabel">Reviewer</span>
+                <select id="execReviewer"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.agentModel">Model</span>
+                <select id="execReviewerModel"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.agentEffort">Effort</span>
+                <select id="execReviewerEffort"></select>
+              </label>
               <button id="execAutopilot" class="ghost small" type="button" data-i18n="ui.execAutopilot">Execution autopilot</button>
-              <span id="deliverablesMsg" class="providers-msg"></span>
             </div>
+            <div id="deliverablesDocForm" class="deliverables-form">
+              <div class="deliverables-form-head">
+                <span data-i18n="ui.docFormTitle">Doc: one author, no review loop</span>
+                <span class="help" data-tooltip-key="t.docForm">?</span>
+              </div>
+              <label class="deliverables-field">
+                <span data-i18n="ui.docTemplateLabel">Doc template</span>
+                <select id="docTemplate"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.docAuthorLabel">Doc author</span>
+                <select id="docAuthor"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.agentModel">Model</span>
+                <select id="docAuthorModel"></select>
+              </label>
+              <label class="deliverables-field">
+                <span data-i18n="ui.agentEffort">Effort</span>
+                <select id="docAuthorEffort"></select>
+              </label>
+              <button id="generateDoc" class="ghost small" type="button" data-i18n="ui.generateDoc">Doc</button>
+            </div>
+            <span id="deliverablesMsg" class="providers-msg"></span>
           </div>
         </details>
 

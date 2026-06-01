@@ -150,7 +150,7 @@ let state = {
   status: "idle",
   run: null,
   autopilot: { running: false, subtaskId: null, reason: "", startedAt: null, round: 0 },
-  execAutopilot: { running: false, subtaskId: null, reason: "", startedAt: null, template: "", iteration: 0 },
+  execAutopilot: { running: false, subtaskId: null, reason: "", startedAt: null, template: "", iteration: 0, phase: "" },
   updateStatus: { checked: false, updateAvailable: false },
   settings: {
     language: "ru",
@@ -771,8 +771,71 @@ function currentParticipants() {
   }).participants;
 }
 
-function pickParticipant(participants, slot, fallbackIndex = 0) {
-  if (slot) {
+function roleSpec(body, slotKey, legacyKey) {
+  if (Object.prototype.hasOwnProperty.call(body || {}, slotKey)) return body[slotKey];
+  return body ? body[legacyKey] : undefined;
+}
+
+function isBackendSpec(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function backendIdentity(backend) {
+  return `${backend.provider || ""}|${backend.account || ""}|${backend.model || ""}`;
+}
+
+function backendDisplay(backend = {}) {
+  const parts = [
+    backend.label || backend.provider || "backend",
+    backend.account || "",
+    backend.model || "",
+    backend.effort || "auto",
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function stableInlineSlot(roleName, backend) {
+  const clean = backendIdentity(backend)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 56) || "agent";
+  return `inline-${roleName}-${clean}`;
+}
+
+function inlineBackendParticipant(roleName, backend) {
+  const spec = { ...backend };
+  const failoverSpec = isBackendSpec(spec.failover) ? { ...spec.failover } : null;
+  delete spec.failover;
+  const err = profiles.validateProfile({ id: "x", ...spec });
+  if (err) throw new Error(`${roleName} backend: ${err}`);
+  const slot = stableInlineSlot(roleName, spec);
+  const chain = [profiles.backendToProfile(slot, spec)];
+  if (failoverSpec) {
+    const failoverErr = profiles.validateProfile({ id: "x", ...failoverSpec });
+    if (failoverErr) throw new Error(`${roleName} failover backend: ${failoverErr}`);
+    chain.push(profiles.backendToProfile(`${slot}_failover`, failoverSpec));
+  }
+  return {
+    slot,
+    label: spec.label || roleName,
+    mode: chain.length > 1 ? "auto" : "manual",
+    chain,
+    _inlineBackend: failoverSpec ? { ...spec, failover: failoverSpec } : spec,
+  };
+}
+
+function participantIdentity(participant) {
+  if (!participant) return "";
+  if (participant._inlineBackend) return `backend:${backendIdentity(participant._inlineBackend)}`;
+  return `slot:${participant.slot || ""}`;
+}
+
+function pickParticipant(participants, spec, fallbackIndex = 0, roleName = "participant") {
+  if (spec !== undefined && spec !== null && spec !== "") {
+    if (isBackendSpec(spec)) return inlineBackendParticipant(roleName, spec);
+    const slot = String(spec).trim();
+    if (!slot) throw new Error(`Invalid ${roleName}`);
     const found = participants.find((p) => p.slot === slot);
     if (!found) throw new Error(`Unknown participant: ${slot}`);
     return found;
@@ -797,6 +860,34 @@ function deliverableContext(dir, subtask, participants, customPrompt = "", extra
   };
 }
 
+function roleHasConfiguredFailover(role) {
+  return Boolean(role && role.mode === "auto" && Array.isArray(role.chain) && role.chain.length > 1);
+}
+
+function classifyRoleFailure(text) {
+  const src = String(text || "");
+  const usageCap = /status:\s*429|rate.?limit|daily cap|quota|insufficient quota|too many requests|usage cap|exhausted/i.test(src);
+  const authFailure = /status:\s*40[13]|unauthori[sz]ed|forbidden|authentication|authorization|invalid api key|missing api key|login required|expired token/i.test(src);
+  return { usageCap, authFailure };
+}
+
+function roleFailureTarget(role, result) {
+  const profile = (result && result.profile) || (role && Array.isArray(role.chain) && role.chain[0]) || null;
+  return profile ? backendDisplay(profile) : (role && role.label) || "backend";
+}
+
+function friendlyRoleFailureMessage(role, label, result) {
+  const detail = String(result?.text || "");
+  const { usageCap, authFailure } = classifyRoleFailure(detail);
+  if (!usageCap && !authFailure) return "";
+  const actor = label === "review" ? "Reviewer" : label === "draft" ? "Author" : (role?.label || "Agent");
+  const cause = usageCap ? "usage cap" : "authentication";
+  const failoverNote = roleHasConfiguredFailover(role)
+    ? " after configured failover attempts"
+    : " with no configured failover backend";
+  return `${actor} failed due to ${cause} on ${roleFailureTarget(role, result)}${failoverNote}.`;
+}
+
 async function runAuthoringRole(role, agentPrompt, subtask, stamp, label) {
   const result = await roles.runRole(role, agentPrompt, {
     workdir: WORKDIR,
@@ -811,7 +902,10 @@ async function runAuthoringRole(role, agentPrompt, subtask, stamp, label) {
     outFile: path.join(runDir(state.run.id), `${stamp}-${role.slot}.txt`),
     logFile: path.join(runDir(state.run.id), `${stamp}-${role.slot}.log`),
   });
-  if (!result.ok) throw new Error(result.text || `${label || role.label} failed`);
+  if (!result.ok) {
+    const friendly = friendlyRoleFailureMessage(role, label, result);
+    throw new Error(friendly || result.text || `${label || role.label} failed`);
+  }
   let usageRecorded = false;
   if (result.result && result.result.usage && result.profile) {
     usage.record(ROOMS_DIR, result.profile, result.result.usage);
@@ -870,13 +964,25 @@ async function createDeliverable(body = {}) {
 
   const tpl = templates.get(body.template || body.templateId || "summary");
   const participants = currentParticipants();
-  const localOnly = (body.authorSlot || body.author) === "local" || (tpl.defaultAuthor === "local" && !body.authorSlot && !body.author);
-  const author = localOnly ? null : pickParticipant(participants, body.authorSlot || body.author, 0);
-  const reviewerSlot = body.reviewerSlot || body.reviewer;
-  const reviewer = reviewerSlot
-    ? pickParticipant(participants, reviewerSlot, 1)
-    : (participants.find((p) => !author || p.slot !== author.slot) || null);
-  if (author && reviewer && author.slot === reviewer.slot) throw new Error("Author and reviewer must be different");
+  const authorSpec = roleSpec(body, "authorSlot", "author");
+  const reviewerSpec = roleSpec(body, "reviewerSlot", "reviewer");
+  const localOnly = authorSpec === "local" || (tpl.defaultAuthor === "local" && authorSpec === undefined);
+  let author = null;
+  let reviewer = null;
+  try {
+    author = localOnly ? null : pickParticipant(participants, authorSpec, 0, "author");
+    reviewer = (reviewerSpec !== undefined && reviewerSpec !== null && reviewerSpec !== "")
+      ? pickParticipant(participants, reviewerSpec, 1, "reviewer")
+      : (participants.find((p) => !author || participantIdentity(p) !== participantIdentity(author)) || null);
+  } catch (error) {
+    if (/^Unknown participant:/.test(error.message || "")) {
+      throw new Error("Selected author/reviewer is no longer available. Re-select from the dropdowns and run again.");
+    }
+    throw error;
+  }
+  if (author && reviewer && participantIdentity(author) === participantIdentity(reviewer)) {
+    throw new Error("Author and reviewer must be different");
+  }
 
   const ctx = deliverableContext(dir, subtask, participants, body.customPrompt || "");
 
@@ -916,13 +1022,13 @@ async function createDeliverable(body = {}) {
   return { ok: true, template: tpl.id, deliverable: item, document: { id: doc.id, name: doc.name, chars: doc.chars }, author: author ? author.slot : "local", reviewer: reviewer ? reviewer.slot : "" };
 }
 
-function deliveryRoots() {
+function deliveryRoots({ allowExternal = false } = {}) {
   // Phase 8: gated-write is constrained to the app folder (ROOT) only — NOT the
   // C:\AI umbrella (WORKDIR). Relative target paths resolve against ROOT; any
   // write resolving outside it (incl. sibling projects like game_agent) is
   // refused by deliverables.resolveTarget. Agent-driven actions still produce
   // in-chat deliverables only; an actual file write always needs explicit confirm.
-  return { root: ROOT };
+  return { root: ROOT, allowExternal: Boolean(allowExternal) };
 }
 
 function createHandoffPacket(body = {}) {
@@ -954,6 +1060,18 @@ function previewDeliverableWrite(body = {}) {
   return deliverables.previewWrite(runDir(state.run.id), body.id, body.targetPath, deliveryRoots());
 }
 
+function previewDeliverableApply(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  if (body.allowExternal !== true) throw new Error("allowExternal=true is required");
+  const targetPath = String(body.targetPath || "").trim();
+  if (!targetPath || !path.isAbsolute(targetPath)) {
+    throw new Error("Absolute targetPath required for apply-preview");
+  }
+  return deliverables.previewWrite(runDir(state.run.id), body.id, targetPath, deliveryRoots({ allowExternal: true }), {
+    allowExternal: true,
+  });
+}
+
 function writeDeliverable(body = {}) {
   if (!state.run) throw new Error("No active run");
   if (body.confirm !== true && body.confirm !== "I understand what and where") {
@@ -974,7 +1092,31 @@ function writeDeliverable(body = {}) {
   return { ok: true, result };
 }
 
-async function runExecutionAutopilot(body = {}) {
+function applyDeliverable(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  if (body.confirm !== true) throw new Error("Explicit apply confirmation required");
+  if (body.allowExternal !== true) throw new Error("allowExternal=true is required");
+  const targetPath = String(body.targetPath || "").trim();
+  if (!targetPath || !path.isAbsolute(targetPath)) {
+    throw new Error("Absolute targetPath required for apply");
+  }
+  const result = deliverables.write(runDir(state.run.id), body.id, targetPath, {
+    roots: deliveryRoots({ allowExternal: true }),
+    allowOverwrite: Boolean(body.allowOverwrite),
+    allowExternal: true,
+  });
+  addMessage({
+    role: "system",
+    name: "Council Room",
+    kind: "write",
+    text: `Applied: ${result.deliverable.name} -> ${result.targetPath} (${result.mode}${result.backupPath ? `, backup ${result.backupPath}` : ""}).`,
+    textRu: `Applied: ${result.deliverable.name} -> ${result.targetPath} (${result.mode}${result.backupPath ? `, backup ${result.backupPath}` : ""}).`,
+    subtaskId: result.deliverable.subtaskId,
+  });
+  return { ok: true, result };
+}
+
+function prepareExecutionAutopilot(body = {}) {
   if (!state.run) throw new Error("No active run");
   if (state.busy) throw new Error("Busy");
   if (state.execAutopilot.running) throw new Error("Execution autopilot already running");
@@ -988,17 +1130,41 @@ async function runExecutionAutopilot(body = {}) {
 
   const tpl = templates.get(body.template || "checklist");
   const participants = currentParticipants();
-  const author = pickParticipant(participants, body.authorSlot || body.author, 0);
-  const reviewer = pickParticipant(participants, body.reviewerSlot || body.reviewer, 1);
+  let author;
+  let reviewer;
+  try {
+    author = pickParticipant(participants, roleSpec(body, "authorSlot", "author"), 0, "author");
+    reviewer = pickParticipant(participants, roleSpec(body, "reviewerSlot", "reviewer"), 1, "reviewer");
+  } catch (error) {
+    if (/^Unknown participant:/.test(error.message || "")) {
+      throw new Error("Selected author/reviewer is no longer available. Re-select from the dropdowns and run again.");
+    }
+    throw error;
+  }
   if (!author || !reviewer) throw new Error("Author and reviewer participants are required");
-  if (author.slot === reviewer.slot) throw new Error("Author and reviewer must be different");
+  if (participantIdentity(author) === participantIdentity(reviewer)) throw new Error("Author and reviewer must be different");
   const maxIterations = Math.max(1, Math.min(5, Number(body.maxIterations || 2)));
+  return { dir, subtask, tpl, participants, author, reviewer, maxIterations };
+}
+
+async function runExecutionAutopilot(body = {}, prepared = null) {
+  const {
+    dir, subtask, tpl, participants, author, reviewer, maxIterations,
+  } = prepared || prepareExecutionAutopilot(body);
 
   const ac = new AbortController();
   activeAbort = ac;
   state.busy = true;
   state.status = "exec-autopilot";
-  state.execAutopilot = { running: true, subtaskId: subtask.id, reason: "", startedAt: store.now(), template: tpl.id, iteration: 0 };
+  state.execAutopilot = {
+    running: true,
+    subtaskId: subtask.id,
+    reason: "",
+    startedAt: store.now(),
+    template: tpl.id,
+    iteration: 0,
+    phase: "drafting",
+  };
   addMessage({
     role: "system",
     name: "Council Room",
@@ -1016,12 +1182,24 @@ async function runExecutionAutopilot(body = {}) {
     for (let i = 1; i <= maxIterations; i++) {
       if (ac.signal.aborted || !state.execAutopilot.running) throw new Error("user-stop");
       state.execAutopilot.iteration = i;
+      state.execAutopilot.phase = "drafting";
+      broadcast();
       const guidance = [body.customPrompt || "", reviewText ? `Previous review findings to fix:\n${reviewText}` : ""].filter(Boolean).join("\n\n");
       const ctx = deliverableContext(dir, subtask, participants, guidance);
       broadcastStream(author.slot, "", { subtaskId: subtask.id, round: 0, reset: true, label: author.label });
       draft = await runAuthoringRole(author, tpl.promptBuilder(ctx), subtask, `EXEC-${tpl.id}-${subtask.id}-draft${i}`, "draft");
-      if (!draft.trim()) throw new Error("Execution draft is empty");
+      if (!draft.trim()) throw new Error("Author produced no draft — review skipped. Re-run or pick another author.");
+      addMessage({
+        role: "agent",
+        name: `${author.label} · draft ${i}`,
+        kind: "deliverable-draft",
+        text: draft,
+        subtaskId: subtask.id,
+        slot: author.slot,
+      });
 
+      state.execAutopilot.phase = "reviewing";
+      broadcast();
       broadcastStream(reviewer.slot, "", { subtaskId: subtask.id, round: 0, reset: true, label: reviewer.label });
       reviewText = await runAuthoringRole(
         reviewer,
@@ -1043,6 +1221,7 @@ async function runExecutionAutopilot(body = {}) {
         const ctx = deliverableContext(dir, subtask, participants, body.customPrompt || "");
         const { item, doc } = storeDeliverable({ dir, tpl, subtask, text: draft, author, reviewer, status: "ready", ctx });
         state.execAutopilot.reason = "review-pass";
+        state.execAutopilot.phase = "done";
         return { ok: true, status: "ready", deliverable: item, document: { id: doc.id, name: doc.name, chars: doc.chars }, review: reviewText };
       }
     }
@@ -1055,9 +1234,11 @@ async function runExecutionAutopilot(body = {}) {
     ].join("\n");
     const { item, doc } = storeDeliverable({ dir, tpl, subtask, text: halted, author, reviewer, status: "halted", ctx });
     state.execAutopilot.reason = "review-fail-budget";
+    state.execAutopilot.phase = "halted";
     return { ok: false, status: "halted", deliverable: item, document: { id: doc.id, name: doc.name, chars: doc.chars }, review: reviewText, parsedReview: lastReview };
   } finally {
     state.execAutopilot.running = false;
+    state.execAutopilot.phase = "";
     state.busy = false;
     state.status = "idle";
     activeAbort = null;
@@ -1265,7 +1446,11 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
       const dir = runDir(state.run.id);
-      const subtask = subtasks.openSubtask(dir, { title: body.title || "Untitled", mode: body.mode || "STANDARD" });
+      const subtask = subtasks.openSubtask(dir, {
+        title: body.title || "Untitled",
+        mode: body.mode || "STANDARD",
+        parentId: body.parentId || "",
+      });
       addMessage({
         role: "system",
         name: "Council Room",
@@ -1477,6 +1662,16 @@ async function router(req, res) {
       }
     }
 
+    if (method === "POST" && pathname === "/api/deliverables/apply-preview") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        return sendJson(res, 200, { ok: true, preview: previewDeliverableApply(body) });
+      } catch (error) {
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
     if (method === "POST" && pathname === "/api/deliverables/content") {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
@@ -1492,6 +1687,19 @@ async function router(req, res) {
       const body = await readBody(req);
       try {
         const result = writeDeliverable(body);
+        broadcast();
+        return sendJson(res, 200, { ...result, state: publicState() });
+      } catch (error) {
+        broadcast();
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/deliverables/apply") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        const result = applyDeliverable(body);
         broadcast();
         return sendJson(res, 200, { ...result, state: publicState() });
       } catch (error) {
@@ -1516,13 +1724,38 @@ async function router(req, res) {
     if (method === "POST" && pathname === "/api/exec-autopilot/start") {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
-      runExecutionAutopilot(body).catch((error) => {
-        state.execAutopilot.reason = `error: ${error.message}`;
+      let prepared;
+      try {
+        prepared = prepareExecutionAutopilot(body);
+      } catch (error) {
+        return sendJson(res, 400, { error: error.message });
+      }
+      runExecutionAutopilot(body, prepared).catch((error) => {
+        const message = String(error && error.message ? error.message : "Execution autopilot failed");
+        if (message === "user-stop") {
+          state.execAutopilot.reason = state.execAutopilot.reason || "user-stop";
+          state.execAutopilot.running = false;
+          state.execAutopilot.phase = "";
+          state.busy = false;
+          state.status = "idle";
+          activeAbort = null;
+          broadcast();
+          return;
+        }
+        state.execAutopilot.reason = `error: ${message}`;
         state.execAutopilot.running = false;
+        state.execAutopilot.phase = "";
         state.busy = false;
         state.status = "idle";
         activeAbort = null;
-        addMessage({ role: "system", name: "Council Room", kind: "error", text: `Execution autopilot failed: ${error.message}`, textRu: `Execution autopilot failed: ${error.message}`, subtaskId: body.subtaskId || "" });
+        addMessage({
+          role: "system",
+          name: "Council Room",
+          kind: "error",
+          text: `Execution autopilot failed: ${message}`,
+          textRu: `Execution autopilot failed: ${message}`,
+          subtaskId: prepared?.subtask?.id || body.subtaskId || "",
+        });
         broadcast();
       });
       return sendJson(res, 202, { accepted: true });
@@ -1531,6 +1764,7 @@ async function router(req, res) {
     if (method === "POST" && pathname === "/api/exec-autopilot/stop") {
       const wasRunning = state.execAutopilot.running;
       state.execAutopilot.running = false;
+      state.execAutopilot.phase = "";
       if (wasRunning) {
         state.execAutopilot.reason = "user-stop";
         addMessage({ role: "system", name: "Council Room", kind: "process", text: "Execution autopilot stopped: user-stop.", textRu: "Execution autopilot stopped: user-stop.", subtaskId: state.execAutopilot.subtaskId || "" });

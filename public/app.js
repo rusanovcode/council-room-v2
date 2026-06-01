@@ -20,26 +20,52 @@ const STRINGS = {
     "ui.traceSummary": "Служебные события",
     "ui.runRound": "▶ Запустить раунд",
     "ui.generateDoc": "Док",
-    "ui.generateDocPrompt": "Шаблон: summary, checklist или closure-review",
-    "ui.generateDocAuthorPrompt": "Автор (slot) или пусто для дефолта:",
+    "ui.execSubtaskLabel": "Подзадача",
+    "ui.execTemplateLabel": "Шаблон",
+    "ui.execAuthorLabel": "Author",
+    "ui.execReviewerLabel": "Reviewer",
+    "ui.docTemplateLabel": "Шаблон документа",
+    "ui.docAuthorLabel": "Автор документа",
+    "ui.docFormTitle": "Doc: один автор, без review",
+    "ui.execNoResolved": "Нет закрытых (resolved) подзадач",
+    "ui.execAuthorReviewerDiff": "Author и reviewer должны быть разными.",
+    "ui.docLocalSummaryOnly": "Локальный author доступен только для шаблона summary.",
     "ui.deliverableCreated": "Документ создан: {name}",
     "ui.deliverableFailed": "Не удалось создать документ: {error}",
-    "ui.deliverables": "Deliverables",
+    "ui.deliverables": "Артефакты (Deliverables)",
     "ui.deliverablesEmpty": "Пока нет deliverable-документов.",
     "ui.deliverableBadge": "{n}",
     "ui.deliverableStale": "stale",
     "ui.copy": "Копировать",
+    "ui.apply": "Применить",
     "ui.packet": "Packet",
     "ui.write": "Write",
     "ui.targetPathPrompt": "Путь для записи внутри рабочей папки:",
+    "ui.applyTargetPathPrompt": "Абсолютный путь для Apply:",
+    "ui.applyAbsoluteRequired": "Для Apply нужен абсолютный путь.",
+    "ui.targetPathUnset": "путь не задан",
     "ui.confirmWriteNew": "Создать новый файл?\n\n{path}\n\nБудет записано ровно содержимое deliverable.",
     "ui.confirmOverwrite": "Файл уже существует. Разрешить overwrite?\n\n{path}\n\nБудет создан .bak backup. Diff preview:\n{diff}",
+    "ui.applyExternalWarning": "ВНИМАНИЕ: запись будет выполнена ВНЕ папки приложения Council Room.",
     "ui.writeDone": "Записано: {path}",
+    "ui.applyDone": "Применено: {path}",
+    "ui.applyOpenNextConfirm": "Apply завершён.\n\nОткрыть следующую подзадачу в этом чате?\nШаблон: {template}\nПуть: {path}",
+    "ui.nextSubtaskPrompt": "Название следующей подзадачи:",
+    "ui.nextSubtaskDefault": "Следующая подзадача",
+    "ui.nextSubtaskOpened": "Открыта подзадача: {title}",
     "ui.packetDone": "Handoff packet создан: {name}",
-    "ui.execAutopilot": "Execution autopilot",
-    "ui.execTemplatePrompt": "Шаблон execution-autopilot: checklist или closure-review",
-    "ui.execAuthorPrompt": "Author slot:",
-    "ui.execReviewerPrompt": "Reviewer slot (должен отличаться):",
+    "ui.execAutopilot": "Автопилот исполнения",
+    "ui.execStatusDrafting": "Автопилот исполнения: черновик (итерация {n})…",
+    "ui.execStatusReviewing": "Автопилот исполнения: проверка (итерация {n})…",
+    "ui.execStatusRunning": "Автопилот исполнения: выполняется (итерация {n})…",
+    "ui.execLiveDrafting": "{label} пишет черновик {n}… (прошло {elapsed}с)",
+    "ui.execLiveReviewing": "{label} проверяет черновик {n}… (прошло {elapsed}с)",
+    "ui.execStatusPass": "Автопилот исполнения: PASS, документ создан.",
+    "ui.execStatusFail": "Автопилот исполнения остановлен: review не дал PASS за лимит итераций.",
+    "ui.execStatusStopped": "Автопилот исполнения остановлен пользователем.",
+    "ui.execStatusError": "Автопилот исполнения остановлен: {reason}",
+    "ui.execEmptyDraftFriendly": "Автор не выдал черновик — review пропущен. Перезапусти или выбери другого author.",
+    "ui.execParticipantsUnavailable": "Выбранный author/reviewer больше недоступен. Выбери их заново в списках и повтори запуск.",
     "ui.execConfirm": "Запустить execution-autopilot?\n\nПодзадача должна быть resolved. Будут вызваны author и reviewer агенты, это может тратить токены.",
     "ui.guidancePlaceholder": "Направление на следующий раунд (опц.)",
     "ui.knowledgeBase": "База знаний",
@@ -104,8 +130,13 @@ const STRINGS = {
     "tip.resolve": "Закрыть активную подзадачу. Она исчезает из ленты, остаётся в стеке как закрытая (resolved).|||оба агента сообщили Статус: готова к закрытию (Status: resolve), KB пополнен 3 пунктами — жмёшь «Закрыть», вводишь короткое резюме («stop = stale×2 OR token<25%»).",
     "tip.freeze": "Заморозить подзадачу с причиной. Не закрыта, но временно не дебатируется.|||подзадача «выбор UI-библиотеки» — ждёт пока пользователь сравнит варианты. Причина: «жду решения пользователя по vanilla vs preact».",
     "tip.runRound": "Один синхронный раунд: Codex и Claude отвечают параллельно ПО АКТИВНОЙ подзадаче.\nРеализацию не запускает, файлы не меняет (read-only debate).|||жмёшь «▶ Запустить раунд». Через 30-90 секунд в ленте два новых сообщения: Codex и Claude, каждое заканчивается хвостом «New facts / risks / alternatives / Status / KB-patch».",
-    "tip.generateDoc": "Сгенерировать deliverable по закрытой подзадаче. A1 не пишет файлы вне чата: текст появляется в ленте и добавляется как chat-document.|||После консенсуса нажимаешь Doc на resolved-строке, выбираешь checklist — получаешь markdown-чеклист для копирования.",
-    "tip.deliverables": "Версии deliverable-документов по закрытым подзадачам. Copy копирует текст, Packet создаёт handoff-пакет, Write пишет файл только после явного подтверждения.|||Создал checklist v1, KB изменилась — бейдж stale подсказывает regenerate перед записью.",
+    "tip.generateDoc": "Doc-path: один агент, без review-петли. По шагам: 1) выбери resolved подзадачу; 2) в Doc-блоке выбери шаблон и автора; 3) нажми Doc. Текст попадёт в ленту и в документы чата, вне чата ничего не пишется. Для цикла черновик→review→правки используй автопилот выше.|||После консенсуса: выбери resolved подзадачу в панели Deliverables, в Doc-блоке поставь checklist и автора, затем нажми Doc.",
+    "tip.deliverables": "Панель превращает консенсус в deliverable. Автопилот: шаблон + author + reviewer из общего пула (label · account · model · effort), далее цикл draft→review до PASS/лимита. Doc: один автор без review. Готовые версии можно забрать через Copy / Apply / Packet / Write.|||Типовой поток: resolve → в автопилоте выбери checklist, author и reviewer (разные identity) → дождись PASS/halted → доставь результат.",
+    "tip.apply": "Apply записывает выбранный deliverable в указанный target path (можно вне папки приложения) только после явного подтверждения, затем может открыть следующую подзадачу в текущем чате. Task tracking внешнего проекта Apply не трогает.|||Выбери абсолютный путь, проверь preview/diff в confirm, подтверди запись, затем при желании открой next subtask.",
+    "tip.deliverableCopy": "Копирует текст deliverable в буфер обмена.",
+    "tip.deliverablePacket": "Создаёт handoff-packet внутри папки Council Room по указанному пути.",
+    "tip.deliverableWrite": "Write записывает deliverable только внутри папки Council Room.",
+    "tip.docForm": "Doc-блок — ускоренный путь: один author генерирует deliverable без reviewer и без PASS/FAIL-петли. Автопилот выше — это полный цикл с author+reviewer и итерациями.|||Нужен быстрый итоговый summary или checklist без ревью — используй Doc-блок. Нужен контроль качества через PASS/FAIL — запускай автопилот.",
     "tip.trace": "Служебные сообщения (запуск CLI, KB-патчи и т.п.).\nСкрыты из обычной ленты, чтобы не засорять её.|||«Раунд 3 (subtask st_5a625327): запуск Codex и Claude параллельно. Codex prompt 1842 chars, Claude prompt 1842 chars.» — техническая запись, не для чтения.",
     "tip.msgTrash": "Показать/скрыть удалённые ответы агентов.\nОтвет в корзине скрыт из ленты и не передаётся агентам в контекст следующего раунда — но не удаляется, его можно восстановить.|||ошибочный или шумный ответ убираешь в корзину кнопкой 🗑 на карточке; передумал — открываешь корзину и жмёшь «Восстановить».",
     "tip.mode": "LIGHT — хотфикс ≤3 файлов, без дебатов.\nSTANDARD — обычная фича, 2–4 раунда.\nSTRICT — критичные системы, 4–8 раундов.\nCRITICAL — прод/финансы, 6–10 раундов + независимый аудит.|||смена цвета кнопки → LIGHT. Новый эндпоинт API → STANDARD. Переезд auth-логики → STRICT. Миграция платёжной БД → CRITICAL.",
@@ -143,8 +174,12 @@ const STRINGS = {
     "coach.resolveReady.action": "Закрыть подзадачу",
     "coach.block.title": "Требуется твоё решение",
     "coach.block.body": "Один из агентов сообщил Статус: заблокирован (Status: block). Перечитай его сообщение, добавь нужный факт в Базу знаний (справа) или дай направление в окошке guidance и запусти раунд.",
+    "coach.execRunning.title": "Автопилот исполнения идёт",
+    "coach.execRunning.body": "{status} Дождись Review: PASS/FAIL — не жми Stop без необходимости.",
+    "coach.delivered.title": "Документ готов к передаче",
+    "coach.delivered.body": "Документ «{template}» готов. 1) Packet → {targetPath} (или Copy). 2) Примени его в целевом проекте через его operator-сессию. 3) Отметь задачу выполненной в том проекте.",
     "coach.allDone.title": "Все подзадачи закрыты",
-    "coach.allDone.body": "Knowledge Base собрана. Следующий шаг — handoff к исполнителю (Phase 4 в разработке: кнопки Spawn / Copy prompt).",
+    "coach.allDone.body": "Консенсус собран — все подзадачи закрыты. Следующий шаг: справа в панели «Deliverables» сгенерировать документ — «Doc» на закрытой подзадаче (один агент) или «Execution autopilot» (author пишет черновик → reviewer проверяет Review: PASS/FAIL). Готовый документ доставляется кнопками Copy / Apply / Packet / Write.",
     "coach.runRound.title": "Готов к следующему раунду",
     "coach.runRound.body": "Можешь запустить ещё раунд или закрыть подзадачу, если решение собрано. В Knowledge Base уже добавлено: {kbCount} пункт(а).",
     "coach.runRound.action": "Запустить раунд",
@@ -452,8 +487,16 @@ const STRINGS = {
     "ui.traceSummary": "Process trace (system events)",
     "ui.runRound": "▶ Run round",
     "ui.generateDoc": "Doc",
-    "ui.generateDocPrompt": "Template: summary, checklist, or closure-review",
-    "ui.generateDocAuthorPrompt": "Author slot, or blank for the default:",
+    "ui.execSubtaskLabel": "Subtask",
+    "ui.execTemplateLabel": "Template",
+    "ui.execAuthorLabel": "Author",
+    "ui.execReviewerLabel": "Reviewer",
+    "ui.docTemplateLabel": "Doc template",
+    "ui.docAuthorLabel": "Doc author",
+    "ui.docFormTitle": "Doc: one author, no review loop",
+    "ui.execNoResolved": "No resolved subtasks",
+    "ui.execAuthorReviewerDiff": "Author and reviewer must be different.",
+    "ui.docLocalSummaryOnly": "Local author is available only for the summary template.",
     "ui.deliverableCreated": "Document created: {name}",
     "ui.deliverableFailed": "Could not create document: {error}",
     "ui.deliverables": "Deliverables",
@@ -461,17 +504,35 @@ const STRINGS = {
     "ui.deliverableBadge": "{n}",
     "ui.deliverableStale": "stale",
     "ui.copy": "Copy",
+    "ui.apply": "Apply",
     "ui.packet": "Packet",
     "ui.write": "Write",
     "ui.targetPathPrompt": "Write path inside the workspace:",
+    "ui.applyTargetPathPrompt": "Absolute target path for Apply:",
+    "ui.applyAbsoluteRequired": "Apply requires an absolute target path.",
+    "ui.targetPathUnset": "target path not set",
     "ui.confirmWriteNew": "Create a new file?\n\n{path}\n\nExactly the deliverable content will be written.",
     "ui.confirmOverwrite": "The file already exists. Allow overwrite?\n\n{path}\n\nA .bak backup will be created. Diff preview:\n{diff}",
+    "ui.applyExternalWarning": "WARNING: this write will go OUTSIDE the Council Room app folder.",
     "ui.writeDone": "Wrote: {path}",
+    "ui.applyDone": "Applied: {path}",
+    "ui.applyOpenNextConfirm": "Apply completed.\n\nOpen the next subtask in this chat?\nTemplate: {template}\nPath: {path}",
+    "ui.nextSubtaskPrompt": "Next subtask title:",
+    "ui.nextSubtaskDefault": "Next subtask",
+    "ui.nextSubtaskOpened": "Opened subtask: {title}",
     "ui.packetDone": "Handoff packet created: {name}",
     "ui.execAutopilot": "Execution autopilot",
-    "ui.execTemplatePrompt": "Execution-autopilot template: checklist or closure-review",
-    "ui.execAuthorPrompt": "Author slot:",
-    "ui.execReviewerPrompt": "Reviewer slot (must be different):",
+    "ui.execStatusDrafting": "Execution autopilot: drafting (iteration {n})…",
+    "ui.execStatusReviewing": "Execution autopilot: reviewing (iteration {n})…",
+    "ui.execStatusRunning": "Execution autopilot: running (iteration {n})…",
+    "ui.execLiveDrafting": "{label} is drafting version {n}… (elapsed {elapsed}s)",
+    "ui.execLiveReviewing": "{label} is reviewing version {n}… (elapsed {elapsed}s)",
+    "ui.execStatusPass": "Execution autopilot: PASS, deliverable created.",
+    "ui.execStatusFail": "Execution autopilot halted: review did not PASS within the iteration budget.",
+    "ui.execStatusStopped": "Execution autopilot stopped by user.",
+    "ui.execStatusError": "Execution autopilot halted: {reason}",
+    "ui.execEmptyDraftFriendly": "Author produced no draft — review skipped. Re-run or pick another author.",
+    "ui.execParticipantsUnavailable": "Selected author/reviewer is no longer available. Re-select from the dropdowns and run again.",
     "ui.execConfirm": "Start execution autopilot?\n\nThe subtask must be resolved. Author and reviewer agents will run, which may spend tokens.",
     "ui.guidancePlaceholder": "Steer the next round (optional)",
     "ui.knowledgeBase": "Knowledge Base",
@@ -536,8 +597,13 @@ const STRINGS = {
     "tip.resolve": "Resolve the active subtask. It disappears from the feed, stays in the stack as resolved.|||both agents returned Status: resolve, KB got 3 new items — you click Resolve and type a short summary (“stop = stale×2 OR token<25%”).",
     "tip.freeze": "Freeze the subtask with a reason. Not closed, but paused from debate.|||subtask “pick UI library” — waiting for the user to compare options. Reason: “awaiting user decision on vanilla vs preact”.",
     "tip.runRound": "One synchronous round: Codex and Claude answer in parallel ON THE ACTIVE subtask.\nDoes not run implementation, does not modify files (read-only debate).|||click ▶ Run round. After 30-90 seconds, two new messages appear: Codex and Claude, each ending with “New facts / risks / alternatives / Status / KB-patch”.",
-    "tip.generateDoc": "Generate a deliverable from a resolved subtask. A1 does not write files outside the chat: the text appears in the feed and is attached as a chat document.|||After consensus, click Doc on a resolved row, choose checklist, and get a markdown checklist ready to copy.",
-    "tip.deliverables": "Versioned deliverables for resolved subtasks. Copy copies text, Packet creates a handoff packet, Write writes a file only after explicit confirmation.|||Created checklist v1, then KB changed — the stale badge tells you to regenerate before writing.",
+    "tip.generateDoc": "Doc path: one agent, no review loop. Steps: 1) choose a resolved subtask; 2) in the Doc block pick template and author; 3) press Doc. The result is added to the feed and chat documents; nothing is written outside chat. For draft→review→revise, use execution autopilot above.|||After consensus: pick the resolved subtask in Deliverables, set checklist + author in the Doc block, then press Doc.",
+    "tip.deliverables": "This panel turns consensus into deliverables. Autopilot uses template + author + reviewer from the full pool (label · account · model · effort), then runs draft→review iterations until PASS or budget stop. Doc is a one-author/no-review shortcut. Final versions can be delivered via Copy / Apply / Packet / Write.|||Typical flow: resolve → in autopilot pick checklist, author, reviewer (different identity) → wait for PASS/halted → deliver the result.",
+    "tip.apply": "Apply writes the selected deliverable to a chosen target path (can be outside the app folder) only under explicit confirmation, then can open the next subtask in the current chat. It does not modify the target project's own task tracking.|||Pick an absolute path, inspect preview/diff in confirm, approve the write, then optionally open the next subtask.",
+    "tip.deliverableCopy": "Copy the deliverable text to clipboard.",
+    "tip.deliverablePacket": "Create a handoff packet inside the Council Room workspace at the chosen path.",
+    "tip.deliverableWrite": "Write keeps changes inside the Council Room workspace only.",
+    "tip.docForm": "Doc block is the fast path: one author generates a deliverable with no reviewer and no PASS/FAIL loop. Autopilot above is the full cycle with author+reviewer and iterations.|||Need a quick summary/checklist without review — use the Doc block. Need quality control via PASS/FAIL — run autopilot.",
     "tip.trace": "System messages (CLI launch, KB patches, etc.).\nHidden from the main feed to keep it clean.|||“Round 3 (subtask st_5a625327): Codex and Claude launched in parallel. Codex prompt 1842 chars, Claude prompt 1842 chars.” — a technical record, not for reading.",
     "tip.msgTrash": "Show/hide trashed agent responses.\nA trashed response is hidden from the feed and excluded from the context sent to the agents next round — but not deleted, it can be restored.|||trash a wrong or noisy answer with the 🗑 button on its card; changed your mind — open the bin and hit «Restore».",
     "tip.mode": "LIGHT — hotfix ≤3 files, no debate.\nSTANDARD — normal feature, 2–4 rounds.\nSTRICT — critical systems, 4–8 rounds.\nCRITICAL — production/finance, 6–10 rounds + independent audit.|||recoloring a button → LIGHT. New API endpoint → STANDARD. Moving auth logic → STRICT. Migrating the payments DB → CRITICAL.",
@@ -575,8 +641,12 @@ const STRINGS = {
     "coach.resolveReady.action": "Resolve subtask",
     "coach.block.title": "Decision needed from you",
     "coach.block.body": "One of the agents returned Status: block. Re-read its message, add the missing fact into the Knowledge Base (right) or provide guidance and run another round.",
+    "coach.execRunning.title": "Execution autopilot is running",
+    "coach.execRunning.body": "{status} Wait for Review: PASS/FAIL — do not press Stop unless needed.",
+    "coach.delivered.title": "Deliverable ready to hand off",
+    "coach.delivered.body": "Deliverable “{template}” is ready. 1) Packet → {targetPath} (or Copy). 2) Apply it in the target project via its operator session. 3) Mark the task done in that project.",
     "coach.allDone.title": "All subtasks resolved",
-    "coach.allDone.body": "Knowledge Base is collected. Next step — handoff to the executor (Phase 4 WIP: Spawn / Copy prompt buttons).",
+    "coach.allDone.body": "Consensus is in — all subtasks resolved. Next step: in the «Deliverables» panel on the right, generate a document — «Doc» on a resolved subtask (one agent) or «Execution autopilot» (author drafts → reviewer returns Review: PASS/FAIL). Deliver it with Copy / Apply / Packet / Write.",
     "coach.runRound.title": "Ready for next round",
     "coach.runRound.body": "You can run another round or resolve the subtask if the decision is collected. Knowledge Base already has {kbCount} item(s).",
     "coach.runRound.action": "Run round",
@@ -1127,7 +1197,10 @@ function updateTerminalsVisibility() {
   const section = $("terminals");
   if (!section) return;
   const hasContent = Object.values(termBuffers).some((b) => b && b.trim());
-  const show = hasContent || Boolean(currentState && currentState.busy);
+  const show = hasContent || Boolean(
+    currentState
+    && (currentState.busy || currentState.execAutopilot?.running || deliverablesExecPendingStart),
+  );
   section.classList.toggle("empty", !show);
 }
 
@@ -1135,7 +1208,11 @@ function connectEvents() {
   const source = new EventSource("/api/events");
   source.onmessage = (event) => {
     try {
+      const prevExec = currentState && currentState.execAutopilot
+        ? { ...currentState.execAutopilot }
+        : null;
       currentState = JSON.parse(event.data);
+      updateExecRunProgressFromState(prevExec, currentState.execAutopilot);
       render();
     } catch (error) {
       console.error("SSE parse failed", error);
@@ -1146,6 +1223,29 @@ function connectEvents() {
       const data = JSON.parse(event.data);
       if (!data.agent) return; // slot key: codex/claude (legacy) or a1..a5
       appendTerminal(data.agent, data.chunk || "", Boolean(data.reset), data.label);
+      if ((currentState?.execAutopilot?.running || deliverablesExecPendingStart) && data.reset) {
+        const agentKey = String(data.agent || "");
+        const phaseFromState = currentExecPhase(currentState?.execAutopilot);
+        if (phaseFromState === "reviewing" || phaseFromState === "drafting") {
+          if (deliverablesExecPhase !== phaseFromState) deliverablesExecPhaseStartedMs = Date.now();
+          deliverablesExecPhase = phaseFromState;
+        } else if (!deliverablesExecLastResetAgent) {
+          deliverablesExecPhase = "drafting";
+          deliverablesExecPhaseStartedMs = Date.now();
+        } else if (deliverablesExecLastResetAgent !== agentKey) {
+          deliverablesExecPhase = deliverablesExecPhase === "reviewing" ? "drafting" : "reviewing";
+          deliverablesExecPhaseStartedMs = Date.now();
+        }
+        const phaseKey = deliverablesExecPhase === "reviewing" ? "reviewing" : "drafting";
+        const fallback = deliverablesExecRoleHints[phaseKey] || {};
+        deliverablesExecRoleHints[phaseKey] = {
+          key: agentKey,
+          label: String(data.label || fallback.label || agentKey),
+        };
+        deliverablesExecLastResetAgent = agentKey;
+        renderDeliverablesExecStatus();
+        renderExecLiveTerminalPlaceholder();
+      }
     } catch (error) {
       console.error("SSE stream parse failed", error);
     }
@@ -1182,6 +1282,8 @@ function render() {
   renderPinnedHint();
   renderSwitcher();
   renderProviderStatsPanel();
+  syncExecLiveTicker();
+  renderExecLiveTerminalPlaceholder();
   updateTerminalsVisibility();
 }
 
@@ -1292,6 +1394,26 @@ function parseListLine(text, label) {
   return v.split(/[,;]\s*/).map((s) => s.trim()).filter(Boolean);
 }
 
+function readyDeliverableForCoach(subtasks = [], items = []) {
+  if (!Array.isArray(subtasks) || !Array.isArray(items) || !subtasks.length || !items.length) return null;
+  const resolvedIds = new Set(
+    subtasks
+      .filter((st) => st.status === "resolved" && !st.bin)
+      .map((st) => st.id),
+  );
+  if (!resolvedIds.size) return null;
+  const candidates = items
+    .filter((d) => d && d.status === "ready" && resolvedIds.has(d.subtaskId))
+    .sort((a, b) => (Date.parse(b.createdAt || "") || 0) - (Date.parse(a.createdAt || "") || 0));
+  return candidates[0] || null;
+}
+
+function coachTargetPath(deliverable) {
+  const remembered = deliverable?.id ? knownDeliverableTargetPath(deliverable.id) : "";
+  const value = String(remembered || deliverable?.lastDelivery?.targetPath || "").trim();
+  return value || t("ui.targetPathUnset");
+}
+
 function computeNextStep() {
   const s = currentState;
   if (!s) return null;
@@ -1333,7 +1455,33 @@ function computeNextStep() {
     // No open one, but stack has items
     const allResolved = subtasks.every((st) => st.status === "resolved");
     if (allResolved) {
-      return { title: t("coach.allDone.title"), body: t("coach.allDone.body"), action: null, tone: "ok" };
+      const exec = s.execAutopilot || null;
+      if (exec?.running || deliverablesExecPendingStart) {
+        const n = currentExecIteration(exec);
+        const status = execPhaseStatusText(exec, n);
+        return {
+          title: t("coach.execRunning.title"),
+          body: t("coach.execRunning.body", { status }),
+          action: null,
+          tone: "warn",
+          highlight: ["deliverablesPanel", "execAutopilot"],
+        };
+      }
+      const ready = readyDeliverableForCoach(subtasks, s.run?.deliverables || []);
+      if (ready) {
+        return {
+          title: t("coach.delivered.title"),
+          body: t("coach.delivered.body", {
+            template: ready.template || "deliverable",
+            targetPath: coachTargetPath(ready),
+          }),
+          action: null,
+          tone: "ok",
+          highlight: ["deliverablesPanel", "deliverablesList"],
+        };
+      }
+      // Phase 8: consensus reached → signal the Deliverables panel as the next step.
+      return { title: t("coach.allDone.title"), body: t("coach.allDone.body"), action: null, tone: "ok", highlight: ["deliverablesPanel"] };
     }
     return {
       title: t("coach.step2.title"),
@@ -1408,6 +1556,10 @@ function computeNextStep() {
 // dismissed (quiet mode). This is the "подсвечивает кнопку … гаснет когда сделано"
 // behavior threaded through every onboarding step.
 let navHighlighted = [];
+let supplementalNavHighlights = [];
+function setSupplementalNavHighlights(ids) {
+  supplementalNavHighlights = Array.isArray(ids) ? ids : [];
+}
 function applyNavHighlights(ids) {
   const want = new Set(ids || []);
   for (const id of navHighlighted) {
@@ -1421,7 +1573,8 @@ function renderNextStep() {
   const step = computeNextStep();
   const panel = $("nextStep");
   const reopen = $("nextStepReopen");
-  applyNavHighlights(step && !nextStepDismissed ? (step.highlight || []) : []);
+  const coachIds = step && !nextStepDismissed ? (step.highlight || []) : [];
+  applyNavHighlights([...new Set([...coachIds, ...supplementalNavHighlights])]);
   if (coachPinned) {
     // Guidance is docked at the bottom — hide the floating panel to avoid duplication.
     panel.classList.add("hidden");
@@ -1678,26 +1831,6 @@ function makeIconBtn(cls, glyph, title, handler) {
   return b;
 }
 
-async function generateDeliverableForSubtask(st) {
-  const ids = (currentState.deliverableTemplates || []).map((tpl) => tpl.id).join(", ") || "summary, checklist, closure-review";
-  const template = (prompt(`${t("ui.generateDocPrompt")} (${ids})`, "summary") || "").trim();
-  if (!template) return;
-  let authorSlot = "";
-  if (template !== "summary") {
-    authorSlot = (prompt(t("ui.generateDocAuthorPrompt"), "") || "").trim();
-  }
-  try {
-    const result = await api("POST", "/api/deliverables/create", {
-      subtaskId: st.id,
-      template,
-      ...(authorSlot ? { authorSlot } : {}),
-    });
-    if (result && result.document) alert(t("ui.deliverableCreated", { name: result.document.name }));
-  } catch (error) {
-    alert(t("ui.deliverableFailed", { error: error.message }));
-  }
-}
-
 function renderSubtaskRow(st, context) {
   const li = document.createElement("li");
   li.classList.add(st.status);
@@ -1844,6 +1977,38 @@ function msgText(msg) {
   return (UI_LANG === "ru" && msg.textRu) ? msg.textRu : (msg.text || "");
 }
 
+function renderExecLiveConversationPlaceholder(target, filtered, latestExecStartTs) {
+  const exec = currentState?.execAutopilot || null;
+  const running = Boolean(exec?.running || deliverablesExecPendingStart);
+  if (!running) return;
+  const n = currentExecIteration(exec);
+  const phase = currentExecPhase(exec);
+  const startedTs = latestExecStartTs || (Date.parse(exec?.startedAt || "") || 0);
+  const isCurrentRunDeliverableMsg = (msg) => {
+    if (!msg || (msg.kind !== "deliverable-draft" && msg.kind !== "deliverable-review")) return false;
+    if (exec?.subtaskId && msg.subtaskId && msg.subtaskId !== exec.subtaskId) return false;
+    if (!startedTs) return true;
+    const ts = Date.parse(msg.at || "") || 0;
+    return !ts || ts >= startedTs;
+  };
+  const draftCount = filtered.filter((m) => m.kind === "deliverable-draft" && isCurrentRunDeliverableMsg(m)).length;
+  const reviewCount = filtered.filter((m) => m.kind === "deliverable-review" && isCurrentRunDeliverableMsg(m)).length;
+  const livePhase = phase === "reviewing" ? "reviewing" : "drafting";
+  const pendingOnly = Boolean(deliverablesExecPendingStart && !exec?.running);
+  if (!pendingOnly && ((livePhase === "drafting" && draftCount >= n) || (livePhase === "reviewing" && reviewCount >= n))) return;
+  const role = execRoleForPhase(livePhase);
+  const text = livePhase === "reviewing"
+    ? t("ui.execLiveReviewing", { label: role.label, n, elapsed: execPhaseElapsedSeconds(exec) })
+    : t("ui.execLiveDrafting", { label: role.label, n, elapsed: execPhaseElapsedSeconds(exec) });
+  const card = document.createElement("div");
+  card.className = "msg system exec-live";
+  card.innerHTML = `
+    <div class="name"><span>${escapeHtml(role.label)}</span><span>${escapeHtml(`EXEC · ${livePhase} ${n}`)}</span></div>
+    <div class="text">${escapeHtml(text)}</div>
+  `;
+  target.appendChild(card);
+}
+
 function renderConversation() {
   const target = $("conversation");
   const trace = $("traceList");
@@ -1880,18 +2045,31 @@ function renderConversation() {
   }
 
   const filtered = active ? messages.filter((m) => !m.subtaskId || m.subtaskId === active.id) : messages;
+  const latestExecStartTs = filtered.reduce((maxTs, msg) => {
+    if (msg.kind !== "process") return maxTs;
+    if (!/Execution autopilot started:/i.test(msgText(msg))) return maxTs;
+    const ts = Date.parse(msg.at || "") || 0;
+    return ts > maxTs ? ts : maxTs;
+  }, 0);
+  const isStaleExecMsg = (msg) => {
+    if (!latestExecStartTs) return false;
+    const ts = Date.parse(msg.at || "") || 0;
+    if (!ts || ts >= latestExecStartTs) return false;
+    if (msg.kind !== "process" && msg.kind !== "error") return false;
+    return /Execution autopilot/i.test(msgText(msg));
+  };
   for (const msg of filtered) {
     const isProcess = msg.kind === "process" || msg.kind?.startsWith("subtask-");
     if (isProcess) {
       const row = document.createElement("div");
-      row.className = "trace-row";
+      row.className = `trace-row${isStaleExecMsg(msg) ? " stale-msg" : ""}`;
       row.textContent = `[${formatTime(msg.at)}] ${msg.name}: ${msgText(msg)}`;
       trace.appendChild(row);
       continue;
     }
     if (msg.trashed) continue; // hidden from the main feed; shown in the response bin
     const card = document.createElement("div");
-    card.className = `msg ${msg.role}`;
+    card.className = `msg ${msg.role}${isStaleExecMsg(msg) ? " stale-msg" : ""}`;
     const meta = msg.round ? `R${msg.round}` : msg.kind || "";
     // Agent responses can be trashed (excluded from the feed and the next round's context).
     const trashBtn = msg.role === "agent"
@@ -1903,6 +2081,7 @@ function renderConversation() {
     `;
     target.appendChild(card);
   }
+  renderExecLiveConversationPlaceholder(target, filtered, latestExecStartTs);
 
   // Response bin: trashed agent responses with a Restore button (toggled in the header).
   if (showTrashedMsgs) {
@@ -4228,44 +4407,866 @@ function renderDocuments() {
   </div>`).join("");
 }
 
-function showDeliverablesMsg(text, isError) {
+function showDeliverablesMsg(text, isError, { sticky = false, timeoutMs = 5000 } = {}) {
   const el = $("deliverablesMsg");
   if (!el) return;
-  el.textContent = text;
-  el.className = `providers-msg ${text ? (isError ? "err" : "ok") : ""}`;
+  const safeText = String(text || "");
+  el.textContent = safeText;
+  el.className = `providers-msg ${safeText ? (isError ? "err" : "ok") : ""}`;
   clearTimeout(showDeliverablesMsg._t);
-  showDeliverablesMsg._t = setTimeout(() => { el.textContent = ""; el.className = "providers-msg"; }, 5000);
+  if (sticky || !safeText) {
+    showDeliverablesMsg._sticky = Boolean(sticky && safeText);
+    return;
+  }
+  showDeliverablesMsg._sticky = false;
+  showDeliverablesMsg._t = setTimeout(() => {
+    const msgEl = $("deliverablesMsg");
+    if (!msgEl || showDeliverablesMsg._sticky) return;
+    msgEl.textContent = "";
+    msgEl.className = "providers-msg";
+  }, Math.max(0, Number(timeoutMs) || 0));
+}
+showDeliverablesMsg._sticky = false;
+
+function apiErrorDetail(errorOrText) {
+  const raw = typeof errorOrText === "string"
+    ? errorOrText
+    : String(errorOrText?.message || errorOrText || "");
+  const apiWrapped = raw.match(/^[A-Z]+\s+\/api\/[^\s]+\s*->\s*\d+\s*:\s*(.+)$/);
+  if (apiWrapped) return String(apiWrapped[1] || "").trim();
+  return raw.trim();
+}
+
+function normalizeDeliverablesError(errorOrText) {
+  const detail = apiErrorDetail(errorOrText);
+  if (!detail) return "";
+  if (/execution draft is empty/i.test(detail) || /author produced no draft/i.test(detail)) {
+    return t("ui.execEmptyDraftFriendly");
+  }
+  if (/selected author\/reviewer is no longer available/i.test(detail)) {
+    return t("ui.execParticipantsUnavailable");
+  }
+  return detail;
+}
+
+let deliverablesExecPendingStart = false;
+let deliverablesExecRunToken = "";
+let deliverablesExecPhase = "";
+let deliverablesExecLastResetAgent = "";
+let deliverablesExecFinalShown = "";
+let deliverablesExecRoleHints = { drafting: null, reviewing: null };
+let deliverablesExecPhaseStartedMs = 0;
+let deliverablesExecTicker = null;
+const deliverablesExecLivePlaceholderKeys = new Set();
+
+let deliverablesForm = null;
+let deliverablesFormForRunId = undefined;
+let deliverablesActorPool = [];
+let deliverableTargetPathHints = {};
+
+function currentExecPhase(exec = null) {
+  const source = exec || currentState?.execAutopilot || null;
+  if (source?.running) {
+    const phase = String(source.phase || "").toLowerCase();
+    if (phase === "reviewing" || phase === "drafting") return phase;
+    return deliverablesExecPhase || "drafting";
+  }
+  if (deliverablesExecPendingStart) return "drafting";
+  const remembered = String(deliverablesExecPhase || "").toLowerCase();
+  if (remembered === "reviewing" || remembered === "drafting") return remembered;
+  return "";
+}
+
+function currentExecIteration(exec = null) {
+  const source = exec || currentState?.execAutopilot || null;
+  if (deliverablesExecPendingStart && !source?.running) return 1;
+  const n = Number(source?.iteration || 0);
+  return Math.max(1, Number.isFinite(n) ? n : 1);
+}
+
+function execPhaseStatusText(exec = null, n = currentExecIteration(exec)) {
+  const phase = currentExecPhase(exec);
+  if (phase === "reviewing") return t("ui.execStatusReviewing", { n });
+  if (phase === "drafting") return t("ui.execStatusDrafting", { n });
+  return t("ui.execStatusRunning", { n });
+}
+
+function fallbackExecRoleForPhase(phase = "drafting") {
+  const selected = selectedParticipantsForDeliverables();
+  if (!selected.length) return null;
+  if (phase === "reviewing") return selected.find((_, idx) => idx > 0) || selected[0];
+  return selected[0];
+}
+
+function execRoleForPhase(phase = "drafting") {
+  const key = phase === "reviewing" ? "reviewing" : "drafting";
+  const hint = deliverablesExecRoleHints[key];
+  if (hint && hint.key) {
+    return {
+      key: hint.key,
+      label: hint.label || hint.key,
+    };
+  }
+  const fallback = fallbackExecRoleForPhase(key);
+  if (fallback) return { key: fallback.slot, label: fallback.label || fallback.slot };
+  return {
+    key: key === "reviewing" ? "reviewer" : "author",
+    label: t(key === "reviewing" ? "ui.execReviewerLabel" : "ui.execAuthorLabel"),
+  };
+}
+
+function execPhaseElapsedSeconds(exec = null) {
+  const source = exec || currentState?.execAutopilot || null;
+  const startedAt = Date.parse(source?.startedAt || "") || 0;
+  const base = deliverablesExecPhaseStartedMs || startedAt || Date.now();
+  return Math.max(0, Math.floor((Date.now() - base) / 1000));
+}
+
+function renderExecLiveTerminalPlaceholder() {
+  if (!currentState) return;
+  const exec = currentState.execAutopilot || null;
+  const running = Boolean(exec?.running || deliverablesExecPendingStart);
+  if (!running) return;
+  const phase = currentExecPhase(exec) === "reviewing" ? "reviewing" : "drafting";
+  const role = execRoleForPhase(phase);
+  if (!role?.key) return;
+  for (const key of [...deliverablesExecLivePlaceholderKeys]) {
+    if (key === role.key) continue;
+    if ((termBuffers[key] || "").length) continue;
+    const safeOther = String(key).replace(/[^A-Za-z0-9._-]/g, "_");
+    const other = document.getElementById(`term-${safeOther}`);
+    if (other) other.textContent = "";
+    deliverablesExecLivePlaceholderKeys.delete(key);
+  }
+  if ((termBuffers[role.key] || "").length) return;
+  const el = ensureTermPane(role.key, role.label);
+  if (!el) return;
+  const n = currentExecIteration(exec);
+  const text = phase === "reviewing"
+    ? t("ui.execLiveReviewing", { label: role.label, n, elapsed: execPhaseElapsedSeconds(exec) })
+    : t("ui.execLiveDrafting", { label: role.label, n, elapsed: execPhaseElapsedSeconds(exec) });
+  el.textContent = text;
+  el.scrollTop = el.scrollHeight;
+  deliverablesExecLivePlaceholderKeys.add(role.key);
+  updateTerminalsVisibility();
+}
+
+function clearExecLiveTerminalPlaceholders() {
+  for (const key of deliverablesExecLivePlaceholderKeys) {
+    if ((termBuffers[key] || "").length) continue;
+    const safe = String(key).replace(/[^A-Za-z0-9._-]/g, "_");
+    const el = document.getElementById(`term-${safe}`);
+    if (el) el.textContent = "";
+  }
+  deliverablesExecLivePlaceholderKeys.clear();
+  updateTerminalsVisibility();
+}
+
+function syncExecLiveTicker() {
+  const shouldRun = Boolean(currentState && (currentState.execAutopilot?.running || deliverablesExecPendingStart));
+  if (shouldRun && !deliverablesExecTicker) {
+    deliverablesExecTicker = setInterval(() => {
+      if (!currentState || !(currentState.execAutopilot?.running || deliverablesExecPendingStart)) {
+        syncExecLiveTicker();
+        return;
+      }
+      renderDeliverablesExecStatus();
+      renderExecLiveTerminalPlaceholder();
+      renderConversation();
+    }, 1000);
+  } else if (!shouldRun && deliverablesExecTicker) {
+    clearInterval(deliverablesExecTicker);
+    deliverablesExecTicker = null;
+    clearExecLiveTerminalPlaceholders();
+  }
+}
+
+function isAbsoluteTargetPath(value) {
+  const text = String(value || "");
+  return /^[A-Za-z]:[\\/]/.test(text) || /^\\\\/.test(text) || text.startsWith("/");
+}
+
+function deliverablesItemsList() {
+  return (currentState?.run?.deliverables) || [];
+}
+
+function deliverableById(id) {
+  return deliverablesItemsList().find((item) => item.id === id) || null;
+}
+
+function knownDeliverableTargetPath(id) {
+  const cached = deliverableTargetPathHints[id];
+  if (cached) return cached;
+  const item = deliverableById(id);
+  return String(item?.lastDelivery?.targetPath || "");
+}
+
+function rememberDeliverableTargetPath(id, targetPath) {
+  const clean = String(targetPath || "").trim();
+  if (!id || !clean) return;
+  deliverableTargetPathHints[id] = clean;
+}
+
+function promptDeliverableTargetPath(id, { requireAbsolute = false } = {}) {
+  const initial = knownDeliverableTargetPath(id);
+  const promptText = requireAbsolute ? t("ui.applyTargetPathPrompt") : t("ui.targetPathPrompt");
+  const input = (prompt(promptText, initial) || "").trim();
+  if (!input) return "";
+  if (requireAbsolute && !isAbsoluteTargetPath(input)) {
+    throw new Error(t("ui.applyAbsoluteRequired"));
+  }
+  rememberDeliverableTargetPath(id, input);
+  return input;
+}
+
+function confirmDeliverableWritePreview(preview, { allowExternal = false } = {}) {
+  const text = preview.exists
+    ? t("ui.confirmOverwrite", { path: preview.targetPath, diff: preview.diff || "(no diff)" })
+    : t("ui.confirmWriteNew", { path: preview.targetPath });
+  const externalWarn = allowExternal && preview.isExternal
+    ? `\n\n${t("ui.applyExternalWarning")}`
+    : "";
+  return confirm(`${text}${externalWarn}`);
+}
+
+async function maybeOpenNextSubtaskAfterApply(deliverable, targetPath) {
+  if (!deliverable) return;
+  const shouldOpen = confirm(t("ui.applyOpenNextConfirm", {
+    template: deliverable.template || "deliverable",
+    path: targetPath || "—",
+  }));
+  if (!shouldOpen) return;
+  const fallbackTitle = t("ui.nextSubtaskDefault");
+  const title = (prompt(t("ui.nextSubtaskPrompt"), fallbackTitle) || "").trim() || fallbackTitle;
+  await api("POST", "/api/subtasks/open", {
+    title,
+    mode: "STANDARD",
+    parentId: deliverable.subtaskId || "",
+  });
+  showDeliverablesMsg(t("ui.nextSubtaskOpened", { title }), false);
+}
+
+function resolvedSubtasksForDeliverables() {
+  const all = (currentState.run && currentState.run.subtasks) || [];
+  return all
+    .filter((s) => s.status === "resolved" && !s.bin)
+    .sort((a, b) => {
+      const ta = Date.parse(a.resolvedAt || "") || 0;
+      const tb = Date.parse(b.resolvedAt || "") || 0;
+      if (tb !== ta) return tb - ta;
+      return String(b.openedAt || "").localeCompare(String(a.openedAt || ""));
+    });
+}
+
+function deliverableTemplatesForForm() {
+  const list = currentState.deliverableTemplates || [];
+  if (list.length) return list;
+  return [
+    { id: "summary", label: "summary" },
+    { id: "checklist", label: "checklist" },
+    { id: "closure-review", label: "closure-review" },
+  ];
+}
+
+function selectedParticipantsForDeliverables() {
+  const fromRun = currentState.run?.settings?.participants;
+  const fromGlobal = currentState.settings?.participants;
+  const list = (Array.isArray(fromRun) && fromRun.length) ? fromRun : (Array.isArray(fromGlobal) ? fromGlobal : []);
+  return list
+    .map((p) => ({
+      slot: p.key || p.slot || "",
+      label: p.label || p.key || p.slot || "",
+      backend: p.backend ? { ...p.backend } : null,
+    }))
+    .filter((p) => p.slot);
+}
+
+function backendFromCatalogEntry(entry, { model = "", effort = "" } = {}) {
+  const provider = entry.provider;
+  const backend = {
+    provider,
+    model: model || entry.defaultModel || weakModelFor(provider, ""),
+    effort: effort || (isCliProviderId(provider) ? "low" : "auto"),
+    label: entry.label || provider,
+  };
+  if (entry.account) backend.account = entry.account;
+  if (entry.baseUrl) backend.baseUrl = entry.baseUrl;
+  if (entry.credentialRef) backend.credentialRef = entry.credentialRef;
+  return backend;
+}
+
+function backendIdentityForDeliverables(backend) {
+  if (!backend) return "";
+  return `${backend.provider || ""}|${backend.account || ""}|${backend.model || ""}|${backend.effort || ""}`;
+}
+
+function accountLabelForBackend(backend) {
+  if (!backend) return "—";
+  if (backend.account) return backend.account;
+  if (backend.provider === "ollama") return UI_LANG === "ru" ? "локально" : "local";
+  return "—";
+}
+
+function actorAccountDisplayLabel(label, backend) {
+  const account = accountLabelForBackend(backend);
+  return `${label || "agent"} · ${account}`;
+}
+
+function failoverEntryForCatalog(entry, catalogEntries) {
+  if (!isCliProviderId(entry.provider) || !entry.account) return null;
+  return (catalogEntries || []).find((candidate) => (
+    candidate.provider === entry.provider
+    && candidate.account
+    && candidate.account !== entry.account
+  )) || null;
+}
+
+function deliverablesActorIdForCatalog(entry) {
+  return `catalog:${entry.id}`;
+}
+
+function uniqueNonEmpty(values) {
+  const seen = new Set();
+  const out = [];
+  for (const value of values || []) {
+    const clean = String(value || "").trim();
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out;
+}
+
+function modelOptionsForDeliverablesActor(actor, extraModel = "") {
+  if (!actor) return [];
+  if (isCliProviderId(actor.entry.provider)) {
+    const defaults = ((CLI_MODELS[actor.entry.provider] || []).length
+      ? CLI_MODELS[actor.entry.provider]
+      : [actor.entry.defaultModel || weakModelFor(actor.entry.provider, "")]);
+    return uniqueNonEmpty([extraModel, ...defaults, actor.entry.defaultModel || ""]);
+  }
+  return uniqueNonEmpty([extraModel, actor.entry.defaultModel || ""]);
+}
+
+function effortOptionsForDeliverablesActor(actor, extraEffort = "") {
+  if (!actor) return [];
+  if (!isCliProviderId(actor.entry.provider)) return ["auto"];
+  const defaults = ((CLI_EFFORTS[actor.entry.provider] || []).length
+    ? CLI_EFFORTS[actor.entry.provider]
+    : ["auto"]);
+  return uniqueNonEmpty([extraEffort, ...defaults]);
+}
+
+function actorMatchesBackend(actor, backend) {
+  if (!actor || !backend) return false;
+  if ((actor.entry.provider || "") !== (backend.provider || "")) return false;
+  if ((actor.entry.account || "") !== (backend.account || "")) return false;
+  const actorCred = actor.entry.credentialRef || "";
+  const backendCred = backend.credentialRef || "";
+  if (actorCred && backendCred && actorCred !== backendCred) return false;
+  const actorBaseUrl = actor.entry.baseUrl || "";
+  const backendBaseUrl = backend.baseUrl || "";
+  if (actorBaseUrl && backendBaseUrl && actorBaseUrl !== backendBaseUrl) return false;
+  return true;
+}
+
+function actorIdForBackend(backend, actors = deliverablesActorPool) {
+  if (!backend) return "";
+  let match = (actors || []).find((actor) => (
+    actorMatchesBackend(actor, backend)
+    && (actor.entry.credentialRef || "") === (backend.credentialRef || "")
+    && (actor.entry.baseUrl || "") === (backend.baseUrl || "")
+  ));
+  if (match) return match.id;
+  match = (actors || []).find((actor) => actorMatchesBackend(actor, backend));
+  if (match) return match.id;
+  match = (actors || []).find((actor) => (
+    (actor.entry.provider || "") === (backend.provider || "")
+    && (actor.entry.defaultModel || "") === (backend.model || "")
+  ));
+  if (match) return match.id;
+  match = (actors || []).find((actor) => (actor.entry.provider || "") === (backend.provider || ""));
+  return match ? match.id : "";
+}
+
+function composeDeliverablesBackend(actor, { model = "", effort = "" } = {}) {
+  if (!actor) return null;
+  const backend = backendFromCatalogEntry(actor.entry, { model, effort });
+  if (actor.failoverEntry) {
+    backend.failover = backendFromCatalogEntry(actor.failoverEntry, {
+      model: backend.model,
+      effort: backend.effort,
+    });
+  }
+  return backend;
+}
+
+function roleSpecsForDeliverables() {
+  return {
+    execAuthor: {
+      actorKey: "execAuthor",
+      modelKey: "execAuthorModel",
+      effortKey: "execAuthorEffort",
+      allowLocal: false,
+    },
+    execReviewer: {
+      actorKey: "execReviewer",
+      modelKey: "execReviewerModel",
+      effortKey: "execReviewerEffort",
+      allowLocal: false,
+    },
+    docAuthor: {
+      actorKey: "docAuthor",
+      modelKey: "docAuthorModel",
+      effortKey: "docAuthorEffort",
+      allowLocal: true,
+    },
+  };
+}
+
+function preferredParticipantBackends() {
+  const selected = selectedParticipantsForDeliverables();
+  return {
+    execAuthor: selected[0]?.backend || null,
+    execReviewer: selected.find((p, idx) => idx > 0 && p.backend)?.backend || null,
+  };
+}
+
+function fallbackRoleActorId(currentActorId = "") {
+  if ((deliverablesActorPool || []).some((actor) => actor.id === currentActorId)) return currentActorId;
+  return (deliverablesActorPool[0] || {}).id || "";
+}
+
+function findActorOption(id) {
+  return deliverablesActorPool.find((o) => o.id === id) || null;
+}
+
+function normalizeDeliverablesRole(spec, { forceDefaults = false, preferredBackend = null } = {}) {
+  if (!deliverablesForm || !spec) return { actor: null, modelOptions: [], effortOptions: [] };
+  let actorId = deliverablesForm[spec.actorKey] || "";
+  if (spec.allowLocal && actorId === "local") {
+    deliverablesForm[spec.modelKey] = "";
+    deliverablesForm[spec.effortKey] = "";
+    return { actor: null, modelOptions: [], effortOptions: [] };
+  }
+  actorId = fallbackRoleActorId(actorId);
+  deliverablesForm[spec.actorKey] = actorId;
+  const actor = findActorOption(actorId);
+  if (!actor) {
+    deliverablesForm[spec.modelKey] = "";
+    deliverablesForm[spec.effortKey] = "";
+    return { actor: null, modelOptions: [], effortOptions: [] };
+  }
+  const preferred = (preferredBackend && actorMatchesBackend(actor, preferredBackend))
+    ? preferredBackend
+    : null;
+  const modelOptions = modelOptionsForDeliverablesActor(actor, preferred?.model || "");
+  const defaultModel = (preferred && modelOptions.includes(preferred.model || ""))
+    ? preferred.model
+    : (modelOptions[0] || "");
+  const currentModel = deliverablesForm[spec.modelKey] || "";
+  if (forceDefaults || !modelOptions.includes(currentModel)) {
+    deliverablesForm[spec.modelKey] = defaultModel;
+  }
+  const effortOptions = effortOptionsForDeliverablesActor(actor, preferred?.effort || "");
+  const defaultEffort = (preferred && effortOptions.includes(preferred.effort || ""))
+    ? preferred.effort
+    : (effortOptions[0] || "");
+  const currentEffort = deliverablesForm[spec.effortKey] || "";
+  if (forceDefaults || !effortOptions.includes(currentEffort)) {
+    deliverablesForm[spec.effortKey] = defaultEffort;
+  }
+  return { actor, modelOptions, effortOptions };
+}
+
+function deliverablesChoiceFromRole(spec) {
+  if (!deliverablesForm || !spec) return null;
+  const actorId = deliverablesForm[spec.actorKey] || "";
+  if (spec.allowLocal && actorId === "local") return { kind: "local", identity: "local", payload: "local" };
+  const actor = findActorOption(actorId);
+  if (!actor) return null;
+  const model = deliverablesForm[spec.modelKey] || "";
+  const effort = deliverablesForm[spec.effortKey] || "";
+  const backend = composeDeliverablesBackend(actor, { model, effort });
+  if (!backend || !backend.model) return null;
+  return {
+    kind: "backend",
+    identity: `backend:${backendIdentityForDeliverables(backend)}`,
+    payload: { ...backend },
+  };
+}
+
+function optionsByValues(values, selectedValue, fallbackLabel = "—") {
+  const list = Array.isArray(values) ? values : [];
+  if (!list.length) {
+    return `<option value="">${escapeHtml(fallbackLabel)}</option>`;
+  }
+  return list.map((value) => (
+    `<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(value)}</option>`
+  )).join("");
+}
+
+function roleDefaultsBySpec(spec) {
+  const preferred = preferredParticipantBackends();
+  if (!spec) return null;
+  if (spec.actorKey === "execAuthor") return preferred.execAuthor;
+  if (spec.actorKey === "execReviewer") return preferred.execReviewer;
+  return null;
+}
+
+function resetRoleModelEffort(spec) {
+  normalizeDeliverablesRole(spec, {
+    forceDefaults: true,
+    preferredBackend: roleDefaultsBySpec(spec),
+  });
+}
+
+function buildDeliverablesActorPool() {
+  const out = [];
+  const catalogEntries = agentCatalog();
+  for (const entry of catalogEntries) {
+    const baseBackend = backendFromCatalogEntry(entry);
+    out.push({
+      id: deliverablesActorIdForCatalog(entry),
+      entry: { ...entry },
+      failoverEntry: failoverEntryForCatalog(entry, catalogEntries),
+      display: actorAccountDisplayLabel(entry.label || baseBackend.label || baseBackend.provider, baseBackend),
+    });
+  }
+  return out;
+}
+
+function ensureDeliverablesFormState() {
+  const rid = currentState.activeRunId || "__none__";
+  if (deliverablesForm && deliverablesFormForRunId === rid) return;
+  if (deliverablesFormForRunId !== undefined && deliverablesFormForRunId !== rid) {
+    deliverablesExecPendingStart = false;
+    deliverablesExecRunToken = "";
+    deliverablesExecPhase = "";
+    deliverablesExecLastResetAgent = "";
+    deliverablesExecFinalShown = "";
+    deliverablesExecRoleHints = { drafting: null, reviewing: null };
+    deliverablesExecPhaseStartedMs = 0;
+    deliverableTargetPathHints = {};
+    syncExecLiveTicker();
+  }
+  deliverablesFormForRunId = rid;
+  const resolved = resolvedSubtasksForDeliverables();
+  const templates = deliverableTemplatesForForm();
+  const templateIds = templates.map((tpl) => tpl.id);
+  const actorPool = buildDeliverablesActorPool();
+  deliverablesActorPool = actorPool;
+  const preferred = preferredParticipantBackends();
+  const firstActor = (actorPool[0] || {}).id || "";
+  let execAuthor = actorIdForBackend(preferred.execAuthor, actorPool) || firstActor;
+  if (!execAuthor) execAuthor = firstActor;
+  let execReviewer = actorIdForBackend(preferred.execReviewer, actorPool) || "";
+  if (!execReviewer) execReviewer = (actorPool.find((o) => o.id !== execAuthor) || actorPool[0] || {}).id || "";
+  deliverablesForm = {
+    subtaskId: (resolved[0] || {}).id || "",
+    execTemplate: templateIds.includes("checklist") ? "checklist" : (templateIds[0] || "checklist"),
+    execAuthor,
+    execAuthorModel: "",
+    execAuthorEffort: "",
+    execReviewer,
+    execReviewerModel: "",
+    execReviewerEffort: "",
+    docTemplate: templateIds.includes("summary") ? "summary" : (templateIds[0] || "summary"),
+    docAuthor: "local",
+    docAuthorModel: "",
+    docAuthorEffort: "",
+  };
+  const specs = roleSpecsForDeliverables();
+  normalizeDeliverablesRole(specs.execAuthor, { forceDefaults: true, preferredBackend: preferred.execAuthor });
+  normalizeDeliverablesRole(specs.execReviewer, { forceDefaults: true, preferredBackend: preferred.execReviewer });
+  normalizeDeliverablesRole(specs.docAuthor, { forceDefaults: true, preferredBackend: null });
+}
+
+function syncDeliverablesFormFromDom() {
+  if (!deliverablesForm) return;
+  const pairs = [
+    ["execSubtask", "subtaskId"],
+    ["execTemplate", "execTemplate"],
+    ["execAuthor", "execAuthor"],
+    ["execAuthorModel", "execAuthorModel"],
+    ["execAuthorEffort", "execAuthorEffort"],
+    ["execReviewer", "execReviewer"],
+    ["execReviewerModel", "execReviewerModel"],
+    ["execReviewerEffort", "execReviewerEffort"],
+    ["docTemplate", "docTemplate"],
+    ["docAuthor", "docAuthor"],
+    ["docAuthorModel", "docAuthorModel"],
+    ["docAuthorEffort", "docAuthorEffort"],
+  ];
+  for (const [id, key] of pairs) {
+    const el = $(id);
+    if (el) deliverablesForm[key] = el.value;
+  }
 }
 
 function deliverableLabel(d) {
   return `${d.template} v${d.version}${d.stale ? ` · ${t("ui.deliverableStale")}` : ""}`;
 }
 
+function execAutopilotRunToken(execState = null) {
+  if (!execState || !execState.startedAt) return "";
+  return `${execState.subtaskId || ""}|${execState.startedAt}`;
+}
+
+function updateExecRunProgressFromState(prevExec = null, nextExec = null) {
+  const wasRunning = Boolean(prevExec && prevExec.running);
+  const running = Boolean(nextExec && nextExec.running);
+  const token = execAutopilotRunToken(nextExec);
+  const nextPhase = currentExecPhase(nextExec);
+  if (running) {
+    const isNewRun = !deliverablesExecRunToken || deliverablesExecRunToken !== token;
+    if (isNewRun) {
+      deliverablesExecRunToken = token;
+      deliverablesExecLastResetAgent = "";
+      deliverablesExecFinalShown = "";
+      deliverablesExecRoleHints = { drafting: null, reviewing: null };
+      deliverablesExecPhaseStartedMs = Date.now();
+    } else if (nextPhase && deliverablesExecPhase !== nextPhase) {
+      deliverablesExecPhaseStartedMs = Date.now();
+    }
+    deliverablesExecPhase = nextPhase || deliverablesExecPhase || "drafting";
+    deliverablesExecPendingStart = false;
+    syncExecLiveTicker();
+    return;
+  }
+  if (deliverablesExecPendingStart) {
+    deliverablesExecPhase = "drafting";
+    if (!deliverablesExecPhaseStartedMs) deliverablesExecPhaseStartedMs = Date.now();
+    syncExecLiveTicker();
+    return;
+  }
+  if (wasRunning && !running) {
+    deliverablesExecPhase = "";
+    deliverablesExecLastResetAgent = "";
+    deliverablesExecRoleHints = { drafting: null, reviewing: null };
+    deliverablesExecPhaseStartedMs = 0;
+    deliverablesExecPendingStart = false;
+  }
+  if (!running && !token) deliverablesExecRunToken = "";
+  syncExecLiveTicker();
+}
+
+function renderDeliverablesExecStatus() {
+  const exec = currentState?.execAutopilot || null;
+  if (exec?.running || deliverablesExecPendingStart) {
+    const n = currentExecIteration(exec);
+    showDeliverablesMsg(execPhaseStatusText(exec, n), false, { sticky: true });
+    return true;
+  }
+  if (!exec) return false;
+  const reason = String(exec.reason || "").trim();
+  if (!reason) return false;
+  const finalKey = `${execAutopilotRunToken(exec)}|${reason}`;
+  if (deliverablesExecFinalShown === finalKey && !showDeliverablesMsg._sticky) return false;
+  let text = "";
+  let isError = false;
+  if (reason === "review-pass") text = t("ui.execStatusPass");
+  else if (reason === "review-fail-budget") { text = t("ui.execStatusFail"); isError = true; }
+  else if (reason === "user-stop") { text = t("ui.execStatusStopped"); isError = true; }
+  else {
+    const cleanReason = reason.startsWith("error:") ? reason.slice(6).trim() : reason;
+    text = t("ui.execStatusError", { reason: normalizeDeliverablesError(cleanReason) || cleanReason });
+    isError = true;
+  }
+  showDeliverablesMsg(text, isError, { sticky: true });
+  deliverablesExecFinalShown = finalKey;
+  return true;
+}
+
 function renderDeliverables() {
   const list = $("deliverablesList");
   if (!list) return;
   const items = (currentState.run && currentState.run.deliverables) || [];
+  ensureDeliverablesFormState();
+  deliverablesActorPool = buildDeliverablesActorPool();
+  const specs = roleSpecsForDeliverables();
+  const preferred = preferredParticipantBackends();
+  const resolved = resolvedSubtasksForDeliverables();
+  const templates = deliverableTemplatesForForm();
+  const running = Boolean(currentState.execAutopilot?.running);
+  const locked = running || deliverablesExecPendingStart;
+  const templateIds = new Set(templates.map((tpl) => tpl.id));
+  if (!templateIds.has(deliverablesForm.execTemplate)) {
+    deliverablesForm.execTemplate = templateIds.has("checklist") ? "checklist" : (templates[0] || {}).id || "";
+  }
+  if (!templateIds.has(deliverablesForm.docTemplate)) {
+    deliverablesForm.docTemplate = templateIds.has("summary") ? "summary" : (templates[0] || {}).id || "";
+  }
+  const subtaskIds = new Set(resolved.map((s) => s.id));
+  if (!subtaskIds.has(deliverablesForm.subtaskId)) {
+    deliverablesForm.subtaskId = (resolved[0] || {}).id || "";
+  }
+  if (!deliverablesActorPool.some((o) => o.id === deliverablesForm.execAuthor)) {
+    deliverablesForm.execAuthor = actorIdForBackend(preferred.execAuthor, deliverablesActorPool) || (deliverablesActorPool[0] || {}).id || "";
+  }
+  if (!deliverablesActorPool.some((o) => o.id === deliverablesForm.execReviewer)) {
+    deliverablesForm.execReviewer = actorIdForBackend(preferred.execReviewer, deliverablesActorPool)
+      || (deliverablesActorPool.find((o) => o.id !== deliverablesForm.execAuthor) || deliverablesActorPool[0] || {}).id || "";
+  }
+  if (deliverablesForm.docAuthor !== "local" && !deliverablesActorPool.some((o) => o.id === deliverablesForm.docAuthor)) {
+    deliverablesForm.docAuthor = "local";
+  }
+
+  const execAuthorState = normalizeDeliverablesRole(specs.execAuthor, { preferredBackend: preferred.execAuthor });
+  const execReviewerState = normalizeDeliverablesRole(specs.execReviewer, { preferredBackend: preferred.execReviewer });
+  const docAuthorState = normalizeDeliverablesRole(specs.docAuthor);
+  const execAuthorChoice = deliverablesChoiceFromRole(specs.execAuthor);
+  const execReviewerChoice = deliverablesChoiceFromRole(specs.execReviewer);
+  const docAuthorChoice = deliverablesChoiceFromRole(specs.docAuthor);
+
+  const execSubtaskEl = $("execSubtask");
+  const execTemplateEl = $("execTemplate");
+  const execAuthorEl = $("execAuthor");
+  const execAuthorModelEl = $("execAuthorModel");
+  const execAuthorEffortEl = $("execAuthorEffort");
+  const execReviewerEl = $("execReviewer");
+  const execReviewerModelEl = $("execReviewerModel");
+  const execReviewerEffortEl = $("execReviewerEffort");
+  const docTemplateEl = $("docTemplate");
+  const docAuthorEl = $("docAuthor");
+  const docAuthorModelEl = $("docAuthorModel");
+  const docAuthorEffortEl = $("docAuthorEffort");
+
+  if (execSubtaskEl) {
+    execSubtaskEl.innerHTML = resolved.length
+      ? resolved.map((s) => `<option value="${escapeHtml(s.id)}"${s.id === deliverablesForm.subtaskId ? " selected" : ""}>${escapeHtml(`${s.title} · ${s.id.slice(-6)}`)}</option>`).join("")
+      : `<option value="">${escapeHtml(t("ui.execNoResolved"))}</option>`;
+    execSubtaskEl.disabled = !resolved.length || locked;
+  }
+  if (execTemplateEl) {
+    execTemplateEl.innerHTML = templates.map((tpl) => `<option value="${escapeHtml(tpl.id)}"${tpl.id === deliverablesForm.execTemplate ? " selected" : ""}>${escapeHtml(tpl.id)}</option>`).join("");
+    execTemplateEl.disabled = !templates.length || locked;
+  }
+
+  const accountOptionsHtml = (selectedValue, allowLocal = false) => {
+    const options = [];
+    if (allowLocal) {
+      options.push({
+        id: "local",
+        display: UI_LANG === "ru" ? "Локально" : "Local",
+      });
+    }
+    for (const actor of deliverablesActorPool) {
+      options.push({ id: actor.id, display: actor.display });
+    }
+    if (!options.length) return `<option value="">${escapeHtml(t("ui.agentNoBackends"))}</option>`;
+    return options.map((opt) => (
+      `<option value="${escapeHtml(opt.id)}"${opt.id === selectedValue ? " selected" : ""}>${escapeHtml(opt.display)}</option>`
+    )).join("");
+  };
+
+  if (execAuthorEl) {
+    execAuthorEl.innerHTML = accountOptionsHtml(deliverablesForm.execAuthor, false);
+    execAuthorEl.disabled = !deliverablesActorPool.length || locked;
+  }
+  if (execAuthorModelEl) {
+    execAuthorModelEl.innerHTML = optionsByValues(execAuthorState.modelOptions, deliverablesForm.execAuthorModel);
+    execAuthorModelEl.disabled = !execAuthorState.actor || !execAuthorState.modelOptions.length || locked;
+  }
+  if (execAuthorEffortEl) {
+    execAuthorEffortEl.innerHTML = optionsByValues(execAuthorState.effortOptions, deliverablesForm.execAuthorEffort);
+    const canPickEffort = Boolean(execAuthorState.actor && isCliProviderId(execAuthorState.actor.entry.provider));
+    execAuthorEffortEl.disabled = !canPickEffort || !execAuthorState.effortOptions.length || locked;
+  }
+  if (execReviewerEl) {
+    execReviewerEl.innerHTML = accountOptionsHtml(deliverablesForm.execReviewer, false);
+    execReviewerEl.disabled = !deliverablesActorPool.length || locked;
+  }
+  if (execReviewerModelEl) {
+    execReviewerModelEl.innerHTML = optionsByValues(execReviewerState.modelOptions, deliverablesForm.execReviewerModel);
+    execReviewerModelEl.disabled = !execReviewerState.actor || !execReviewerState.modelOptions.length || locked;
+  }
+  if (execReviewerEffortEl) {
+    execReviewerEffortEl.innerHTML = optionsByValues(execReviewerState.effortOptions, deliverablesForm.execReviewerEffort);
+    const canPickEffort = Boolean(execReviewerState.actor && isCliProviderId(execReviewerState.actor.entry.provider));
+    execReviewerEffortEl.disabled = !canPickEffort || !execReviewerState.effortOptions.length || locked;
+  }
+  if (docTemplateEl) {
+    docTemplateEl.innerHTML = templates.map((tpl) => `<option value="${escapeHtml(tpl.id)}"${tpl.id === deliverablesForm.docTemplate ? " selected" : ""}>${escapeHtml(tpl.id)}</option>`).join("");
+    docTemplateEl.disabled = !templates.length || locked;
+  }
+  if (docAuthorEl) {
+    docAuthorEl.innerHTML = accountOptionsHtml(deliverablesForm.docAuthor, true);
+    docAuthorEl.disabled = locked;
+  }
+  if (docAuthorModelEl) {
+    docAuthorModelEl.innerHTML = optionsByValues(docAuthorState.modelOptions, deliverablesForm.docAuthorModel);
+    docAuthorModelEl.disabled = !docAuthorState.actor || !docAuthorState.modelOptions.length || locked;
+  }
+  if (docAuthorEffortEl) {
+    docAuthorEffortEl.innerHTML = optionsByValues(docAuthorState.effortOptions, deliverablesForm.docAuthorEffort);
+    const canPickEffort = Boolean(docAuthorState.actor && isCliProviderId(docAuthorState.actor.entry.provider));
+    docAuthorEffortEl.disabled = !canPickEffort || !docAuthorState.effortOptions.length || locked;
+  }
+
+  const sameIdentity = Boolean(execAuthorChoice?.identity && execReviewerChoice?.identity
+    && execAuthorChoice.identity === execReviewerChoice.identity);
+  const canRunExec = Boolean(resolved.length && execAuthorChoice && execReviewerChoice && !sameIdentity);
+  if (typeof setSupplementalNavHighlights === "function") {
+    setSupplementalNavHighlights((!running && !deliverablesExecPendingStart && canRunExec)
+      ? [
+        "execTemplate",
+        "execAuthor",
+        "execAuthorModel",
+        "execAuthorEffort",
+        "execReviewer",
+        "execReviewerModel",
+        "execReviewerEffort",
+      ]
+      : []);
+  }
+
   const execBtn = $("execAutopilot");
   if (execBtn) {
-    const running = Boolean(currentState.execAutopilot?.running);
     execBtn.textContent = running ? t("ui.autopilotStop") : t("ui.execAutopilot");
-    execBtn.disabled = currentState.busy && !running;
+    execBtn.disabled = deliverablesExecPendingStart
+      || (currentState.busy && !running)
+      || (!running && (!resolved.length || !execAuthorChoice || !execReviewerChoice || sameIdentity));
     execBtn.classList.toggle("primary", running);
     execBtn.classList.toggle("ghost", !running);
   }
+  const docBtn = $("generateDoc");
+  if (docBtn) {
+    const localWithoutSummary = deliverablesForm.docAuthor === "local" && deliverablesForm.docTemplate !== "summary";
+    docBtn.disabled = locked
+      || currentState.busy
+      || !resolved.length
+      || !docAuthorChoice
+      || localWithoutSummary;
+  }
+  renderDeliverablesExecStatus();
   const badge = $("deliverablesCount");
   if (badge) badge.textContent = items.length ? t("ui.deliverableBadge", { n: items.length }) : "";
   if (!items.length) {
     list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.deliverablesEmpty"))}</div>`;
     return;
   }
-  list.innerHTML = items.map((d) => `<div class="doc-row deliverable-row${d.stale ? " stale" : ""}" data-id="${escapeHtml(d.id)}">
-    <span class="doc-name" title="${escapeHtml(d.name)}">${escapeHtml(deliverableLabel(d))}</span>
-    <span class="doc-chars">${escapeHtml(d.status)} · ${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
-    <button class="del-copy" type="button">${escapeHtml(t("ui.copy"))}</button>
-    <button class="del-packet" type="button">${escapeHtml(t("ui.packet"))}</button>
-    <button class="del-write" type="button">${escapeHtml(t("ui.write"))}</button>
-  </div>`).join("");
+  const allSubtasks = currentState.run?.subtasks || [];
+  const allResolved = allSubtasks.length > 0 && allSubtasks.every((st) => st.status === "resolved");
+  const coachReady = (!running && !deliverablesExecPendingStart && allResolved)
+    ? readyDeliverableForCoach(allSubtasks, items)
+    : null;
+  const coachFocusId = coachReady?.id || "";
+  list.innerHTML = items.map((d) => {
+    const coachFocus = Boolean(coachFocusId && d.id === coachFocusId);
+    return `<div class="doc-row deliverable-row${d.stale ? " stale" : ""}${coachFocus ? " coach-focus" : ""}" data-id="${escapeHtml(d.id)}">
+      <div class="doc-main">
+        <span class="doc-name" title="${escapeHtml(d.name)}">${escapeHtml(deliverableLabel(d))}</span>
+        <span class="doc-chars">${escapeHtml(d.status)} · ${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
+      </div>
+      <div class="doc-actions">
+        <button class="del-copy" type="button" data-tooltip-key="t.deliverableCopy" data-tooltip-text="${escapeHtml(t("tip.deliverableCopy"))}">${escapeHtml(t("ui.copy"))}</button>
+        ${d.status === "ready" ? `<button class="del-apply" type="button" data-tooltip-key="t.apply" data-tooltip-text="${escapeHtml(t("tip.apply"))}">${escapeHtml(t("ui.apply"))}</button>` : ""}
+        <button class="del-packet${coachFocus ? " coach-focus-btn" : ""}" type="button" data-tooltip-key="t.deliverablePacket" data-tooltip-text="${escapeHtml(t("tip.deliverablePacket"))}">${escapeHtml(t("ui.packet"))}</button>
+        <button class="del-write" type="button" data-tooltip-key="t.deliverableWrite" data-tooltip-text="${escapeHtml(t("tip.deliverableWrite"))}">${escapeHtml(t("ui.write"))}</button>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 async function copyDeliverable(id) {
@@ -4275,19 +5276,18 @@ async function copyDeliverable(id) {
 }
 
 async function packetDeliverable(id) {
-  const targetPath = (prompt(t("ui.targetPathPrompt"), "") || "").trim();
+  const targetPath = promptDeliverableTargetPath(id);
   if (!targetPath) return;
   const result = await api("POST", "/api/deliverables/packet", { id, targetPath });
+  rememberDeliverableTargetPath(id, targetPath);
   showDeliverablesMsg(t("ui.packetDone", { name: result.packet.name }), false);
 }
 
 async function writeDeliverable(id) {
-  const targetPath = (prompt(t("ui.targetPathPrompt"), "") || "").trim();
+  const targetPath = promptDeliverableTargetPath(id);
   if (!targetPath) return;
   const preview = (await api("POST", "/api/deliverables/preview-write", { id, targetPath })).preview;
-  const ok = preview.exists
-    ? confirm(t("ui.confirmOverwrite", { path: preview.targetPath, diff: preview.diff || "(no diff)" }))
-    : confirm(t("ui.confirmWriteNew", { path: preview.targetPath }));
+  const ok = confirmDeliverableWritePreview(preview, { allowExternal: false });
   if (!ok) return;
   const result = await api("POST", "/api/deliverables/write", {
     id,
@@ -4295,30 +5295,108 @@ async function writeDeliverable(id) {
     allowOverwrite: Boolean(preview.exists),
     confirm: true,
   });
+  rememberDeliverableTargetPath(id, result.result.targetPath);
   showDeliverablesMsg(t("ui.writeDone", { path: result.result.targetPath }), false);
 }
 
-async function startExecutionAutopilot() {
-  const subtasks = currentState.run?.subtasks || [];
-  const fallback = [...subtasks].reverse().find((s) => s.status === "resolved");
-  if (!fallback) return showDeliverablesMsg("No resolved subtask", true);
-  const subtaskId = (prompt("Subtask id:", fallback.id) || "").trim();
-  if (!subtaskId) return;
-  const template = (prompt(t("ui.execTemplatePrompt"), "checklist") || "").trim();
-  if (!template) return;
-  const authorSlot = (prompt(t("ui.execAuthorPrompt"), "") || "").trim();
-  if (!authorSlot) return;
-  const reviewerSlot = (prompt(t("ui.execReviewerPrompt"), "") || "").trim();
-  if (!reviewerSlot) return;
-  if (!confirm(t("ui.execConfirm"))) return;
-  await api("POST", "/api/exec-autopilot/start", {
-    subtaskId,
-    template,
-    authorSlot,
-    reviewerSlot,
-    optIn: true,
+async function applyDeliverable(id) {
+  const targetPath = promptDeliverableTargetPath(id, { requireAbsolute: true });
+  if (!targetPath) return;
+  const preview = (await api("POST", "/api/deliverables/apply-preview", { id, targetPath, allowExternal: true })).preview;
+  const ok = confirmDeliverableWritePreview(preview, { allowExternal: true });
+  if (!ok) return;
+  const result = await api("POST", "/api/deliverables/apply", {
+    id,
+    targetPath: preview.targetPath,
+    allowOverwrite: Boolean(preview.exists),
+    confirm: true,
+    allowExternal: true,
   });
-  showDeliverablesMsg("Execution autopilot started", false);
+  const writtenPath = result.result.targetPath;
+  rememberDeliverableTargetPath(id, writtenPath);
+  showDeliverablesMsg(t("ui.applyDone", { path: writtenPath }), false);
+  await maybeOpenNextSubtaskAfterApply(result.result.deliverable || deliverableById(id), writtenPath);
+}
+
+async function startDocFromForm(subtaskIdOverride = "") {
+  ensureDeliverablesFormState();
+  syncDeliverablesFormFromDom();
+  const specs = roleSpecsForDeliverables();
+  normalizeDeliverablesRole(specs.docAuthor);
+  const subtaskId = subtaskIdOverride || deliverablesForm.subtaskId || "";
+  if (!subtaskId) throw new Error(t("ui.execNoResolved"));
+  const author = deliverablesChoiceFromRole(specs.docAuthor);
+  if (!author) throw new Error(t("ui.agentNoBackends"));
+  if (author.kind === "local" && deliverablesForm.docTemplate !== "summary") {
+    throw new Error(t("ui.docLocalSummaryOnly"));
+  }
+  const payload = { subtaskId, template: deliverablesForm.docTemplate };
+  if (author.kind === "local") payload.author = "local";
+  else payload.author = author.payload;
+  const result = await api("POST", "/api/deliverables/create", payload);
+  if (result && result.document) showDeliverablesMsg(t("ui.deliverableCreated", { name: result.document.name }), false);
+}
+
+async function generateDeliverableForSubtask(st) {
+  ensureDeliverablesFormState();
+  deliverablesForm.subtaskId = st.id;
+  const panel = $("deliverablesPanel");
+  if (panel) panel.open = true;
+  renderDeliverables();
+  try {
+    await startDocFromForm(st.id);
+  } catch (error) {
+    showDeliverablesMsg(normalizeDeliverablesError(error), true);
+  }
+}
+
+async function startExecutionAutopilot() {
+  ensureDeliverablesFormState();
+  syncDeliverablesFormFromDom();
+  const specs = roleSpecsForDeliverables();
+  normalizeDeliverablesRole(specs.execAuthor);
+  normalizeDeliverablesRole(specs.execReviewer);
+  const subtaskId = deliverablesForm.subtaskId || "";
+  if (!subtaskId) throw new Error(t("ui.execNoResolved"));
+  const author = deliverablesChoiceFromRole(specs.execAuthor);
+  const reviewer = deliverablesChoiceFromRole(specs.execReviewer);
+  if (!author || !reviewer) throw new Error(t("ui.agentNoBackends"));
+  if (author.identity === reviewer.identity) throw new Error(t("ui.execAuthorReviewerDiff"));
+  if (!confirm(t("ui.execConfirm"))) return;
+  const payload = {
+    subtaskId,
+    template: deliverablesForm.execTemplate,
+    optIn: true,
+  };
+  payload.author = author.payload;
+  payload.reviewer = reviewer.payload;
+  const selected = selectedParticipantsForDeliverables();
+  const draftRole = selected[0] ? { key: selected[0].slot, label: selected[0].label || selected[0].slot } : null;
+  const reviewFallback = selected.find((_, idx) => idx > 0) || selected[0] || null;
+  const reviewRole = reviewFallback ? { key: reviewFallback.slot, label: reviewFallback.label || reviewFallback.slot } : null;
+  deliverablesExecPendingStart = true;
+  deliverablesExecPhase = "drafting";
+  deliverablesExecPhaseStartedMs = Date.now();
+  deliverablesExecRoleHints = { drafting: draftRole, reviewing: reviewRole };
+  deliverablesExecFinalShown = "";
+  renderDeliverables();
+  renderConversation();
+  renderNextStep();
+  syncExecLiveTicker();
+  renderExecLiveTerminalPlaceholder();
+  try {
+    await api("POST", "/api/exec-autopilot/start", payload);
+  } catch (error) {
+    deliverablesExecPendingStart = false;
+    deliverablesExecPhase = "";
+    deliverablesExecRoleHints = { drafting: null, reviewing: null };
+    deliverablesExecPhaseStartedMs = 0;
+    renderDeliverables();
+    renderConversation();
+    renderNextStep();
+    syncExecLiveTicker();
+    throw error;
+  }
 }
 
 function escapeHtml(value) {
@@ -4697,15 +5775,44 @@ function bindUi() {
     const id = row.dataset.id;
     try {
       if (event.target.closest(".del-copy")) await copyDeliverable(id);
+      else if (event.target.closest(".del-apply")) await applyDeliverable(id);
       else if (event.target.closest(".del-packet")) await packetDeliverable(id);
       else if (event.target.closest(".del-write")) await writeDeliverable(id);
     } catch (error) {
-      showDeliverablesMsg(error.message, true);
+      showDeliverablesMsg(normalizeDeliverablesError(error), true);
     }
+  });
+  const deliverablesInputs = [
+    "execSubtask",
+    "execTemplate",
+    "execAuthor",
+    "execAuthorModel",
+    "execAuthorEffort",
+    "execReviewer",
+    "execReviewerModel",
+    "execReviewerEffort",
+    "docTemplate",
+    "docAuthor",
+    "docAuthorModel",
+    "docAuthorEffort",
+  ];
+  for (const id of deliverablesInputs) {
+    $(id)?.addEventListener("change", () => {
+      ensureDeliverablesFormState();
+      syncDeliverablesFormFromDom();
+      const specs = roleSpecsForDeliverables();
+      if (id === "execAuthor") resetRoleModelEffort(specs.execAuthor);
+      if (id === "execReviewer") resetRoleModelEffort(specs.execReviewer);
+      if (id === "docAuthor") resetRoleModelEffort(specs.docAuthor);
+      renderDeliverables();
+    });
+  }
+  $("generateDoc")?.addEventListener("click", () => {
+    startDocFromForm().catch((error) => showDeliverablesMsg(normalizeDeliverablesError(error), true));
   });
   $("execAutopilot")?.addEventListener("click", () => {
     if (currentState.execAutopilot?.running) api("POST", "/api/exec-autopilot/stop", {});
-    else startExecutionAutopilot().catch((error) => showDeliverablesMsg(error.message, true));
+    else startExecutionAutopilot().catch((error) => showDeliverablesMsg(normalizeDeliverablesError(error), true));
   });
 
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.

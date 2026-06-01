@@ -666,6 +666,9 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .msg.system { background: transparent; border: 1px dashed var(--border); }
 .msg.system .name { color: var(--muted); }
 .msg.system .text { font-size: 11.5px; color: var(--muted); }
+.msg.exec-live { border-style: dashed; }
+.msg.exec-live .name { color: var(--amber); }
+.msg.exec-live .text { font-style: italic; }
 
 /* Trash / restore controls on response cards */
 .msg .name-right { display: inline-flex; align-items: center; gap: 8px; }
@@ -738,6 +741,8 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   gap: 2px;
 }
 .trace-list .trace-row { padding: 2px 0; border-top: 1px dotted var(--border); }
+.trace-list .trace-row.stale-msg { opacity: 0.45; }
+.msg.stale-msg { opacity: 0.62; }
 
 /* Pinned agent terminals */
 .terminals {
@@ -1889,22 +1894,95 @@ button.square {
 .doc-row {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+  min-width: 0;
 }
 .doc-row:last-child { border-bottom: none; }
 .doc-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-chars { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.deliverable-row { flex-wrap: wrap; align-items: flex-start; row-gap: 4px; }
+.deliverable-row .doc-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.deliverable-row .doc-main .doc-name { min-width: 0; }
+.deliverable-row .doc-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
 .doc-remove,
 .del-copy,
+.del-apply,
 .del-packet,
 .del-write {
   background: none; border: none; color: var(--muted);
-  cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px;
+  cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px; white-space: nowrap;
 }
 .doc-remove:hover { color: var(--red); }
 .del-copy:hover { color: var(--green); }
+.del-apply:hover { color: var(--accent); }
 .del-packet:hover { color: var(--amber); }
 .del-write:hover { color: var(--accent); }
 .deliverable-row.stale .doc-name { color: var(--amber); }
+.deliverable-row.coach-focus {
+  box-shadow: 0 0 0 1px var(--accent) inset;
+  border-radius: 6px;
+}
+.deliverable-row .coach-focus-btn { color: var(--accent); font-weight: 600; }
+.deliverables-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  margin-top: 8px;
+}
+.deliverables-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.deliverables-field > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.deliverables-field > select {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+#deliverablesExecForm {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+#deliverablesDocForm {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+#deliverablesDocForm .deliverables-form-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+#execAutopilot,
+#generateDoc {
+  grid-column: 1 / -1;
+  align-self: end;
+  justify-self: start;
+}
+#deliverablesMsg {
+  display: block;
+  margin-top: 6px;
+}
 .doc-add { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .doc-add-row { display: flex; gap: 6px; align-items: center; }
 .doc-add-row #docName { flex: 1 1 auto; min-width: 0; }
