@@ -16,3 +16,6 @@ rooms/
 Thumbs.db
 .vscode/
 .idea/
+
+# scratch / temp dumps
+tmp_*
