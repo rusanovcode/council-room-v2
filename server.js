@@ -917,7 +917,12 @@ async function createDeliverable(body = {}) {
 }
 
 function deliveryRoots() {
-  return { root: ROOT, workdir: WORKDIR };
+  // Phase 8: gated-write is constrained to the app folder (ROOT) only — NOT the
+  // C:\AI umbrella (WORKDIR). Relative target paths resolve against ROOT; any
+  // write resolving outside it (incl. sibling projects like game_agent) is
+  // refused by deliverables.resolveTarget. Agent-driven actions still produce
+  // in-chat deliverables only; an actual file write always needs explicit confirm.
+  return { root: ROOT };
 }
 
 function createHandoffPacket(body = {}) {
