@@ -82,6 +82,12 @@ const STRINGS = {
     "ui.openSubtaskHint": "Подзадача становится активной. Предыдущая (если была открыта) переходит в ожидание (pending).",
     "ui.title": "Постановка подзадачи",
     "ui.mode": "Режим",
+    "ui.scopeProposalSubtask": "Подзадача на предложение scope (предложить scope вместо block при пустом Files-in-Scope)",
+    "ui.scopeModeNormal": "normal",
+    "ui.scopeModeProposal": "proposal",
+    "ui.scopeShortNormal": "normal",
+    "ui.scopeShortProposal": "proposal",
+    "ui.scopeModeToggle": "Scope mode: {current}. Переключить на {next}.",
     "ui.cancel": "Отмена",
     "ui.feedbackTitle": "Обратная связь",
     "ui.feedbackBug": "Баг",
@@ -104,7 +110,7 @@ const STRINGS = {
     "ui.runInProgress": "Раунд выполняется…",
     "ui.openFirstHint": "(нет подзадач — открой первую через +)",
     "ui.noActiveSubtaskHint": "Открой подзадачу слева, чтобы начать раунды.",
-    "ui.subtaskMeta": "id {id} · режим {mode} · раунды {rounds}",
+    "ui.subtaskMeta": "id {id} · режим {mode} · scope {scope} · раунды {rounds}",
     "ui.tracePrefix": "Лог",
     "ui.confirmDelete": "Удалить чат \"{topic}\"?",
     "ui.confirmReopen": "Переоткрыть закрытую подзадачу?",
@@ -127,6 +133,7 @@ const STRINGS = {
     "tip.subtaskStack": "Каждая подзадача — изолированный мини-дебат. Активная одна.\nВ промт агентам отправляется ТОЛЬКО она + база знаний — не вся история чата. Это главная экономия токенов.|||открыто: «выбрать stop-condition для autopilot». После закрытия открываешь следующую: «формат логов терминалов». Агенты НЕ видят первую — только KB-итоги.",
     "tip.openSubtask": "Открыть новую подзадачу. Предыдущая активная уходит в ожидание (pending).|||название: «выбрать stop-condition для autopilot». Режим: STANDARD. Через 3 раунда оба агента дают Статус: готова к закрытию (Status: resolve) — закрываешь.",
     "tip.openSubtaskModal": "Подзадача становится активной — следующий «▶ Запустить раунд» будет уже по ней.\nПредыдущая активная (если была) переходит в ожидание (pending) — её можно вернуть кликом в списке.\nПока по подзадаче не было раундов, её название и режим можно редактировать (✎) или удалить (×).|||открыл подзадачу «выбрать stop-condition» по ошибке вместо «выбрать UI терминалов» — пока не запускал раунд, можешь нажать ✎ и переписать название.",
+    "tip.subtaskScopeProposal": "Помечает подзадачу как proposal/scoping. В strict-scope и при пустом Files-in-Scope агенты не должны блокироваться — они должны предложить минимальный scope через KB-patch.|||Название не содержит слово scope, но эта подзадача именно на определение границ файлов — включи флаг.",
     "tip.subtaskTitle": "Одно короткое предложение — что именно дебатируем. Не общая тема, а конкретный вопрос с ожидаемым ответом.|||плохо: «autopilot». Лучше: «выбрать stop-condition для autopilot». Идеально: «stop-condition: stale×2 или token<25% — что приоритетнее?»",
     "tip.knowledgeBase": "Единая база собранных правил по этому чату.\nАгенты добавляют пункты через строку KB-patch: в конце ответа. Можно править вручную.\nСнапшот KB шлётся в каждый промт вместо растущей истории.|||Codex в ответе пишет «KB-patch: prohibitions: не использовать PowerShell для codex CLI». Сервер парсит и кладёт в секцию Запреты. В следующем раунде эта строка уже в промте обоих.",
     "tip.resolve": "Закрыть активную подзадачу. Она исчезает из ленты, остаётся в стеке как закрытая (resolved).|||оба агента сообщили Статус: готова к закрытию (Status: resolve), KB пополнен 3 пунктами — жмёшь «Закрыть», вводишь короткое резюме («stop = stale×2 OR token<25%»).",
@@ -551,6 +558,12 @@ const STRINGS = {
     "ui.openSubtaskHint": "This subtask becomes active. The previous active one (if any) moves to pending.",
     "ui.title": "Subtask statement",
     "ui.mode": "Mode",
+    "ui.scopeProposalSubtask": "Scope-proposal subtask (propose scope instead of blocking on empty Files-in-Scope)",
+    "ui.scopeModeNormal": "normal",
+    "ui.scopeModeProposal": "proposal",
+    "ui.scopeShortNormal": "normal",
+    "ui.scopeShortProposal": "proposal",
+    "ui.scopeModeToggle": "Scope mode: {current}. Click to switch to {next}.",
     "ui.cancel": "Cancel",
     "ui.feedbackTitle": "Feedback",
     "ui.feedbackBug": "Bug",
@@ -573,7 +586,7 @@ const STRINGS = {
     "ui.runInProgress": "Round in progress…",
     "ui.openFirstHint": "(no subtasks — open the first one via +)",
     "ui.noActiveSubtaskHint": "Open a subtask on the left to start rounds.",
-    "ui.subtaskMeta": "id {id} · mode {mode} · rounds {rounds}",
+    "ui.subtaskMeta": "id {id} · mode {mode} · scope {scope} · rounds {rounds}",
     "ui.tracePrefix": "Trace",
     "ui.confirmDelete": "Delete chat \"{topic}\"?",
     "ui.confirmReopen": "Re-open a resolved subtask?",
@@ -596,6 +609,7 @@ const STRINGS = {
     "tip.subtaskStack": "Each subtask is an isolated mini-debate. One active at a time.\nThe agent prompt receives ONLY the active subtask + KB snapshot — not the whole chat history. This is the main token economy.|||open: “pick stop-condition for autopilot”. Once closed, you open the next: “terminal log format”. Agents do NOT see the first one — only the KB-rolled outcomes.",
     "tip.openSubtask": "Open a new subtask. The previous active one moves to pending.|||title: “pick stop-condition for autopilot”. Mode: STANDARD. After 3 rounds both agents return Status: resolve — you close it.",
     "tip.openSubtaskModal": "The subtask becomes active — the next “▶ Run round” will target it.\nThe previous active one (if any) moves to pending — you can return to it by clicking it in the list.\nUntil any round has been run, the title and mode are editable (✎) and the subtask can be deleted (×).|||you opened “pick stop-condition” by mistake instead of “pick terminal UI” — while no round has run yet, click ✎ and rewrite the title.",
+    "tip.subtaskScopeProposal": "Marks this subtask as scope-definition/proposal. In strict-scope mode with empty Files-in-Scope, agents should propose a minimal scope via KB-patch instead of blocking.|||Title does not mention scope clearly, but this round must define file boundaries first — turn this on.",
     "tip.subtaskTitle": "One short sentence — what specifically you're debating. Not a broad topic, but a concrete question with an expected answer.|||bad: “autopilot”. Better: “pick stop-condition for autopilot”. Best: “stop-condition: stale×2 or token<25% — which takes priority?”",
     "tip.knowledgeBase": "Single accumulator of agreed rules for this chat.\nAgents add items via the KB-patch: line at the end of their answer. Editable manually.\nKB snapshot is sent in every prompt instead of a growing transcript.|||Codex ends its answer with “KB-patch: prohibitions: don't use PowerShell for codex CLI”. The server parses it and pushes into the Prohibitions section. Next round both agents see this line in the prompt.",
     "tip.resolve": "Resolve the active subtask. It disappears from the feed, stays in the stack as resolved.|||both agents returned Status: resolve, KB got 3 new items — you click Resolve and type a short summary (“stop = stale×2 OR token<25%”).",
@@ -1835,6 +1849,12 @@ function makeIconBtn(cls, glyph, title, handler) {
   return b;
 }
 
+function scopeModeLabel(scopeMode, short = false) {
+  const proposal = scopeMode === "proposal";
+  if (short) return t(proposal ? "ui.scopeShortProposal" : "ui.scopeShortNormal");
+  return t(proposal ? "ui.scopeModeProposal" : "ui.scopeModeNormal");
+}
+
 function renderSubtaskRow(st, context) {
   const li = document.createElement("li");
   li.classList.add(st.status);
@@ -1850,8 +1870,15 @@ function renderSubtaskRow(st, context) {
   right.className = "subtask-actions";
   if (context === "stack") {
     if (st.rounds === 0 && st.status !== "resolved") {
-      right.appendChild(makeIconBtn("subtask-edit", "✎", t("ui.editIcon"), () => openSubtaskModal({ editId: st.id, title: st.title, mode: st.mode })));
+      right.appendChild(makeIconBtn("subtask-edit", "✎", t("ui.editIcon"), () => openSubtaskModal({ editId: st.id, title: st.title, mode: st.mode, scopeMode: st.scopeMode })));
     }
+    const nextScopeMode = st.scopeMode === "proposal" ? "normal" : "proposal";
+    right.appendChild(makeIconBtn(
+      "subtask-scope",
+      st.scopeMode === "proposal" ? "S+" : "S-",
+      t("ui.scopeModeToggle", { current: scopeModeLabel(st.scopeMode), next: scopeModeLabel(nextScopeMode) }),
+      () => api("POST", "/api/subtasks/edit", { id: st.id, scopeMode: nextScopeMode }),
+    ));
     if (st.status === "resolved") {
       right.appendChild(makeIconBtn("subtask-doc", t("ui.generateDoc"), t("tip.generateDoc").split("|||")[0], () => generateDeliverableForSubtask(st)));
     }
@@ -1864,7 +1891,7 @@ function renderSubtaskRow(st, context) {
 
   const tag = document.createElement("span");
   tag.className = "subtask-tag";
-  tag.textContent = `${st.id.slice(-6)} · ${st.mode} · R${st.rounds}`;
+  tag.textContent = `${st.id.slice(-6)} · ${st.mode} · scope ${scopeModeLabel(st.scopeMode, true)} · R${st.rounds}`;
   li.appendChild(tag);
 
   li.title = `${st.status} — ${st.id}`;
@@ -1950,7 +1977,7 @@ function renderActiveSubtask() {
     stToggle.setAttribute("aria-expanded", String(subtaskStatementExpanded));
   }
   $("activeSubtaskMeta").textContent = active
-    ? t("ui.subtaskMeta", { id: active.id, mode: active.mode, rounds: active.rounds })
+    ? t("ui.subtaskMeta", { id: active.id, mode: active.mode, scope: scopeModeLabel(active.scopeMode, true), rounds: active.rounds })
     : t("ui.noActiveSubtaskHint");
   $("runRound").disabled = !active || currentState.busy || autopilotRunning || needsAgents();
   $("resolveSubtask").disabled = !active || autopilotRunning;
@@ -5653,12 +5680,13 @@ function autoGrowTextarea(el) {
   el.style.height = `${Math.max(52, el.scrollHeight)}px`;
 }
 
-function openSubtaskModal({ editId = "", title = "", mode = "STANDARD" } = {}) {
+function openSubtaskModal({ editId = "", title = "", mode = "STANDARD", scopeMode = "normal" } = {}) {
   const modal = $("openSubtaskModal");
   modal.dataset.editId = editId;
   const titleInput = $("subtaskTitleInput");
   titleInput.value = title;
   $("subtaskModeInput").value = mode;
+  $("subtaskScopeProposalInput").checked = scopeMode === "proposal";
   $("subtaskModalTitle").textContent = t(editId ? "ui.editSubtask" : "ui.openNewSubtask");
   $("confirmSubtask").textContent = t(editId ? "ui.save" : "ui.open");
   modal.classList.remove("hidden");
@@ -5836,12 +5864,13 @@ function bindUi() {
     const title = $("subtaskTitleInput").value.trim();
     if (!title) return;
     const mode = $("subtaskModeInput").value;
+    const scopeMode = $("subtaskScopeProposalInput").checked ? "proposal" : "normal";
     const editId = $("openSubtaskModal").dataset.editId || "";
     $("openSubtaskModal").classList.add("hidden");
     if (editId) {
-      await api("POST", "/api/subtasks/edit", { id: editId, title, mode });
+      await api("POST", "/api/subtasks/edit", { id: editId, title, mode, scopeMode });
     } else {
-      await api("POST", "/api/subtasks/open", { title, mode });
+      await api("POST", "/api/subtasks/open", { title, mode, scopeMode });
     }
   });
 

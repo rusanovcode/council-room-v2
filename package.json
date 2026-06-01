@@ -7,6 +7,6 @@
   "license": "MIT",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/providers.test.js && node test/roles.test.js && node test/round.integration.test.js"
+    "test": "node test/providers.test.js && node test/roles.test.js && node test/scope-mode.test.js && node test/round.integration.test.js"
   }
 }

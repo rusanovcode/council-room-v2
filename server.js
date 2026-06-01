@@ -24,6 +24,7 @@ const roles = require("./lib/roles");
 const providers = require("./lib/providers");
 const usage = require("./lib/usage");
 const orquota = require("./lib/orquota");
+const { inferScopeMode } = require("./lib/scope-mode");
 
 // OpenRouter key pool: every OPENROUTER_API_KEY* env var that is set (a key = a
 // separate account = a separate free daily quota). Scales to any number of keys.
@@ -336,7 +337,7 @@ function publicState() {
   const activeQuestions = active ? questions.forSubtask(dir, active.id) : [];
   const runDomainId = state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code";
   const runDomain = domains.getProfile(runDomainId);
-  const kb = knowledge.load(dir, runDomain.sections);
+  const kb = knowledge.load(dir, runDomain.sections, { subtaskId: active && active.id });
   const currentKbDigest = deliverables.kbDigest(kb);
   return {
     activeRunId: state.run.id,
@@ -418,6 +419,10 @@ function recentTurnsForSubtask(runId, subtaskId, count = 4) {
     .slice(-count);
 }
 
+function isScopeProposalSubtask(subtask) {
+  return Boolean(subtask && subtask.scopeMode === "proposal");
+}
+
 // Move an agent response to the trash (or restore it). Trashed messages are kept
 // in the transcript but hidden from the conversation and excluded from the
 // context fed to the next round.
@@ -450,7 +455,8 @@ async function runRound({ guidance = "" } = {}) {
     }
     const activeDomainId = state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code";
     const domain = domains.getProfile(activeDomainId);
-    const kbSnapshot = knowledge.snapshotForPrompt(dir, domain.sections);
+    ensureQuestionsMigrated(dir, active.id);
+    const kbSnapshot = knowledge.snapshotForPrompt(dir, domain.sections, { subtaskId: active.id });
     const documentsSnapshot = documents.snapshotForPrompt(dir);
     const language = state.run.settings.language || "ru";
 
@@ -475,7 +481,6 @@ async function runRound({ guidance = "" } = {}) {
 
     // Question lifecycle: feed only OPEN questions; if none open but some resolved
     // remain, this round is the FINAL VERIFICATION pass over the resolved batch.
-    ensureQuestionsMigrated(dir, active.id);
     const openQs = questions.openForSubtask(dir, active.id);
     const criticalOpen = openQs.filter((q) => q.priority === "critical");
     const minorOpen = openQs.filter((q) => q.priority === "minor");
@@ -489,6 +494,7 @@ async function runRound({ guidance = "" } = {}) {
 
     const allowScan = Boolean(state.run.settings?.allowFilesystemScan ?? state.settings.allowFilesystemScan);
     const strictScope = Boolean(state.run.settings?.strictScope ?? state.settings.strictScope);
+    const scopeProposal = isScopeProposalSubtask(active);
     const promptCommon = {
       language,
       subtask: active,
@@ -500,6 +506,7 @@ async function runRound({ guidance = "" } = {}) {
       round,
       allowFilesystemScan: allowScan,
       strictScope,
+      scopeProposal,
       openQuestions: openQs.map((q) => ({ id: q.id, text: q.text, priority: q.priority })),
       verify,
       deferredMinors: minorOpen.map((q) => ({ id: q.id, text: q.text })),
@@ -630,7 +637,7 @@ async function runRound({ guidance = "" } = {}) {
         if (patch.section === "open_questions") {
           questions.addQuestion(dir, active.id, patch.item, round);
         } else {
-          try { knowledge.addItem(dir, patch.section, patch.item, domain.sections); } catch {}
+          try { knowledge.addItem(dir, patch.section, patch.item, domain.sections, { subtaskId: active.id }); } catch {}
         }
       }
       // Record this participant's resolutions of existing questions.
@@ -754,7 +761,8 @@ function stopAutopilot(reason) {
 
 // Local summary on auto-resolve — no extra agent call (token economy).
 function buildLocalSummary(dir, subtask) {
-  const kb = knowledge.load(dir);
+  const domain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
+  const kb = knowledge.load(dir, domain.sections, { subtaskId: subtask.id });
   const decisions = (kb.sections.decisions || []).slice(0, 5);
   const lines = [`Goal: ${subtask.title}`];
   if (decisions.length) lines.push(`Decisions: ${decisions.join("; ")}`);
@@ -845,13 +853,13 @@ function pickParticipant(participants, spec, fallbackIndex = 0, roleName = "part
 
 function deliverableContext(dir, subtask, participants, customPrompt = "", extra = {}) {
   const domain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
-  const kb = knowledge.load(dir, domain.sections);
+  const kb = knowledge.load(dir, domain.sections, { subtaskId: subtask.id });
   return {
     run: state.run,
     subtask,
     kb,
     kbDigest: deliverables.kbDigest(kb),
-    kbSnapshot: knowledge.snapshotForPrompt(dir, domain.sections),
+    kbSnapshot: knowledge.snapshotForPrompt(dir, domain.sections, { subtaskId: subtask.id }),
     documentsSnapshot: documents.snapshotForPrompt(dir),
     recentTurns: recentTurnsForSubtask(state.run.id, subtask.id, Math.max(4, participants.length * 2)),
     language: state.run.settings.language || "ru",
@@ -1463,6 +1471,7 @@ async function router(req, res) {
       const subtask = subtasks.openSubtask(dir, {
         title: body.title || "Untitled",
         mode: body.mode || "STANDARD",
+        scopeMode: inferScopeMode(body.title || "Untitled", body.scopeMode),
         parentId: body.parentId || "",
       });
       addMessage({
@@ -1515,7 +1524,10 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
       const dir = runDir(state.run.id);
-      const edited = subtasks.editSubtask(dir, body.id, { title: body.title, mode: body.mode });
+      const inferredScopeMode = body.scopeMode !== undefined
+        ? inferScopeMode("", body.scopeMode)
+        : (typeof body.title === "string" && body.title.trim() ? inferScopeMode(body.title) : undefined);
+      const edited = subtasks.editSubtask(dir, body.id, { title: body.title, mode: body.mode, scopeMode: inferredScopeMode });
       addMessage({
         role: "system",
         name: "Council Room",
@@ -1634,8 +1646,9 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
       const dir = runDir(state.run.id);
+      const active = subtasks.activeSubtask(dir);
       const kbDomain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
-      knowledge.addItem(dir, body.section, body.item, kbDomain.sections);
+      knowledge.addItem(dir, body.section, body.item, kbDomain.sections, { subtaskId: active && active.id });
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -1644,8 +1657,9 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
       const dir = runDir(state.run.id);
+      const active = subtasks.activeSubtask(dir);
       const kbDomain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
-      knowledge.removeItem(dir, body.section, body.item, kbDomain.sections);
+      knowledge.removeItem(dir, body.section, body.item, kbDomain.sections, { subtaskId: active && active.id });
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -2222,7 +2236,8 @@ async function router(req, res) {
             const newProfile = domains.getProfile(body.discussionMode);
             const newKeys = new Set(newProfile.sections.map((s) => s.key));
             const currentProfile = domains.getProfile(currentDomainId);
-            const kb = knowledge.load(runDir(state.run.id), currentProfile.sections);
+            const active = subtasks.activeSubtask(runDir(state.run.id));
+            const kb = knowledge.load(runDir(state.run.id), currentProfile.sections, { subtaskId: active && active.id });
             const foreignSections = currentProfile.sections.filter((s) => !newKeys.has(s.key) && (kb.sections[s.key] || []).length > 0);
             if (foreignSections.length > 0) {
               return sendJson(res, 409, { error: `Cannot switch to "${body.discussionMode}": the KB contains items in sections not available in the new profile (${foreignSections.map((s) => s.key).join(", ")}). Clear those sections first.` });
