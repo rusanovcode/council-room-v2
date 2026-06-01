@@ -9,7 +9,7 @@
       },
       "acc2": {
         "label": "Claude acc2",
-        "configDir": "C:\\AI\\ai-switcher\\auth\\claude-acc2",
+        "configDir": "auth\\claude-acc2",
         "env": {}
       },
       "apikey": {
@@ -31,7 +31,7 @@
       },
       "acc2": {
         "label": "Codex acc2",
-        "configDir": "C:\\AI\\ai-switcher\\auth\\codex-acc2",
+        "configDir": "auth\\codex-acc2",
         "env": {}
       },
       "apikey": {

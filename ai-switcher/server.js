@@ -39,6 +39,18 @@ function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function resolveConfigDir(configDir) {
+  if (!configDir) return configDir;
+  const raw = String(configDir);
+  if (path.isAbsolute(raw) && !/^[A-Za-z]:\\AI\\ai-switcher(\\|$)/i.test(raw)) return raw;
+  const normalized = raw.replace(/\//g, "\\");
+  if (/^[A-Za-z]:\\AI\\ai-switcher(\\|$)/i.test(normalized)) {
+    const rel = normalized.replace(/^[A-Za-z]:\\AI\\ai-switcher\\?/i, "");
+    return path.join(ROOT, rel);
+  }
+  return path.resolve(ROOT, raw);
+}
+
 function otherProfile(profileId) {
   return profileId === "acc1" ? "acc2" : "acc1";
 }
@@ -228,10 +240,11 @@ function buildEnv(service, profileId) {
       delete env.CODEX_HOME;
     }
   } else if (prof.configDir) {
+    const configDir = resolveConfigDir(prof.configDir);
     if (service === "claude") {
-      env.CLAUDE_CONFIG_DIR = prof.configDir;
+      env.CLAUDE_CONFIG_DIR = configDir;
     } else if (service === "codex") {
-      env.CODEX_HOME = prof.configDir;
+      env.CODEX_HOME = configDir;
     }
   } else {
     if (service === "claude") delete env.CLAUDE_CONFIG_DIR;

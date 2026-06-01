@@ -71,8 +71,10 @@ function Get-TokenStats {
     }
 }
 
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$switcherRoot = Split-Path -Parent $scriptRoot
 $acc1Dir = "$env:USERPROFILE\.claude\projects"
-$acc2Dir = "C:\AI\ai-switcher\auth\claude-acc2\projects"
+$acc2Dir = Join-Path $switcherRoot "auth\claude-acc2\projects"
 
 Write-Host ""
 Write-Host "Claude token usage [$Period]" -ForegroundColor Cyan
