@@ -316,7 +316,7 @@ const STRINGS = {
     "ui.applyProviders": "Применить",
     "ui.providersSaved": "Сохранено ✓",
     "ui.profileModelRequired": "Укажи модель для «{label}» (например: llama3.2, gpt-4o-mini)",
-    "ui.ollamaSelectModel": "— выбери модель —",
+    "ui.ollamaSelectModel": "выбери модель",
     "ui.ollamaRegisterHint": "← зарегистрируй в «Регистрация агентов»",
     "ui.ollamaNoModels": "Ollama не запущена?",
     "ui.ollamaDetected": "Ollama обнаружена на порту {port} · {n} модел{suffix}",
@@ -722,7 +722,7 @@ const STRINGS = {
     "ui.applyProviders": "Apply",
     "ui.providersSaved": "Saved ✓",
     "ui.profileModelRequired": "Enter a model name for «{label}» (e.g. llama3.2, gpt-4o-mini)",
-    "ui.ollamaSelectModel": "— select model —",
+    "ui.ollamaSelectModel": "select model",
     "ui.ollamaRegisterHint": "← register in «Agent registration»",
     "ui.ollamaNoModels": "Ollama not running?",
     "ui.ollamaDetected": "Ollama detected on port {port} · {n} model{suffix}",
@@ -968,16 +968,42 @@ function closeCoachPinned() {
 }
 
 function bindTooltipDelegation() {
+  let delayedTooltipTimer = null;
+  const clearDelayedTooltip = () => {
+    if (delayedTooltipTimer) {
+      clearTimeout(delayedTooltipTimer);
+      delayedTooltipTimer = null;
+    }
+  };
   document.addEventListener("mouseover", (event) => {
     const target = event.target.closest("[data-tooltip-key]");
     if (!target) return;
+    clearDelayedTooltip();
     showTooltip(target.dataset.tooltipText || "", target);
   });
   document.addEventListener("mouseout", (event) => {
-    if (event.target.closest("[data-tooltip-key]")) hideTooltip();
+    if (event.target.closest("[data-tooltip-key]")) {
+      clearDelayedTooltip();
+      hideTooltip();
+    }
   });
-  document.addEventListener("scroll", hideTooltip, true);
-  window.addEventListener("blur", hideTooltip);
+  document.addEventListener("mouseover", (event) => {
+    const target = event.target.closest("[data-tooltip-text]:not([data-tooltip-key])");
+    if (!target || !target.dataset.tooltipDelay) return;
+    clearDelayedTooltip();
+    delayedTooltipTimer = setTimeout(() => {
+      showTooltip(target.dataset.tooltipText || "", target);
+      delayedTooltipTimer = null;
+    }, Number(target.dataset.tooltipDelay) || 2000);
+  });
+  document.addEventListener("mouseout", (event) => {
+    if (event.target.closest("[data-tooltip-text]:not([data-tooltip-key])")) {
+      clearDelayedTooltip();
+      hideTooltip();
+    }
+  });
+  document.addEventListener("scroll", () => { clearDelayedTooltip(); hideTooltip(); }, true);
+  window.addEventListener("blur", () => { clearDelayedTooltip(); hideTooltip(); });
 }
 
 // ---- API + SSE -----------------------------------------------------------
@@ -2149,17 +2175,21 @@ function renderProviderStatsPanel() {
   // OpenRouter free-pool quota: our own daily request tally per key (OpenRouter
   // exposes no remaining number). Green/yellow/red by remaining requests.
   const orQuota = (currentState?.providers?.orQuota) || {};
-  const orRefs = Object.keys(orQuota).sort();
+  const orRefs = Object.keys(orQuota).sort((a, b) => {
+    const ai = a === "OPENROUTER_API_KEY" ? 1 : (Number(String(a).split("_").pop()) || 0);
+    const bi = b === "OPENROUTER_API_KEY" ? 1 : (Number(String(b).split("_").pop()) || 0);
+    return ai - bi;
+  });
   if (orRefs.length) {
     const cells = orRefs.map((ref) => {
       const q = orQuota[ref];
       const cls = q.remaining > 20 ? "tok-green" : (q.remaining > 5 ? "tok-yellow" : "tok-red");
       const warn = q.blocked ? ` <span style="color:#e05252" title="429 / rate-limited">⚠${q.blocked}</span>` : "";
-      return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap">`
+      return `<span class="psp-or-cell" title="${escapeHtml(ref)}">`
         + `<span class="psp-dot ${cls}"></span>${escapeHtml(orKeyShort(ref))} ${q.count}/${q.cap}${warn}</span>`;
     }).join("");
-    html += `<div class="psp-row" style="flex-wrap:wrap;gap:6px" title="${escapeHtml(t("ui.orQuotaTip"))}">`
-      + `<span class="psp-name" style="opacity:.7;flex:0 0 auto">${escapeHtml(t("ui.orQuotaLabel"))}</span>${cells}</div>`;
+    html += `<div class="psp-row psp-or-wrap" title="${escapeHtml(t("ui.orQuotaTip"))}">`
+      + `<span class="psp-name psp-or-label">${escapeHtml(t("ui.orQuotaLabel"))} ${orRefs.length}</span><span class="psp-or-grid">${cells}</span></div>`;
   }
   const hasUsage = Object.values(usage).some((u) => u && u.totalTokens > 0);
   if (hasUsage) {
@@ -2538,6 +2568,7 @@ function renderSettings() {
 // chat changes or the UI language flips; otherwise it persists across renders.
 let providersDraft = null;
 let providersForRunId = undefined;
+const PROVIDERS_DRAFT_KEY = "council-room-v2.providersDraft";
 // Ollama auto-detection result (null = not yet fetched).
 let ollamaDetect = null;
 
@@ -2563,12 +2594,290 @@ function provLogAdd(ru, en) {
     body: JSON.stringify({ text: en, textRu: ru }),
   }).catch(() => {});
 }
+function provLogUpsert(key, ru, en, pinned = false, legacyPrefixes = [], flashMs = 1000) {
+  const entries = provLogLoad().filter((e) => {
+    if (e.key === key) return false;
+    const ruMsg = String(e.ru || "");
+    const enMsg = String(e.en || "");
+    return !legacyPrefixes.some((prefix) => ruMsg.startsWith(prefix) || enMsg.startsWith(prefix));
+  });
+  entries.push({ key, pinned, at: new Date().toISOString(), ru, en });
+  provLogSave(entries);
+  providerLogFlash = { key, until: Date.now() + flashMs };
+  if (providerLogFlashTimer) clearTimeout(providerLogFlashTimer);
+  providerLogFlashTimer = setTimeout(() => {
+    providerLogFlash = null;
+    providerLogFlashTimer = null;
+    renderRegisteredModels();
+  }, flashMs);
+  renderRegisteredModels();
+  fetch("/api/log", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: en, textRu: ru }),
+  }).catch(() => {});
+}
 
 // baseUrl → string[] of model names fetched from Ollama /api/tags
 const ollamaModelsCache = {};
+let openrouterCatalog = { loaded: false, loading: false, refs: [], files: [], models: [], error: "" };
+const openrouterImportedKeys = {};
+const openrouterPickerState = {};
+const ollamaPickerState = {};
+const providerLogState = { open: false };
+let providerLogFlash = null;
+let providerLogFlashTimer = null;
+const OPENROUTER_ARENA_SCORES = {
+  "moonshotai/kimi-k2.6": 1410,
+  "qwen/qwen3-next-80b-a3b-instruct": 1388,
+  "qwen/qwen3-coder": 1386,
+  "qwen/qwen3-30b-a3b-instruct-2507": 1365,
+  "qwen/qwen3-next-80b-a3b-thinking": 1352,
+  "z-ai/glm-4.5-air": 1357,
+  "openai/gpt-oss-120b": 1338,
+  "google/gemma-4-31b-it": 1320,
+  "google/gemma-4-26b-a4b-it": 1310,
+  "openai/gpt-oss-20b": 1307,
+  "nvidia/nemotron-3-super-120b-a12b": 1330,
+  "nvidia/nemotron-3-nano-30b-a3b": 1264,
+};
+const OPENROUTER_ARENA_PREFIX_SCORES = [
+  ["moonshotai/kimi-k2.6", 1410],
+  ["qwen/qwen3-next-80b-a3b-instruct", 1388],
+  ["qwen/qwen3-coder", 1386],
+  ["qwen/qwen3-30b-a3b", 1365],
+  ["qwen/qwen3-next-80b-a3b-thinking", 1352],
+  ["z-ai/glm-4.5-air", 1357],
+  ["openai/gpt-oss-120b", 1338],
+  ["openai/gpt-oss-20b", 1307],
+  ["google/gemma-4-31b-it", 1320],
+  ["google/gemma-4-26b-a4b-it", 1310],
+  ["nvidia/nemotron-3-super-120b-a12b", 1330],
+  ["nvidia/nemotron-3-nano-30b-a3b", 1264],
+];
 
-async function detectOllama() {
-  if (ollamaDetect !== null) return ollamaDetect;
+function isOpenrouterProvider(provider) { return provider === "openrouter"; }
+function sortOpenrouterRefs(refs) {
+  return [...new Set((refs || []).filter(Boolean))].sort((a, b) => {
+    const ai = a === "OPENROUTER_API_KEY" ? 1 : (Number(String(a).split("_").pop()) || 0);
+    const bi = b === "OPENROUTER_API_KEY" ? 1 : (Number(String(b).split("_").pop()) || 0);
+    return ai - bi;
+  });
+}
+function knownOpenrouterRefs() {
+  return sortOpenrouterRefs([...(openrouterCatalog.refs || []), ...Object.keys(openrouterImportedKeys)]);
+}
+function openProviderLog() {
+  providerLogState.open = true;
+  renderRegisteredModels();
+}
+function logOpenrouterDiscovery() {
+  const refs = knownOpenrouterRefs().length;
+  const files = Array.isArray(openrouterCatalog.files) ? openrouterCatalog.files.length : 0;
+  provLogUpsert(
+    "openrouter-scan",
+    `OpenRouter: найдено refs: ${refs}${files ? ` · файлов: ${files}` : ""}`,
+    `OpenRouter: refs found: ${refs}${files ? ` · files: ${files}` : ""}`,
+    true,
+    ["OpenRouter:"],
+    4000
+  );
+}
+function nextOpenrouterRef() {
+  const refs = knownOpenrouterRefs();
+  let max = 0;
+  for (const ref of refs) {
+    const n = ref === "OPENROUTER_API_KEY" ? 1 : (Number(String(ref).split("_").pop()) || 0);
+    if (n > max) max = n;
+  }
+  const next = max + 1;
+  return next <= 1 ? "OPENROUTER_API_KEY" : `OPENROUTER_API_KEY_${next}`;
+}
+async function fetchOpenrouterCatalog(force = false) {
+  if (openrouterCatalog.loading) return;
+  if (openrouterCatalog.loaded && !force) return;
+  openrouterCatalog.loading = true;
+  try {
+    const [d, m] = await Promise.all([
+      fetch("/api/openrouter/discover").then((r) => r.json().catch(() => ({}))),
+      fetch("/api/openrouter/models").then((r) => r.json().catch(() => ({}))),
+    ]);
+    openrouterCatalog = {
+      loaded: true,
+      loading: false,
+      refs: sortOpenrouterRefs(d.refs || []),
+      files: Array.isArray(d.files) ? d.files : [],
+      models: Array.isArray(m.models) ? m.models : [],
+      error: m.error || "",
+    };
+  } catch (e) {
+    openrouterCatalog = { ...openrouterCatalog, loaded: true, loading: false, error: e.message };
+  }
+}
+function parseOpenrouterKeysFromText(raw, fileName = "") {
+  const out = [];
+  const seenValues = new Set();
+  for (const line of String(raw || "").split(/\r?\n/)) {
+    const m = /^\s*(OPENROUTER_API_KEY(?:_\d+)?)\s*=\s*(.*?)\s*$/.exec(line);
+    if (!m) continue;
+    let value = String(m[2] || "").trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    if (!/^sk-or-v1-[A-Za-z0-9]+$/.test(value) || seenValues.has(value)) continue;
+    seenValues.add(value);
+    out.push({ ref: m[1], value, fileName });
+  }
+  const bare = String(raw || "").match(/sk-or-v1-[A-Za-z0-9]+/g) || [];
+  for (const value of bare) {
+    if (seenValues.has(value)) continue;
+    seenValues.add(value);
+    out.push({ ref: nextOpenrouterRef(), value, fileName });
+  }
+  return out;
+}
+async function importOpenrouterKeyFile(file, profileId) {
+  if (!file) return;
+  let text = "";
+  try { text = await file.text(); } catch (e) { showProvidersMsg(e.message, true); return; }
+  const found = parseOpenrouterKeysFromText(text, file.name || "");
+  if (!found.length) {
+    showProvidersMsg(UI_LANG === "ru" ? "В файле не найдено OpenRouter-ключей" : "No OpenRouter keys found in file", true);
+    return;
+  }
+  for (const item of found) openrouterImportedKeys[item.ref] = { value: item.value, fileName: item.fileName || "" };
+  syncProvidersFromDOM();
+  const p = providersDraft && providersDraft.profiles.find((x) => x.id === profileId);
+  if (p && !p.credentialRef) p.credentialRef = found[0].ref;
+  await fetchOpenrouterCatalog(true);
+  logOpenrouterDiscovery();
+  renderProviders();
+  showProvidersMsg(
+    UI_LANG === "ru" ? `Загружено ключей OpenRouter: ${found.length}` : `OpenRouter keys loaded: ${found.length}`,
+    false
+  );
+}
+function filterOpenrouterModelList(input) {
+  const panel = input.closest(".or-model-panel");
+  if (!panel) return;
+  const q = String(input.value || "").trim().toLowerCase();
+  const rows = [...panel.querySelectorAll(".or-model-row")];
+  let shown = 0;
+  for (const row of rows) {
+    const hay = row.dataset.search || "";
+    const ok = !q || hay.includes(q);
+    row.style.display = ok ? "" : "none";
+    if (ok) shown++;
+  }
+  const empty = panel.querySelector(".or-model-empty");
+  if (empty) empty.classList.toggle("hidden", shown > 0);
+}
+function openrouterModelInfoText(m) {
+  if (!m) return "";
+  const freeText = m.free ? (UI_LANG === "ru" ? "Без оплаты" : "Free") : (UI_LANG === "ru" ? "Платно" : "Paid");
+  const prices = Object.entries(m.pricing || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+  return UI_LANG === "ru"
+    ? `${m.name}\nID: ${m.id}\nТип: ${freeText}\nКонтекст: ${m.contextLength || "—"}\nPricing: ${prices || "—"}`
+    : `${m.name}\nID: ${m.id}\nType: ${freeText}\nContext: ${m.contextLength || "—"}\nPricing: ${prices || "—"}`;
+}
+function normalizeOpenrouterArenaId(modelId) {
+  return String(modelId || "").trim().replace(/:free$/, "");
+}
+function openrouterCommunityScoreMeta(modelId) {
+  const normalized = normalizeOpenrouterArenaId(modelId);
+  if (OPENROUTER_ARENA_SCORES[normalized]) {
+    return { score: Number(OPENROUTER_ARENA_SCORES[normalized] || 0), proxy: false };
+  }
+  const prefix = OPENROUTER_ARENA_PREFIX_SCORES.find(([p]) => normalized === p || normalized.startsWith(`${p}-`) || normalized.startsWith(`${p}.`));
+  if (prefix) return { score: Number(prefix[1] || 0), proxy: true };
+  return { score: 0, proxy: false };
+}
+function openrouterCommunityScore(modelId) {
+  return openrouterCommunityScoreMeta(modelId).score;
+}
+function openrouterArenaBadge(modelId) {
+  const meta = openrouterCommunityScoreMeta(modelId);
+  return meta.score ? `Arena ${meta.proxy ? "~" : ""}${meta.score}` : "Arena n/a";
+}
+function sortOpenrouterModels(models) {
+  return [...(models || [])].sort((a, b) => {
+    if (a.free !== b.free) return a.free ? -1 : 1;
+    const as = openrouterCommunityScore(a.id);
+    const bs = openrouterCommunityScore(b.id);
+    if (as !== bs) return bs - as;
+    if (a.free && b.free && Number(a.contextLength || 0) !== Number(b.contextLength || 0)) {
+      return Number(b.contextLength || 0) - Number(a.contextLength || 0);
+    }
+    return String(a.name || a.id || "").localeCompare(String(b.name || b.id || ""));
+  });
+}
+function renderOpenrouterModelRows(models, profileId, selectedModelId) {
+  return sortOpenrouterModels(models || []).slice(0, 120).map((m) => `
+    <div class="or-model-row${m.id === selectedModelId ? " selected" : ""}" data-search="${escapeHtml(`${m.id} ${m.name}`.toLowerCase())}">
+      <button type="button" class="or-model-pick" data-profile-id="${escapeHtml(profileId)}" data-model-id="${escapeHtml(m.id)}">
+        <span class="or-model-name">${escapeHtml(m.name)}</span>
+        <span class="or-model-badges"><span class="or-model-badge arena${openrouterCommunityScore(m.id) ? "" : " arena-empty"}">${escapeHtml(openrouterArenaBadge(m.id))}</span><span class="or-model-badge ${m.free ? "free" : "paid"}">${m.free ? "free" : "paid"}</span></span>
+      </button>
+      <button type="button" class="or-model-info" data-tooltip-text="${escapeHtml(openrouterModelInfoText(m))}">i</button>
+    </div>
+  `).join("");
+}
+function renderOpenrouterModelPicker(p) {
+  const st = openrouterPickerState[p.id] || { open: false, query: "" };
+  const selected = (openrouterCatalog.models || []).find((m) => m.id === p.model) || null;
+  const title = selected ? `${selected.name} [${selected.free ? "free" : "paid"}]` : (p.model || (openrouterCatalog.loading ? "loading models..." : "select model"));
+  const query = String(st.query || "");
+  const rows = renderOpenrouterModelRows(openrouterCatalog.models || [], p.id, p.model);
+  return `
+    <input type="hidden" class="p-model" value="${escapeHtml(p.model || "")}">
+    <details class="or-model-picker"${st.open ? " open" : ""} data-profile-id="${escapeHtml(p.id)}">
+      <summary class="or-model-summary">
+        <span class="or-model-current">${escapeHtml(title)}</span>
+      </summary>
+      <div class="or-model-panel">
+        <div class="or-model-toolbar">
+          <span class="or-model-label">${t("ui.profileModel")} ${helpIcon("profileModel")}</span>
+          <input class="or-model-search" data-profile-id="${escapeHtml(p.id)}" value="${escapeHtml(query)}" placeholder="${UI_LANG === "ru" ? "Фильтр моделей" : "Filter models"}">
+        </div>
+        <div class="or-model-list">${rows}</div>
+        <div class="p-subhint or-model-empty${rows ? " hidden" : ""}">${escapeHtml(UI_LANG === "ru" ? "Ничего не найдено" : "No models found")}</div>
+      </div>
+    </details>`;
+}
+
+function renderOllamaModelRows(models, profileId, selectedModelId) {
+  return [...(models || [])].sort((a, b) => String(a || "").localeCompare(String(b || ""))).map((m) => `
+    <div class="or-model-row${m === selectedModelId ? " selected" : ""}" data-search="${escapeHtml(String(m || "").toLowerCase())}">
+      <button type="button" class="or-model-pick ol-model-pick" data-profile-id="${escapeHtml(profileId)}" data-model-id="${escapeHtml(m)}">
+        <span class="or-model-name">${escapeHtml(m)}</span>
+        <span class="or-model-badges"><span class="or-model-badge">local</span></span>
+      </button>
+    </div>
+  `).join("");
+}
+
+function renderOllamaModelPicker(p, models) {
+  const st = ollamaPickerState[p.id] || { open: false, query: "" };
+  const title = p.model || (models.length ? t("ui.ollamaSelectModel") : "llama3.2");
+  const query = String(st.query || "");
+  const rows = renderOllamaModelRows(models, p.id, p.model);
+  return `
+    <input type="hidden" class="p-model" value="${escapeHtml(p.model || "")}">
+    <details class="or-model-picker ol-model-picker"${st.open ? " open" : ""} data-profile-id="${escapeHtml(p.id)}">
+      <summary class="or-model-summary">
+        <span class="or-model-current">${escapeHtml(title)}</span>
+      </summary>
+      <div class="or-model-panel">
+        <div class="or-model-toolbar">
+          <span class="or-model-label">${t("ui.profileModel")} ${helpIcon("profileModel")}</span>
+          <button type="button" class="ghost small ol-model-scan" data-profile-id="${escapeHtml(p.id)}">${UI_LANG === "ru" ? "Сканировать" : "Scan"}</button>
+          <input class="or-model-search ol-model-search" data-profile-id="${escapeHtml(p.id)}" value="${escapeHtml(query)}" placeholder="${UI_LANG === "ru" ? "Фильтр моделей" : "Filter models"}">
+        </div>
+        <div class="or-model-list">${rows}</div>
+        <div class="p-subhint or-model-empty${rows ? " hidden" : ""}">${escapeHtml(UI_LANG === "ru" ? "Ничего не найдено" : "No models found")}</div>
+      </div>
+    </details>`;
+}
+
+async function detectOllama(force = false) {
+  if (ollamaDetect !== null && !force) return ollamaDetect;
   try {
     const r = await fetch("/api/ollama/detect");
     ollamaDetect = await r.json().catch(() => ({ detected: false }));
@@ -2579,23 +2888,31 @@ async function detectOllama() {
       const suffixRu = n === 1 ? "ь" : n >= 2 && n <= 4 ? "и" : "ей";
       const names = ollamaDetect.models.slice(0, 5).join(", ");
       const more = n > 5 ? ` +${n - 5}` : "";
-      provLogAdd(
+      provLogUpsert(
+        "ollama-scan",
         `Ollama обнаружена на порту ${ollamaDetect.port} · ${n} модел${suffixRu}: ${names}${more}`,
-        `Ollama detected on port ${ollamaDetect.port} · ${n} model${suffix}: ${names}${more}`
+        `Ollama detected on port ${ollamaDetect.port} · ${n} model${suffix}: ${names}${more}`,
+        true,
+        ["Ollama "],
+        4000
       );
     } else if (ollamaDetect && !ollamaDetect.detected) {
-      provLogAdd(
+      provLogUpsert(
+        "ollama-scan",
         `Ollama не обнаружена (порт ${ollamaDetect.port || 11434})`,
-        `Ollama not detected (port ${ollamaDetect.port || 11434})`
+        `Ollama not detected (port ${ollamaDetect.port || 11434})`,
+        true,
+        ["Ollama "],
+        4000
       );
     }
   } catch { ollamaDetect = { detected: false }; }
   return ollamaDetect;
 }
 
-async function fetchOllamaModels(baseUrl) {
+async function fetchOllamaModels(baseUrl, force = false) {
   const key = baseUrl || "http://localhost:11434/v1";
-  if (ollamaModelsCache[key]) return ollamaModelsCache[key];
+  if (ollamaModelsCache[key] && !force) return ollamaModelsCache[key];
   try {
     const r = await fetch(`/api/ollama/models?baseUrl=${encodeURIComponent(key)}`);
     const j = await r.json().catch(() => ({}));
@@ -2612,12 +2929,41 @@ function blankRoles() {
   };
 }
 
+function loadStoredProvidersDraft() {
+  try {
+    const raw = localStorage.getItem(PROVIDERS_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const runId = currentState?.activeRunId || null;
+    if ((parsed?.runId || null) !== runId) return null;
+    if (!parsed?.draft || !Array.isArray(parsed.draft.profiles) || !parsed.draft.roles?.a || !parsed.draft.roles?.b) return null;
+    return parsed.draft;
+  } catch {
+    return null;
+  }
+}
+
+function saveProvidersDraft() {
+  if (!providersDraft) return;
+  try {
+    localStorage.setItem(PROVIDERS_DRAFT_KEY, JSON.stringify({
+      runId: currentState?.activeRunId || null,
+      draft: providersDraft,
+    }));
+  } catch {}
+}
+
+function clearProvidersDraftStorage() {
+  try { localStorage.removeItem(PROVIDERS_DRAFT_KEY); } catch {}
+}
+
 function initProvidersDraft() {
   const s = currentState.settings || {};
-  providersDraft = {
+  const fallbackDraft = {
     profiles: Array.isArray(s.profiles) ? JSON.parse(JSON.stringify(s.profiles)) : [],
     roles: (s.roles && s.roles.a && s.roles.b) ? JSON.parse(JSON.stringify(s.roles)) : blankRoles(),
   };
+  providersDraft = loadStoredProvidersDraft() || fallbackDraft;
 }
 
 function renderProvidersInit() {
@@ -2665,42 +3011,68 @@ function helpIcon(tipKey) {
 function renderProfileRow(p) {
   const provSel = providerOptions().map((o) => `<option value="${escapeHtml(o.id)}"${o.id === p.provider ? " selected" : ""}>${escapeHtml(o.label)}</option>`).join("");
   const cli = isCliProviderId(p.provider);
+  const isOpenrouter = isOpenrouterProvider(p.provider);
   const preset = presetById(p.provider);
   const creds = (currentState.providers && currentState.providers.credentials) || {};
   const validated = (currentState.providers && currentState.providers.validated) || {};
+  const selectedRef = String(p.credentialRef || (preset ? preset.credentialRef : "") || "").trim();
+  const discoveredOrImported = isOpenrouter && selectedRef
+    && (knownOpenrouterRefs().includes(selectedRef) || Boolean(openrouterImportedKeys[selectedRef]));
+  const profileKeyPresent = Boolean(creds[p.id]) || discoveredOrImported;
   const needsKey = !cli && p.provider !== "ollama" && (preset ? preset.needsKey : true);
-  const keyBadge = needsKey
-    ? `<span class="key-badge ${creds[p.id] ? "ok" : "miss"}">${creds[p.id] ? t("ui.keySet") : t("ui.keyMissing")}</span>`
+  const keyBadge = needsKey && !profileKeyPresent
+    ? `<span class="key-badge miss">${t("ui.keyMissing")}</span>`
     : "";
   const isOllama = p.provider === "ollama";
+  if (isOpenrouter && !openrouterCatalog.loaded && !openrouterCatalog.loading) {
+    fetchOpenrouterCatalog().then(() => renderProviders());
+  }
   const ollamaModels = isOllama ? (ollamaModelsCache[p.baseUrl || (preset && preset.baseUrl) || "http://localhost:11434/v1"] || null) : null;
   let modelWidget;
   if (cli) {
     modelWidget = `<input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="auto">`;
-  } else if (isOllama && ollamaModels && ollamaModels.length) {
-    const opts = ollamaModels.map((m) => `<option value="${escapeHtml(m)}"${m === p.model ? " selected" : ""}>${escapeHtml(m)}</option>`).join("");
-    const emptyOpt = p.model && ollamaModels.includes(p.model) ? "" : `<option value="${escapeHtml(p.model || "")}" selected>${escapeHtml(p.model || t("ui.ollamaSelectModel"))}</option>`;
-    modelWidget = `<select class="p-model">${emptyOpt}${opts}</select>`;
+  } else if (isOpenrouter) {
+    modelWidget = renderOpenrouterModelPicker(p);
+  } else if (isOllama && ollamaModels) {
+    modelWidget = renderOllamaModelPicker(p, ollamaModels);
   } else if (isOllama) {
     const hint = ollamaModels !== null ? ` (${t("ui.ollamaNoModels")})` : "";
     modelWidget = `<input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="llama3.2${hint}">`;
   } else {
     modelWidget = `<input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="model">`;
   }
-  let fields = `<label class="p-field"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span>${modelWidget}</label>`;
+  const showBaseUrl = p.provider === "ollama" || p.provider === "openai-compatible";
+  let fields = "";
   if (cli) {
+    fields += `<label class="p-field${isOpenrouter ? " p-field-wide p-field-inline-model" : ""}"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span>${modelWidget}</label>`;
     fields += `<label class="p-field"><span>${t("ui.profileAccount")}</span><select class="p-account">
       <option value="acc1"${p.account === "acc1" ? " selected" : ""}>acc1</option>
       <option value="acc2"${p.account === "acc2" ? " selected" : ""}>acc2</option>
     </select></label>`;
   } else {
-    fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
     if (p.provider !== "ollama") {
-      fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
+      if (isOpenrouter) {
+        const refList = knownOpenrouterRefs();
+        const selectedRefValue = p.credentialRef || (preset ? preset.credentialRef : "");
+        const refOpts = [
+          ...(!selectedRefValue || refList.includes(selectedRefValue) ? [] : [selectedRefValue]),
+          ...refList,
+        ].map((ref) => `<option value="${escapeHtml(ref)}"${ref === selectedRefValue ? " selected" : ""}>${escapeHtml(ref)}</option>`).join("");
+        fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span>
+          <select class="p-credref">${refOpts}</select>
+          <span class="p-mini-row p-or-refline">
+            <button type="button" class="ghost small p-or-scan">${UI_LANG === "ru" ? "Сканировать" : "Scan"}</button>
+            <button type="button" class="ghost small p-or-import">${UI_LANG === "ru" ? "Файл" : "File"}</button>
+            <input type="file" class="p-or-file" hidden accept=".env,.txt,.json,.md">
+          </span>
+        </label>`;
+      } else {
+        fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
+      }
       // Three states for the ✓: green = key passed a live test (verified);
       // amber = key present but not yet verified; none = no key. Placeholder
       // reflects presence ("key set — leave empty").
-      const keyPresent = Boolean(creds[p.id]);
+      const keyPresent = profileKeyPresent;
       const keyOk = Boolean(validated[p.id]);
       const mark = keyOk
         ? `<span class="key-ok" title="${escapeHtml(t("ui.keyVerified"))}">✓</span>`
@@ -2711,6 +3083,10 @@ function renderProfileRow(p) {
           <input type="password" class="p-apikey${inputCls}" value="" autocomplete="off" placeholder="${keyPresent ? escapeHtml(t("ui.keyKeepPlaceholder")) : "sk-..."}">
           ${mark}
         </span></label>`;
+    }
+    fields += `<label class="p-field${isOpenrouter || isOllama ? " p-field-wide p-field-inline-model" : ""}"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span>${modelWidget}</label>`;
+    if (showBaseUrl) {
+      fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
     }
   }
   return `<div class="profile-row" data-id="${escapeHtml(p.id)}">
@@ -2739,21 +3115,41 @@ function ollamaBanner() {
     + (names ? `<br><span class="ollama-models">${names}${more}</span>` : "") + `</div>`;
 }
 
+function refreshProvidersFieldTooltips() {
+  const root = $("profilesList");
+  if (!root) return;
+  root.querySelectorAll(".p-label, .p-provider, .p-credref, .p-model, .p-baseurl, .p-apikey, .or-model-summary").forEach((el) => {
+    let text = "";
+    if (el.classList.contains("or-model-summary")) {
+      text = el.querySelector(".or-model-current")?.textContent || "";
+    } else if (el.tagName === "SELECT") {
+      text = el.options?.[el.selectedIndex]?.text || el.value || "";
+    } else {
+      text = el.value || el.placeholder || "";
+    }
+    text = String(text || "").trim();
+    if (text) {
+      el.dataset.tooltipText = text;
+      el.dataset.tooltipDelay = "1000";
+    } else {
+      delete el.dataset.tooltipText;
+      delete el.dataset.tooltipDelay;
+    }
+  });
+}
+
 function renderProviders() {
   if (!providersDraft) return;
-  // Ollama banner: only when there are UNSAVED Ollama profiles (not already-saved).
+  const banner = $("ollamaBanner");
+  if (banner) banner.innerHTML = "";
   const savedIds = new Set(((currentState.settings && currentState.settings.profiles) || []).map((p) => p.id));
   const newProfiles = providersDraft.profiles.filter((p) => !savedIds.has(p.id));
-  const banner = $("ollamaBanner");
-  if (banner) {
-    const hasNewOllama = newProfiles.some((p) => p.provider === "ollama");
-    banner.innerHTML = hasNewOllama ? ollamaBanner() : "";
-  }
   const list = $("profilesList");
   if (!list) return;
   list.innerHTML = newProfiles.length
     ? newProfiles.map(renderProfileRow).join("")
     : `<div class="reg-hint muted small">${escapeHtml(t("ui.noNewProfiles"))}</div>`;
+  refreshProvidersFieldTooltips();
   // "Применить" hidden until at least one new profile exists.
   const applyBtn = $("applyProvidersBtn");
   if (applyBtn) applyBtn.style.display = newProfiles.length ? "" : "none";
@@ -2766,8 +3162,22 @@ function renderProviders() {
 // Shows: ↻ | label | provider name | model dropdown | effort | speed (if supported).
 // Changes auto-save via POST /api/settings (no Apply button).
 
-// Per-profile test status: { ok: bool, testing: bool }
+// Per-profile test status: { kind: "primary"|"fallback"|"down", testing: bool, servedModel?, error? }
 const rmStatus = {};
+
+function regModelStatusText(st) {
+  if (!st || !st.kind) return "";
+  if (UI_LANG === "ru") {
+    if (st.kind === "primary") return "доступна";
+    if (st.kind === "fallback") return "через fallback";
+    if (st.kind === "down") return "недоступна";
+    return "";
+  }
+  if (st.kind === "primary") return "available";
+  if (st.kind === "fallback") return "via fallback";
+  if (st.kind === "down") return "unavailable";
+  return "";
+}
 
 function regModelProviderLabel(provider) {
   if (provider === "cli-codex") return "Codex CLI";
@@ -2820,9 +3230,11 @@ function renderRegisteredModelRow(p) {
   }
 
   const st = rmStatus[p.id] || {};
-  const rowCls = st.testing ? " rm-testing" : (st.ok === true ? " rm-ok" : (st.ok === false ? " rm-fail" : ""));
+  const rowCls = st.testing ? " rm-testing" : (st.kind === "primary" ? " rm-ok" : (st.kind === "fallback" ? " rm-fallback" : (st.kind === "down" ? " rm-fail" : "")));
   const btnIcon = st.testing ? "⟳" : "↻";
   const btnTitle = st.testing ? t("ui.regModelTesting") : t("ui.regModelRetest");
+  const statusText = regModelStatusText(st);
+  const statusBadge = statusText ? `<span class="rm-status rm-status-${escapeHtml(st.kind)}">${escapeHtml(statusText)}</span>` : "";
 
   return `<tr class="rm-row${rowCls}" data-id="${escapeHtml(p.id)}">
     <td class="rm-cell rm-cell-retest">
@@ -2833,6 +3245,7 @@ function renderRegisteredModelRow(p) {
     </td>
     <td class="rm-cell rm-cell-agent">
       <span class="rm-prov-badge">${escapeHtml(provLabel)}</span>
+      ${statusBadge}
     </td>
     <td class="rm-cell">
       ${modelField}
@@ -2842,6 +3255,27 @@ function renderRegisteredModelRow(p) {
       <button class="rm-delete ghost" type="button" title="${UI_LANG === "en" ? "Remove" : "Удалить"}">×</button>
     </td>
   </tr>`;
+}
+
+function refreshRegisteredModelsTooltips() {
+  const root = $("registeredModelsList");
+  if (!root) return;
+  root.querySelectorAll(".rm-label, .rm-model, .rm-effort, .rm-speed, .rm-prov-badge, .rm-status").forEach((el) => {
+    let text = "";
+    if (el.tagName === "SELECT") {
+      text = el.options?.[el.selectedIndex]?.text || el.value || "";
+    } else {
+      text = el.value || el.textContent || el.placeholder || "";
+    }
+    text = String(text || "").trim();
+    if (text) {
+      el.dataset.tooltipText = text;
+      el.dataset.tooltipDelay = "1000";
+    } else {
+      delete el.dataset.tooltipText;
+      delete el.dataset.tooltipDelay;
+    }
+  });
 }
 
 function renderRegisteredModels() {
@@ -2864,24 +3298,30 @@ function renderRegisteredModels() {
   let logHtml = "";
   {
     const items = logEntries.length
-      ? [...logEntries].reverse().map((e) => {
+      ? (() => {
+          const pinned = logEntries.filter((e) => e && e.pinned);
+          const regular = logEntries.filter((e) => !e || !e.pinned).reverse();
+          return [...pinned, ...regular].map((e) => {
           const dt = new Date(e.at);
           const dateStr = dt.toLocaleDateString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" });
           const timeStr = dt.toLocaleTimeString(UI_LANG === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
           const msg = escapeHtml(UI_LANG === "ru" ? (e.ru || e.en || "") : (e.en || e.ru || ""));
-          return `<div class="plog-entry"><span class="plog-dt"><span class="plog-date">${dateStr}</span><span class="plog-time">${timeStr}</span></span><span class="plog-msg">${msg}</span></div>`;
-        }).join("")
+          const flashCls = providerLogFlash && e.key && providerLogFlash.key === e.key && providerLogFlash.until > Date.now() ? " flash" : "";
+          return `<div class="plog-entry${e.pinned ? " pinned" : ""}"><span class="plog-dt"><span class="plog-date">${dateStr}</span><span class="plog-time">${timeStr}</span></span><span class="plog-msg${flashCls}">${msg}</span></div>`;
+        }).join("");
+        })()
       : `<div class="muted small" style="padding:4px 0">${escapeHtml(t("ui.providerLogEmpty"))}</div>`;
-    logHtml = `<details class="plog-details">
+    logHtml = `<details class="plog-details"${providerLogState.open ? " open" : ""}>
       <summary class="plog-summary">
         <span>${escapeHtml(t("ui.providerLog"))}</span>
         <button class="plog-clear ghost small" type="button">${escapeHtml(t("ui.providerLogClear"))}</button>
       </summary>
-      <div class="plog-box">${items}</div>
+      <div class="plog-panel"><div class="plog-box">${items}</div></div>
     </details>`;
   }
 
   list.innerHTML = tableHtml + logHtml;
+  refreshRegisteredModelsTooltips();
   bindRegisteredModels();
 }
 
@@ -2914,11 +3354,13 @@ function bindRegisteredModels() {
     if (e.target.classList.contains("rm-model")) fields.model = e.target.value;
     if (e.target.classList.contains("rm-effort")) fields.effort = e.target.value;
     if (e.target.classList.contains("rm-speed")) fields.speed = e.target.value;
+    refreshRegisteredModelsTooltips();
     if (Object.keys(fields).length) saveRegisteredModelRow(id, fields);
   });
   table.addEventListener("input", (e) => {
     if (e.target.classList.contains("rm-label") || e.target.classList.contains("rm-model")) {
       // live update without save (save on blur/change)
+      refreshRegisteredModelsTooltips();
     }
   });
   table.addEventListener("blur", (e) => {
@@ -2937,11 +3379,14 @@ function bindRegisteredModels() {
     provLogSave([]);
     renderRegisteredModels();
   });
+  document.querySelector("#registeredModelsList .plog-details")?.addEventListener("toggle", (e) => {
+    providerLogState.open = Boolean(e.target.open);
+  });
   // Retest / delete buttons.
   document.querySelector("#registeredModelsList .rm-table")?.addEventListener("click", async (e) => {
     if (e.target.closest(".rm-retest")) {
       const id = e.target.closest(".rm-row")?.dataset.id;
-      if (id) retestRegisteredModel(id);
+      if (id) retestRegisteredModelResolved(id);
       return;
     }
     if (e.target.closest(".rm-delete")) {
@@ -2968,10 +3413,11 @@ async function retestRegisteredModel(id) {
   try {
     const r = await fetch("/api/providers/test", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider: p.provider, baseUrl: p.baseUrl, credentialRef: p.credentialRef, model: p.model }),
+      body: JSON.stringify({ provider: p.provider, baseUrl: p.baseUrl, credentialRef: p.credentialRef, model: p.model, fallbackModels: p.fallbackModels }),
     });
     const j = await r.json().catch(() => ({}));
-    rmStatus[id] = { ok: Boolean(j.ok) };
+    const kind = j.ok ? (j.viaFallback ? "fallback" : "primary") : "down";
+    rmStatus[id] = { kind, servedModel: j.servedModel || "", error: j.error || "" };
     agentChipFlash.set(id, { ok: Boolean(j.ok), at: Date.now() });
     startChipFlashTimer();
     const lbl = p.label || p.model || id;
@@ -2987,7 +3433,58 @@ async function retestRegisteredModel(id) {
       );
     }
   } catch (e) {
-    rmStatus[id] = { ok: false };
+    rmStatus[id] = { kind: "down", error: e.message };
+    agentChipFlash.set(id, { ok: false, at: Date.now() });
+    startChipFlashTimer();
+    provLogAdd(
+      `✗ ${p.label || p.model || id} — ошибка: ${e.message}`,
+      `✗ ${p.label || p.model || id} — error: ${e.message}`
+    );
+  }
+  renderRegisteredModels();
+}
+
+async function retestRegisteredModelResolved(id) {
+  const profs = (currentState.settings && currentState.settings.profiles) || [];
+  const p = profs.find((x) => x.id === id);
+  if (!p || !p.model) return;
+  rmStatus[id] = { testing: true };
+  renderRegisteredModels();
+  try {
+    const r = await fetch("/api/providers/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: p.provider,
+        baseUrl: p.baseUrl,
+        credentialRef: p.credentialRef,
+        model: p.model,
+        fallbackModels: p.fallbackModels,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    const kind = j.ok ? (j.viaFallback ? "fallback" : "primary") : "down";
+    rmStatus[id] = { kind, servedModel: j.servedModel || "", error: j.error || "" };
+    agentChipFlash.set(id, { ok: Boolean(j.ok), at: Date.now() });
+    startChipFlashTimer();
+    const lbl = p.label || p.model || id;
+    if (j.ok && j.viaFallback) {
+      provLogAdd(
+        `↺ ${lbl} (${p.provider} / ${p.model}) — доступна через fallback: ${j.servedModel || p.model}`,
+        `↺ ${lbl} (${p.provider} / ${p.model}) — available via fallback: ${j.servedModel || p.model}`
+      );
+    } else if (j.ok) {
+      provLogAdd(
+        `✓ ${lbl} (${p.provider} / ${p.model}) — доступна`,
+        `✓ ${lbl} (${p.provider} / ${p.model}) — available`
+      );
+    } else {
+      provLogAdd(
+        `✗ ${lbl} (${p.provider} / ${p.model}) — недоступна: ${j.error || "ошибка"}`,
+        `✗ ${lbl} (${p.provider} / ${p.model}) — unavailable: ${j.error || "error"}`
+      );
+    }
+  } catch (e) {
+    rmStatus[id] = { kind: "down", error: e.message };
     agentChipFlash.set(id, { ok: false, at: Date.now() });
     startChipFlashTimer();
     provLogAdd(
@@ -3009,11 +3506,16 @@ function syncProvidersFromDOM() {
     if (q(".p-model")) p.model = q(".p-model").value;
     if (q(".p-account")) p.account = q(".p-account").value;
     if (q(".p-baseurl")) p.baseUrl = q(".p-baseurl").value;
+    else {
+      const preset = presetById(p.provider);
+      if (preset && p.provider !== "ollama" && p.provider !== "openai-compatible") p.baseUrl = preset.baseUrl || "";
+    }
     if (q(".p-credref")) p.credentialRef = q(".p-credref").value;
   });
   // Roles A/B are no longer edited in this panel (debate agents are picked per-chat
   // via the "Add agent" chips → settings.participants). The draft keeps whatever
   // roles were already persisted so applyProviders re-sends them untouched.
+  saveProvidersDraft();
 }
 
 function makeBlankProfile() {
@@ -3029,10 +3531,48 @@ function makeBlankProfile() {
   return p;
 }
 
+function profileDuplicateKey(p) {
+  const provider = String(p?.provider || "").trim().toLowerCase();
+  const model = String(p?.model || "").trim().toLowerCase();
+  if (!provider || !model) return "";
+  const baseUrl = (provider === "ollama" || provider === "openai-compatible")
+    ? String(p?.baseUrl || "").trim().toLowerCase()
+    : "";
+  return `${provider}::${model}::${baseUrl}`;
+}
+
+function findDuplicateRegisteredProfile(profiles) {
+  const seen = new Map();
+  for (const p of profiles || []) {
+    const key = profileDuplicateKey(p);
+    if (!key) continue;
+    if (seen.has(key)) return { first: seen.get(key), second: p };
+    seen.set(key, p);
+  }
+  return null;
+}
+
 function addProfileDraft() {
   syncProvidersFromDOM();
+  const savedIds = new Set(((currentState.settings && currentState.settings.profiles) || []).map((p) => p.id));
+  const unsaved = providersDraft.profiles.filter((p) => !savedIds.has(p.id));
+  if (unsaved.length >= 1) {
+    showProvidersMsg(
+      UI_LANG === "ru"
+        ? "Сначала заполни и примени текущий профиль или удали его"
+        : "Finish applying or remove the current profile first",
+      true
+    );
+    return;
+  }
   providersDraft.profiles.push(makeBlankProfile());
+  saveProvidersDraft();
   renderProviders();
+  openProviderLog();
+  fetchOpenrouterCatalog(true).then(() => {
+    logOpenrouterDiscovery();
+    renderProviders();
+  }).catch(() => {});
 }
 
 function removeProfileDraft(id) {
@@ -3042,6 +3582,7 @@ function removeProfileDraft(id) {
     const r = providersDraft.roles[slot];
     r.profileIds = (r.profileIds || []).filter((x) => x !== id);
   }
+  saveProvidersDraft();
   renderProviders();
 }
 
@@ -3093,6 +3634,18 @@ async function applyProviders() {
       return;
     }
   }
+  const duplicate = findDuplicateRegisteredProfile(providersDraft.profiles);
+  if (duplicate) {
+    const a = duplicate.first?.label || duplicate.first?.model || duplicate.first?.id;
+    const b = duplicate.second?.label || duplicate.second?.model || duplicate.second?.id;
+    showProvidersMsg(
+      UI_LANG === "ru"
+        ? `Дублируется зарегистрированная модель: ${a} / ${b}`
+        : `Duplicate registered model: ${a} / ${b}`,
+      true
+    );
+    return;
+  }
 
   // Ollama profiles: run a live test before saving. The chip only appears if
   // the test passes — so we only proceed to the POST /api/settings on success.
@@ -3128,19 +3681,21 @@ async function applyProviders() {
   // Direct API-key entry: any non-empty .p-apikey field is persisted to .env
   // (gitignored) under that profile's credentialRef — never into the profiles
   // body / state.json. Keys read straight from the DOM (not stored in the draft).
-  const keyWrites = [];
+  const keyWriteMap = new Map();
   for (const row of document.querySelectorAll("#profilesList .profile-row")) {
     const inp = row.querySelector(".p-apikey");
-    if (!inp || !inp.value.trim()) continue;
     const p = providersDraft.profiles.find((x) => x.id === row.dataset.id);
     if (!p) continue;
     const ref = (p.credentialRef || "").trim();
+    const directValue = inp && inp.value.trim();
+    const imported = openrouterImportedKeys[ref];
+    if (!directValue && !imported) continue;
     if (!ref) { showProvidersMsg(t("ui.keyNeedsRef", { p: p.label || p.id }), true); return; }
-    keyWrites.push({ credentialRef: ref, value: inp.value.trim() });
+    keyWriteMap.set(ref, directValue || imported.value);
   }
-  for (const w of keyWrites) {
+  for (const [credentialRef, value] of keyWriteMap.entries()) {
     try {
-      const r = await fetch("/api/providers/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(w) });
+      const r = await fetch("/api/providers/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ credentialRef, value }) });
       if (!r.ok) { const j = await r.json().catch(() => ({})); showProvidersMsg(j.error || `key error ${r.status}`, true); return; }
       const j = await r.json().catch(() => ({}));
       if (j.credentials && currentState.providers) currentState.providers.credentials = j.credentials;
@@ -3176,7 +3731,8 @@ async function applyProviders() {
     }
     const successMsg = ollamaProfiles.length
       ? t("ui.ollamaConnectedModels", { models: (ollamaProfiles._testedModels || []).join(", ") })
-      : (keyWrites.length ? t("ui.providersKeySaved") : t("ui.providersSaved"));
+      : (keyWriteMap.size ? t("ui.providersKeySaved") : t("ui.providersSaved"));
+    clearProvidersDraftStorage();
     showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
     // Keep saved profiles in the draft so future applies include them. The
     // "new profiles" panel empties naturally (savedIds covers them all).
@@ -3889,13 +4445,6 @@ function bindUi() {
     if (id) api("POST", "/api/documents/remove", { id });
   });
 
-  // Reset registration draft to a clean state every time the panel is opened.
-  $("providersDetails")?.addEventListener("toggle", () => {
-    if ($("providersDetails").open) {
-      providersForRunId = undefined; // force re-init on next renderProvidersInit
-    }
-  });
-
   // Phase 5: profiles/roles panel. Add/apply buttons + delegated row controls.
   $("addProfileBtn")?.addEventListener("click", () => {
     addProfileDraft();
@@ -3911,6 +4460,55 @@ function bindUi() {
   $("profilesList")?.addEventListener("click", (event) => {
     const rm = event.target.closest(".p-remove");
     if (rm) removeProfileDraft(rm.closest(".profile-row").dataset.id);
+    const scan = event.target.closest(".p-or-scan");
+    if (scan) {
+      fetchOpenrouterCatalog(true).then(() => {
+        logOpenrouterDiscovery();
+        openProviderLog();
+        renderProviders();
+        showProvidersMsg(UI_LANG === "ru" ? "Сканирование OpenRouter обновлено" : "OpenRouter scan refreshed", false);
+      });
+    }
+    const imp = event.target.closest(".p-or-import");
+    if (imp) imp.closest(".p-field")?.querySelector(".p-or-file")?.click();
+    const olScan = event.target.closest(".ol-model-scan");
+    if (olScan) {
+      syncProvidersFromDOM();
+      const id = olScan.dataset.profileId || olScan.closest(".profile-row")?.dataset.id || "";
+      const p = providersDraft && providersDraft.profiles.find((x) => x.id === id);
+      detectOllama(true).then((det) => {
+        const baseUrl = (p && p.baseUrl) || (det && det.baseUrl) || "http://localhost:11434/v1";
+        return fetchOllamaModels(baseUrl, true).then(() => {
+          openProviderLog();
+          renderProviders();
+          showProvidersMsg(UI_LANG === "ru" ? "Сканирование Ollama обновлено" : "Ollama scan refreshed", false);
+        });
+      }).catch(() => {});
+    }
+    const pick = event.target.closest(".or-model-pick");
+    if (pick && !pick.classList.contains("ol-model-pick")) {
+      syncProvidersFromDOM();
+      const id = pick.dataset.profileId;
+      const p = providersDraft && providersDraft.profiles.find((x) => x.id === id);
+      if (p) {
+        p.model = pick.dataset.modelId || "";
+        openrouterPickerState[id] = { ...(openrouterPickerState[id] || {}), open: false };
+        renderProviders();
+        renderConnectedAgents();
+      }
+    }
+    const olPick = event.target.closest(".ol-model-pick");
+    if (olPick) {
+      syncProvidersFromDOM();
+      const id = olPick.dataset.profileId;
+      const p = providersDraft && providersDraft.profiles.find((x) => x.id === id);
+      if (p) {
+        p.model = olPick.dataset.modelId || "";
+        ollamaPickerState[id] = { ...(ollamaPickerState[id] || {}), open: false };
+        renderProviders();
+        renderConnectedAgents();
+      }
+    }
   });
   $("profilesList")?.addEventListener("change", (event) => {
     // Provider change swaps which fields are shown → full panel re-render.
@@ -3935,17 +4533,52 @@ function bindUi() {
       const key = event.target.value.trim();
       if (p && key) testProfileKey(p, key);
     }
-    else { syncProvidersFromDOM(); renderConnectedAgents(); }
+    else if (event.target.classList.contains("p-or-file")) {
+      const row = event.target.closest(".profile-row");
+      const file = event.target.files && event.target.files[0];
+      importOpenrouterKeyFile(file, row?.dataset.id || "");
+      event.target.value = "";
+    }
+    else if (event.target.classList.contains("p-credref")) {
+      syncProvidersFromDOM();
+      refreshProvidersFieldTooltips();
+    }
+    else if (event.target.classList.contains("or-model-search")) {
+      const id = event.target.dataset.profileId;
+      const stMap = event.target.classList.contains("ol-model-search") ? ollamaPickerState : openrouterPickerState;
+      stMap[id] = { ...(stMap[id] || {}), query: event.target.value, open: true };
+      filterOpenrouterModelList(event.target);
+    }
+    else { syncProvidersFromDOM(); refreshProvidersFieldTooltips(); renderConnectedAgents(); }
   });
+  $("profilesList")?.addEventListener("input", (event) => {
+    if (event.target.classList.contains("or-model-search")) {
+      const id = event.target.dataset.profileId;
+      const stMap = event.target.classList.contains("ol-model-search") ? ollamaPickerState : openrouterPickerState;
+      stMap[id] = { ...(stMap[id] || {}), query: event.target.value, open: true };
+      filterOpenrouterModelList(event.target);
+      return;
+    }
+    refreshProvidersFieldTooltips();
+  });
+  $("profilesList")?.addEventListener("toggle", (event) => {
+    const det = event.target.closest(".or-model-picker");
+    if (!det) return;
+    const id = det.dataset.profileId;
+    const stMap = det.classList.contains("ol-model-picker") ? ollamaPickerState : openrouterPickerState;
+    stMap[id] = { ...(stMap[id] || {}), open: det.open };
+    refreshProvidersFieldTooltips();
+  }, true);
 
   // Tooltip on dynamically-added KB help icons uses data-tooltip-text directly
   document.addEventListener("mouseover", (event) => {
     const target = event.target.closest("[data-tooltip-text]:not([data-tooltip-key])");
-    if (!target) return;
+    if (!target || target.dataset.tooltipDelay) return;
     showTooltip(target.dataset.tooltipText, target);
   });
   document.addEventListener("mouseout", (event) => {
-    if (event.target.closest("[data-tooltip-text]:not([data-tooltip-key])")) hideTooltip();
+    const target = event.target.closest("[data-tooltip-text]:not([data-tooltip-key])");
+    if (target && !target.dataset.tooltipDelay) hideTooltip();
   });
 
   $("nextStepPin").addEventListener("click", (event) => {

@@ -37,6 +37,7 @@ let orKeyCursor = 0;
 // Per-key daily cap, learned from OpenRouter: free-tier accounts get ~50/day,
 // accounts with >= $10 credit get 1000/day. Refreshed periodically (below).
 let orKeyCaps = {};
+let orModelsCache = { at: 0, models: [], error: "" };
 async function refreshOrKeyCaps() {
   for (const { ref, apiKey } of listOpenrouterKeys()) {
     try {
@@ -57,6 +58,76 @@ function openrouterKeyPool() {
   const rotated = keys.slice(rot).concat(keys.slice(0, rot));
   rotated.sort((a, b) => q[b.ref].remaining - q[a.ref].remaining); // stable: equal remaining keeps rotation
   return rotated;
+}
+
+function discoverOpenrouterFiles() {
+  const roots = [...new Set([ROOT, WORKDIR].filter(Boolean).map((p) => path.resolve(p)))];
+  const files = [];
+  const seenFiles = new Set();
+  const envRefs = new Set(listOpenrouterKeys().map((k) => k.ref));
+  const nameOk = (name) => /^\.env(\..+)?$/i.test(name) || /openrouter/i.test(name);
+  const skipDir = (name) => name === ".git" || name === "node_modules" || name === "rooms" || name === "public";
+  function visit(dir, depth) {
+    if (depth < 0) return;
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        if (!skipDir(ent.name)) visit(full, depth - 1);
+        continue;
+      }
+      if (!ent.isFile() || !nameOk(ent.name) || seenFiles.has(full)) continue;
+      seenFiles.add(full);
+      let raw = "";
+      try {
+        const st = fs.statSync(full);
+        if (st.size > 256 * 1024) continue;
+        raw = fs.readFileSync(full, "utf8");
+      } catch { continue; }
+      const refs = [];
+      for (const line of raw.split(/\r?\n/)) {
+        const m = /^\s*(OPENROUTER_API_KEY(?:_\d+)?)\s*=/.exec(line);
+        if (m) {
+          refs.push(m[1]);
+          envRefs.add(m[1]);
+        }
+      }
+      const bareKeyCount = (raw.match(/sk-or-v1-[A-Za-z0-9]+/g) || []).length;
+      if (!refs.length && !bareKeyCount) continue;
+      files.push({ path: full, refs: [...new Set(refs)], bareKeyCount });
+    }
+  }
+  for (const root of roots) visit(root, 2);
+  return { refs: [...envRefs].sort((a, b) => orRefIndex(a) - orRefIndex(b)), files };
+}
+
+async function getOpenrouterModels() {
+  const freshMs = 10 * 60 * 1000;
+  if (Date.now() - orModelsCache.at < freshMs && orModelsCache.models.length) return orModelsCache;
+  try {
+    const r = await fetch("https://openrouter.ai/api/v1/models");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    const models = Array.isArray(j.data) ? j.data.map((m) => {
+      const pricing = m && typeof m.pricing === "object" ? m.pricing : {};
+      const free = /:free$/i.test(String(m.id || "")) || Object.values(pricing).every((v) => Number(v || 0) === 0);
+      return {
+        id: String(m.id || ""),
+        name: String(m.name || m.id || ""),
+        free,
+        pricing,
+        contextLength: Number(m.context_length || 0),
+      };
+    }).filter((m) => m.id).sort((a, b) => {
+      if (a.free !== b.free) return a.free ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    }) : [];
+    orModelsCache = { at: Date.now(), models, error: "" };
+  } catch (e) {
+    orModelsCache = { at: Date.now(), models: orModelsCache.models || [], error: e.message };
+  }
+  return orModelsCache;
 }
 const validatedStore = require("./lib/validated");
 const domains = require("./lib/domains");
@@ -1259,15 +1330,33 @@ async function router(req, res) {
       return sendJson(res, 200, { ok: true, credentials: publicState().providers.credentials });
     }
 
+    if (method === "GET" && pathname === "/api/openrouter/discover") {
+      const found = discoverOpenrouterFiles();
+      return sendJson(res, 200, found);
+    }
+
+    if (method === "GET" && pathname === "/api/openrouter/models") {
+      const cat = await getOpenrouterModels();
+      return sendJson(res, 200, { models: cat.models, error: cat.error || "" });
+    }
+
     if (method === "POST" && pathname === "/api/providers/test") {
       // Validate an API key with a tiny live request. Optionally persists the
       // typed key to .env first (so the user gets the green check the moment a
       // working key is entered). Only network providers; CLI is out of scope.
       const body = await readBody(req);
       const provider = String((body && body.provider) || "");
-      const credentialRef = String((body && body.credentialRef) || "").trim();
       const model = String((body && body.model) || "").trim();
       const apiKey = String((body && body.apiKey) || "");
+      const requestedProfile = {
+        provider,
+        baseUrl: body && body.baseUrl,
+        credentialRef: String((body && body.credentialRef) || "").trim(),
+        model,
+        fallbackModels: Array.isArray(body && body.fallbackModels) ? body.fallbackModels.filter(Boolean) : [],
+      };
+      const resolvedProfile = providers.resolveProfile(requestedProfile);
+      const credentialRef = resolvedProfile.credentialRef;
       if (profiles.isCliProvider(provider)) return sendJson(res, 400, { error: "CLI providers can't be key-tested" });
       if (!credentialRef && provider !== "ollama") return sendJson(res, 400, { error: "credentialRef required" });
       if (!model) return sendJson(res, 400, { error: "set a model first" });
@@ -1278,7 +1367,7 @@ async function router(req, res) {
       addMessage({ role: "system", name: "Council Room", kind: "process",
         text: `Agent test: ${provLabel} / ${model} — connecting…`,
         textRu: `Тест агента: ${provLabel} / ${model} — проверяю подключение…` });
-      const profile = { provider, baseUrl: body.baseUrl, credentialRef, model };
+      const profile = { ...requestedProfile, baseUrl: resolvedProfile.baseUrl, credentialRef };
       const r = await providers.runProfile(profile, "What is 1+3? Reply with just the number.", { timeoutMs: 25000 })
         .catch((e) => ({ ok: false, text: e && e.message ? e.message : "error" }));
       if (credentialRef) {
@@ -1298,10 +1387,15 @@ async function router(req, res) {
       }
       broadcast();
       const info = publicState().providers;
+      const servedModel = String((r && r.result && r.result.model) || model || "");
+      const viaFallback = Boolean(r.ok && servedModel && servedModel !== model);
       return sendJson(res, 200, {
         ok: Boolean(r.ok),
         error: r.ok ? "" : errText,
         reply: r.ok ? reply : "",
+        requestedModel: model,
+        servedModel,
+        viaFallback,
         credentials: info.credentials,
         validated: info.validated,
       });
