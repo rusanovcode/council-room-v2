@@ -32,7 +32,7 @@ html, body {
 
 .shell {
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
+  grid-template-columns: 280px 1fr 336px;
   /* Pin the single row to exactly the viewport height. Without an explicit row
      track, the auto row grows to the tallest column's content (> 100vh), which
      stretches every column past the viewport and pushes the center column's
@@ -55,7 +55,19 @@ html, body {
   flex-direction: column;
   min-height: 0; /* allow the column (and its inner scrollers) to shrink below content */
 }
+.col.right {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.col.right::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .col.right { border-right: none; }
+.col.right > .providers-panel,
+.col.right > .kb-head,
+.col.right > .kb-sections {
+  margin-left: 8px;
+  margin-right: 8px;
+  align-self: stretch;
+}
 .col.center { background: var(--bg); }
 
 /* Center column: only the chat scrolls. The header (Закрыть/Заморозить/Лог…) and
@@ -593,7 +605,24 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .stats-close { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; }
 .stats-close:hover { color: var(--text); }
 .stats-body { display: flex; flex-direction: column; gap: 8px; }
-.stats-acc { background: var(--panel-2); border-radius: 4px; padding: 6px 8px; font-size: 11px; line-height: 1.5; }
+.stats-acc {
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  position: relative;
+  overflow: hidden;
+}
+.stats-acc > * { position: relative; z-index: 1; }
+.stats-acc-limit::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--limit-fill, 0%);
+  background: var(--limit-color, transparent);
+  pointer-events: none;
+}
 .stats-acc b { color: var(--accent); }
 .stats-periods { display: flex; gap: 3px; margin-bottom: 4px; }
 .stats-period { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 2px 7px; border-radius: 3px; cursor: pointer; }
@@ -601,7 +630,41 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 .stats-reset { margin-top: 6px; background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; }
 .stats-reset:hover { color: var(--text); border-color: var(--accent); }
 .sub-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 3px 0; font-size: 11px; color: var(--muted); }
-.sub-row input { width: auto; flex: 0 0 auto; font-size: 11px; padding: 2px 4px; background: var(--bg); color: var(--text); border: 1px solid var(--border); color-scheme: dark; }
+.col.right .sub-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 4px;
+}
+.sub-date-box { position: relative; width: 132px; flex: 0 0 auto; display: inline-flex; align-items: center; }
+.col.right .sub-date-box {
+  width: 100%;
+  max-width: none;
+}
+.sub-date-input { width: 100%; font-size: 11px; padding: 2px 24px 2px 4px; background: var(--bg); color: var(--text); border: 1px solid var(--border); font-family: var(--mono); }
+.sub-date-input.invalid { border-color: var(--red); box-shadow: 0 0 0 1px var(--red) inset; }
+.sub-date-btn {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.sub-date-btn:hover { color: var(--text); }
+.sub-date-native {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
 .sub-row input::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 .stats-warn { color: var(--amber); font-weight: 600; }
 .stats-cli {
@@ -637,6 +700,11 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   flex-direction: column;
   gap: 10px;
 }
+.conversation {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.conversation::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
 .msg {
   background: var(--panel);
@@ -809,6 +877,7 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   flex-wrap: wrap;
 }
 /* Fixed widths so RU↔EN label changes don't reflow the row / shift the switcher block. */
+#guidance { min-height: 40px; }
 #runRound { min-width: 156px; }
 #autopilot { min-width: 100px; }
 .autoresolve-row {
@@ -876,11 +945,45 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   border-radius: 4px;
   font-size: 12.5px;
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
   font-family: var(--mono);
   word-break: break-word;
 }
+.kb-collapsible {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.kb-collapsible-text {
+  min-width: 0;
+  width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.kb-collapsible-text.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.kb-collapsible-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.kb-collapsible-toggle:hover { color: var(--text); }
 .kb-section li .remove {
   background: transparent;
   border: none;
@@ -906,18 +1009,23 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   border-radius: 4px;
   font-size: 12.5px;
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
   font-family: var(--mono);
   word-break: break-word;
   border-left: 3px solid var(--amber);
 }
-.q-item .q-text { flex: 1; }
-.q-item .q-text b { color: var(--amber); }
+.q-item .kb-collapsible { margin-right: auto; }
+.q-item .kb-collapsible-text { flex: 1; }
+.q-item .q-text b,
+.q-item .kb-collapsible-text b { color: var(--amber); }
 .q-item.q-resolved { border-left-color: var(--green); opacity: 0.9; }
-.q-item.q-resolved .q-text b { color: var(--green); }
+.q-item.q-resolved .q-text b,
+.q-item.q-resolved .kb-collapsible-text b { color: var(--green); }
 .q-item.q-verified { border-left-color: var(--green); opacity: 0.6; }
-.q-item.q-verified .q-text b { color: var(--green); }
+.q-item.q-verified .q-text b,
+.q-item.q-verified .kb-collapsible-text b { color: var(--green); }
 .q-answer { display: block; color: var(--muted); margin-top: 2px; }
 .q-item .remove { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 0; }
 .q-item .remove:hover { color: var(--red); }
@@ -970,6 +1078,13 @@ label {
 label > span:first-child { grid-column: 1; }
 label > .help { grid-column: 2; margin-left: 0; }
 label > input, label > select, label > textarea { grid-column: 1 / -1; font-size: 13px; color: var(--text); }
+.settings-pair-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+.settings-pair-row > label { margin-bottom: 8px; min-width: 0; }
 
 /* Toggle row (checkbox + label inline, no grid) */
 label.toggle-row {
@@ -1225,7 +1340,7 @@ button.square {
 /* Next-step coach */
 .next-step {
   position: fixed;
-  right: 340px;
+  right: 356px;
   bottom: 16px;
   width: 320px;
   background: linear-gradient(135deg, #1d2638, #1a2030);
@@ -1348,15 +1463,14 @@ button.square {
   border-radius: 6px;
   background: var(--panel);
 }
+.col.right > .providers-panel:first-of-type { margin-top: 8px; }
 /* "Profiles & roles" pinned to the top of the right column: sticks to the
    column's scroll top so it stays reachable while Settings / KB scroll under. */
 .col.right > #providersDetails {
   position: sticky;
   top: 0;
   z-index: 5;
-  margin: 0 0 8px;
-  border-radius: 0;
-  border-width: 0 0 1px;
+  margin: 0 8px 8px;
   background: var(--panel);
 }
 .col.right > #providersDetails[open] .providers-body {
@@ -1369,7 +1483,14 @@ button.square {
   overflow-y: auto;
 }
 /* Settings reuses the collapsible providers-panel look but is NOT sticky. */
-.col.right > #settingsDetails { margin: 0 0 8px; }
+.col.right > #settingsDetails { margin: 0 8px 8px; }
+.col.right .providers-body > label,
+.col.right .providers-body > .doc-add,
+.col.right .providers-body > .deliverables-form,
+.col.right .providers-body > .deliverables-list,
+.col.right .providers-body > .documents-list {
+  width: 100%;
+}
 .providers-panel > summary {
   cursor: pointer;
   padding: 8px 10px;
@@ -1599,7 +1720,7 @@ button.square {
     position: fixed;
     top: 10px;
     bottom: 10px;
-    right: 328px;
+    right: 344px;
     width: var(--providers-overlay-width);
     margin-top: 0;
     z-index: 80;
@@ -1718,7 +1839,7 @@ button.square {
     position: fixed;
     top: 10px;
     bottom: 10px;
-    right: calc(340px + var(--providers-overlay-width));
+    right: calc(356px + var(--providers-overlay-width));
     width: var(--providers-overlay-width);
     margin-top: 0;
     z-index: 79;
@@ -1940,6 +2061,14 @@ button.square {
   gap: 6px 8px;
   margin-top: 8px;
 }
+.col.right .deliverables-form { grid-template-columns: 1fr; }
+.deliverables-pair-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+.deliverables-pair-row > .deliverables-field { min-width: 0; }
 .deliverables-field {
   display: flex;
   flex-direction: column;

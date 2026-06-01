@@ -113,6 +113,8 @@ const STRINGS = {
     "ui.askReason": "Причина заморозки:",
     "ui.alertNoChat": "Сначала создай чат.",
     "ui.add": "+",
+    "ui.showMore": "ещё",
+    "ui.showLess": "свернуть",
     "ui.addPlaceholder": "добавить в {label}…",
     "kb.decisions": "Решения",
     "kb.prohibitions": "Запреты",
@@ -580,6 +582,8 @@ const STRINGS = {
     "ui.askReason": "Freeze reason:",
     "ui.alertNoChat": "Create a chat first.",
     "ui.add": "+",
+    "ui.showMore": "more",
+    "ui.showLess": "less",
     "ui.addPlaceholder": "add to {label}…",
     "kb.decisions": "Decisions",
     "kb.prohibitions": "Prohibitions",
@@ -2178,8 +2182,13 @@ function renderKnowledge() {
     const ul = document.createElement("ul");
     for (const item of items) {
       const li = document.createElement("li");
-      li.innerHTML = `<span>${escapeHtml(item)}</span><button class="remove" title="remove">×</button>`;
-      li.querySelector(".remove").addEventListener("click", () => api("POST", "/api/kb/remove", { section: key, item }));
+      const remove = document.createElement("button");
+      remove.className = "remove";
+      remove.title = "remove";
+      remove.textContent = "\u00D7";
+      remove.addEventListener("click", () => api("POST", "/api/kb/remove", { section: key, item }));
+      li.appendChild(createCollapsibleText(item));
+      li.appendChild(remove);
       ul.appendChild(li);
     }
     block.appendChild(ul);
@@ -2241,7 +2250,9 @@ function renderQuestionsBlock(block, tools, help, label) {
     const prio = q.status === "open"
       ? `<button class="q-prio q-prio-${q.priority}" type="button" title="${escapeHtml(t("ui.qPrioToggle"))}">${q.priority === "critical" ? "crit" : "minor"}</button>`
       : "";
-    li.innerHTML = `<span class="q-text"><b>${escapeHtml(mark)}</b> ${escapeHtml(q.text)}${answer}</span>${prio}<button class="remove" title="remove">×</button>`;
+    li.innerHTML = `${prio}<button class="remove" title="remove">\u00D7</button>`;
+    const text = createCollapsibleText(`<b>${escapeHtml(mark)}</b> ${escapeHtml(q.text)}${answer}`, { html: true });
+    li.prepend(text);
     li.querySelector(".remove").addEventListener("click", () => api("POST", "/api/questions/remove", { id: q.id }));
     const prioBtn = li.querySelector(".q-prio");
     if (prioBtn) prioBtn.addEventListener("click", () => api("POST", "/api/questions/priority", { id: q.id, priority: q.priority === "critical" ? "minor" : "critical" }));
@@ -2313,6 +2324,8 @@ let statsTab = localStorage.getItem("council-room-v2.statsTab") || "limits";
 let statsLoading = false;
 let lastStatsVersion = null; // server statsVersion last applied (re-fetch on bump)
 let lastSubsKey = null;     // JSON snapshot of subscriptions for change detection
+let subscriptionDrafts = {};
+let subscriptionSaveTimers = new Map();
 let switcherRefreshing = false;   // true while account-chip animation is running
 let switcherRefreshBaseVer = null; // statsVersion at the moment refresh was triggered
 
@@ -2368,6 +2381,145 @@ function fmtDateTime(iso) {
 }
 function fmtTokK(n) { return `${(Number(n || 0) / 1000).toFixed(1)}K`; }
 
+function statsHourlyLimitFill(utilization) {
+  const used = Math.max(0, Math.min(100, Number(utilization || 0)));
+  const remaining = Math.max(0, 100 - used);
+  if (remaining <= 0) return { remaining: 0, style: "" };
+  let color = "rgba(78, 195, 138, 0.18)";
+  if (remaining <= 14) color = "rgba(231, 92, 92, 0.18)";
+  else if (remaining <= 49) color = "rgba(255, 140, 59, 0.18)";
+  return { remaining, style: ` style="--limit-fill:${remaining}%;--limit-color:${color}"` };
+}
+
+function isIsoDateOnly(value) {
+  const s = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.toISOString().slice(0, 10) === s;
+}
+
+function formatIsoDateToDisplay(value) {
+  const s = String(value || "").trim();
+  if (!isIsoDateOnly(s)) return "";
+  const [y, m, d] = s.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+function normalizeDisplayDateInput(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+function displayDateToIso(value) {
+  const s = String(value || "").trim();
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return "";
+  const iso = `${m[3]}-${m[2]}-${m[1]}`;
+  return isIsoDateOnly(iso) ? iso : "";
+}
+
+function addDaysToIsoDate(value, days) {
+  if (!isIsoDateOnly(value)) return "";
+  const d = new Date(`${value}T00:00:00`);
+  d.setDate(d.getDate() + Number(days || 0));
+  return d.toISOString().slice(0, 10);
+}
+
+function subscriptionDraftValue(key, field, fallback = "") {
+  return subscriptionDrafts[key]?.[field] ?? formatIsoDateToDisplay(fallback);
+}
+
+function syncSubscriptionDraftsFromState() {
+  const subs = currentState?.settings?.subscriptions || {};
+  for (const [key, sub] of Object.entries(subs)) {
+    if (!subscriptionDrafts[key]) subscriptionDrafts[key] = { start: "", end: "", endManual: false };
+    for (const field of ["start", "end"]) {
+      const draft = subscriptionDrafts[key][field];
+      if (!draft || draft === "" || displayDateToIso(draft)) {
+        subscriptionDrafts[key][field] = formatIsoDateToDisplay(String(sub[field] || ""));
+      }
+    }
+  }
+}
+
+function queueSubscriptionSave(key, startIso, endIso) {
+  const prev = subscriptionSaveTimers.get(key);
+  if (prev) clearTimeout(prev);
+  if (currentState?.settings) {
+    if (!currentState.settings.subscriptions) currentState.settings.subscriptions = {};
+    currentState.settings.subscriptions[key] = { start: startIso, end: endIso };
+    lastSubsKey = JSON.stringify(currentState.settings.subscriptions);
+  }
+  const p = api("POST", "/api/switcher/subscription", { key, start: startIso, end: endIso })
+    .then((state) => {
+      if (state && typeof state === "object") {
+        currentState = state;
+        lastSubsKey = JSON.stringify(currentState?.settings?.subscriptions || {});
+        if (panelOpen.switcherStats && statsTab === "sub") renderStatsPanel();
+      }
+    })
+    .catch(() => {})
+    .finally(() => subscriptionSaveTimers.delete(key));
+  subscriptionSaveTimers.set(key, p);
+}
+
+function bindSubscriptionInputs(panel) {
+  const updateAccount = (key, changedField, value, { manual = true } = {}) => {
+    if (!subscriptionDrafts[key]) subscriptionDrafts[key] = { start: "", end: "", endManual: false };
+    const draft = subscriptionDrafts[key];
+    draft[changedField] = normalizeDisplayDateInput(value);
+    if (changedField === "end" && manual) draft.endManual = true;
+    if (changedField === "start") {
+      const startIso = displayDateToIso(draft.start);
+      if (startIso && !draft.endManual) draft.end = formatIsoDateToDisplay(addDaysToIsoDate(startIso, 30));
+      if (!startIso && !draft.endManual) draft.end = "";
+    }
+    const startIso = displayDateToIso(draft.start);
+    const endIso = displayDateToIso(draft.end);
+    const startInput = panel.querySelector(`input.sub-date-input[data-subkey="${key}"][data-field="start"]`);
+    const endInput = panel.querySelector(`input.sub-date-input[data-subkey="${key}"][data-field="end"]`);
+    if (startInput && startInput.value !== draft.start) startInput.value = draft.start;
+    if (endInput && endInput.value !== draft.end) endInput.value = draft.end;
+    if (startInput) startInput.classList.toggle("invalid", draft.start !== "" && !startIso);
+    if (endInput) endInput.classList.toggle("invalid", draft.end !== "" && !endIso);
+    if ((draft.start === "" || startIso) && (draft.end === "" || endIso)) {
+      queueSubscriptionSave(key, startIso, endIso);
+    }
+  };
+
+  panel.querySelectorAll("input.sub-date-input[data-subkey]").forEach((inp) => {
+    const key = inp.dataset.subkey;
+    const field = inp.dataset.field;
+    inp.addEventListener("input", () => updateAccount(key, field, inp.value, { manual: true }));
+    inp.addEventListener("blur", () => updateAccount(key, field, inp.value, { manual: true }));
+  });
+
+  panel.querySelectorAll("button.sub-date-btn[data-subkey]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.subkey;
+      const field = btn.dataset.field;
+      const picker = panel.querySelector(`input.sub-date-native[data-subkey="${key}"][data-field="${field}"]`);
+      if (!picker) return;
+      const current = subscriptionDraftValue(key, field, "");
+      const iso = displayDateToIso(current);
+      if (iso) picker.value = iso;
+      if (typeof picker.showPicker === "function") picker.showPicker();
+      else picker.click();
+    });
+  });
+
+  panel.querySelectorAll("input.sub-date-native[data-subkey]").forEach((inp) => {
+    inp.addEventListener("change", () => {
+      const key = inp.dataset.subkey;
+      const field = inp.dataset.field;
+      updateAccount(key, field, formatIsoDateToDisplay(inp.value), { manual: field === "end" });
+    });
+  });
+}
+
 function renderStatsPanel() {
   const panel = $("switcherStats");
   if (!panel || panel.classList.contains("hidden")) return;
@@ -2392,7 +2544,8 @@ function renderStatsPanel() {
       const w = accData(a)?.windows;
       if (!w) return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b> <span class="muted small">${noDataNote(a)}</span></div>`;
       const fh = w.fiveHour, sd = w.sevenDay;
-      return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
+      const fill = statsHourlyLimitFill(fh?.utilization);
+      return `<div class="stats-acc stats-acc-limit"${fill.style}><b>${escapeHtml(a.label)}</b>
         <div>${escapeHtml(t("ui.hourlyReset"))}: <b>${fh ? fmtCountdown(fh.resetsAt) : "—"}</b> ${fh ? `(${escapeHtml(t("ui.used"))} ${fh.utilization}%)` : ""}</div>
         <div>${escapeHtml(t("ui.weeklyReset"))}: <b>${sd ? fmtDateTime(sd.resetsAt) : "—"}</b> ${sd ? `(${escapeHtml(t("ui.used"))} ${sd.utilization}%)` : ""}</div>
         <div class="muted small">${escapeHtml(t("ui.windowStart"))}: ${fh ? fmtDateTime(fh.startsAt) : "—"}</div></div>`;
@@ -2408,15 +2561,19 @@ function renderStatsPanel() {
         <div class="muted small">cache R ${s.cacheReadK}K / W ${s.cacheWriteK}K · ${escapeHtml(t("ui.sessions"))}: ${s.sessions}</div></div>`;
     }).join("");
   } else if (statsTab === "sub") {
+    syncSubscriptionDraftsFromState();
     const subs = currentState?.settings?.subscriptions || {};
     body = accs.map((a) => {
       const key = `${a.tool}:${a.id}`;
       const sub = subs[key] || {};
-      const dlRaw = sub.end ? Math.ceil((new Date(sub.end).getTime() - Date.now()) / 86400000) : null;
+      const startValue = subscriptionDraftValue(key, "start", String(sub.start || ""));
+      const endValue = subscriptionDraftValue(key, "end", String(sub.end || ""));
+      const effectiveEnd = displayDateToIso(endValue) || String(sub.end || "");
+      const dlRaw = effectiveEnd ? Math.ceil((new Date(effectiveEnd).getTime() - Date.now()) / 86400000) : null;
       const dl = dlRaw !== null && dlRaw < 0 ? null : dlRaw;
       return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b>
-        <label class="sub-row">${escapeHtml(t("ui.subStart"))} <input type="date" data-subkey="${key}" data-field="start" value="${escapeHtml(sub.start || "")}"></label>
-        <label class="sub-row">${escapeHtml(t("ui.subEnd"))} <input type="date" data-subkey="${key}" data-field="end" value="${escapeHtml(sub.end || "")}"></label>
+        <label class="sub-row">${escapeHtml(t("ui.subStart"))} <span class="sub-date-box"><input class="sub-date-input" type="text" inputmode="numeric" placeholder="ДД.ММ.ГГГГ" data-subkey="${key}" data-field="start" value="${escapeHtml(startValue)}"><button class="sub-date-btn" type="button" data-subkey="${key}" data-field="start">📅</button><input class="sub-date-native" type="date" tabindex="-1" aria-hidden="true" data-subkey="${key}" data-field="start"></span></label>
+        <label class="sub-row">${escapeHtml(t("ui.subEnd"))} <span class="sub-date-box"><input class="sub-date-input" type="text" inputmode="numeric" placeholder="ДД.ММ.ГГГГ" data-subkey="${key}" data-field="end" value="${escapeHtml(endValue)}"><button class="sub-date-btn" type="button" data-subkey="${key}" data-field="end">📅</button><input class="sub-date-native" type="date" tabindex="-1" aria-hidden="true" data-subkey="${key}" data-field="end"></span></label>
         <div class="${dl !== null && dl <= 7 ? "stats-warn" : ""}">${dl === null ? "" : escapeHtml(t("ui.daysLeft", { n: dl }))}</div></div>`;
     }).join("");
   }
@@ -2428,6 +2585,8 @@ function renderStatsPanel() {
   panel.querySelectorAll(".stats-tab").forEach((b) => b.addEventListener("click", () => { statsTab = b.dataset.tab; try { localStorage.setItem("council-room-v2.statsTab", statsTab); } catch {} renderStatsPanel(); }));
   panel.querySelector(".stats-close")?.addEventListener("click", () => { panelOpen.switcherStats = false; savePanelOpen(); renderSwitcher(); });
   panel.querySelectorAll(".stats-period").forEach((b) => b.addEventListener("click", () => { statsPeriod = b.dataset.period; loadStats(); }));
+  bindSubscriptionInputs(panel);
+  return;
   panel.querySelectorAll("input[data-subkey]").forEach((inp) => inp.addEventListener("change", () => {
     const key = inp.dataset.subkey;
     const cur = (currentState?.settings?.subscriptions || {})[key] || {};
@@ -2775,7 +2934,7 @@ function renderSettings() {
       lbl.textContent = uiLang === "en" ? "Mode:" : "Режим:";
       modeSelect = document.createElement("select");
       modeSelect.id = "discussionModeSelect";
-      modeSelect.style.cssText = "flex:1;min-width:0;font-size:13px";
+      modeSelect.style.cssText = "flex:1 1 220px;min-width:220px;font-size:13px";
       // Built from the server's profile registry (state.domains) — adding a
       // profile in lib/domains.js makes it show up here with no frontend edit.
       const profileOpts = currentState.domains || [{ id: "code", label: { ru: "Разработка ПО", en: "Software" } }];
@@ -4035,12 +4194,8 @@ async function applyProviders() {
     ? { profiles: providersDraft.profiles, roles: providersDraft.roles }
     : { profiles: null, roles: null };
   try {
-    const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      showProvidersMsg(j.error || `error ${res.status}`, true);
-      return;
-    }
+    const nextState = await api("POST", "/api/settings", body);
+    if (nextState && typeof nextState === "object") currentState = nextState;
     // Log ALL newly added profiles (any type: Ollama, CLI, API).
     // savedIds was computed before the save — anything not in it is new.
     for (const p of providersDraft.profiles) {
@@ -4060,9 +4215,8 @@ async function applyProviders() {
       ? t("ui.ollamaConnectedModels", { models: (ollamaProfiles._testedModels || []).join(", ") })
       : (keyWriteMap.size ? t("ui.providersKeySaved") : t("ui.providersSaved"));
     clearProvidersDraftStorage();
+    initProvidersDraft();
     showProvidersMsg(successMsg, false, ollamaProfiles.length ? 5000 : 4000);
-    // Keep saved profiles in the draft so future applies include them. The
-    // "new profiles" panel empties naturally (savedIds covers them all).
     renderProviders();
   } catch (e) {
     showProvidersMsg(e.message, true);
@@ -4463,6 +4617,23 @@ let deliverablesForm = null;
 let deliverablesFormForRunId = undefined;
 let deliverablesActorPool = [];
 let deliverableTargetPathHints = {};
+let deliverablesFieldTouched = {};
+let deliverablesFieldArmed = {};
+
+const DELIVERABLES_FIELD_IDS = [
+  "execSubtask",
+  "execTemplate",
+  "execAuthor",
+  "execAuthorModel",
+  "execAuthorEffort",
+  "execReviewer",
+  "execReviewerModel",
+  "execReviewerEffort",
+  "docTemplate",
+  "docAuthor",
+  "docAuthorModel",
+  "docAuthorEffort",
+];
 
 function currentExecPhase(exec = null) {
   const source = exec || currentState?.execAutopilot || null;
@@ -4919,6 +5090,9 @@ function resetRoleModelEffort(spec) {
     forceDefaults: true,
     preferredBackend: roleDefaultsBySpec(spec),
   });
+  if (!spec) return;
+  if (spec.modelKey) deliverablesFieldTouched[spec.modelKey] = false;
+  if (spec.effortKey) deliverablesFieldTouched[spec.effortKey] = false;
 }
 
 function buildDeliverablesActorPool() {
@@ -4951,6 +5125,7 @@ function ensureDeliverablesFormState() {
     syncExecLiveTicker();
   }
   deliverablesFormForRunId = rid;
+  resetDeliverablesFieldTouched();
   const resolved = resolvedSubtasksForDeliverables();
   const templates = deliverableTemplatesForForm();
   const templateIds = templates.map((tpl) => tpl.id);
@@ -5002,6 +5177,34 @@ function syncDeliverablesFormFromDom() {
     const el = $(id);
     if (el) deliverablesForm[key] = el.value;
   }
+}
+
+function resetDeliverablesFieldTouched() {
+  deliverablesFieldTouched = Object.fromEntries(DELIVERABLES_FIELD_IDS.map((id) => [id, false]));
+  deliverablesFieldArmed = Object.fromEntries(DELIVERABLES_FIELD_IDS.map((id) => [id, false]));
+}
+
+function applyDeliverablesFieldHighlights() {
+  for (const id of DELIVERABLES_FIELD_IDS) {
+    const el = $(id);
+    if (!el) continue;
+    el.classList.toggle("hl-default", !deliverablesFieldTouched[id] && !el.disabled);
+  }
+}
+
+function pendingDeliverablesHighlightIds(ids = []) {
+  return (Array.isArray(ids) ? ids : []).filter((id) => {
+    const el = $(id);
+    if (!el || el.disabled) return false;
+    return !deliverablesFieldTouched[id];
+  });
+}
+
+function confirmDeliverablesFieldSelection(id) {
+  if (!id) return;
+  ensureDeliverablesFormState();
+  deliverablesFieldTouched[id] = true;
+  deliverablesFieldArmed[id] = false;
 }
 
 function deliverableLabel(d) {
@@ -5203,22 +5406,13 @@ function renderDeliverables() {
     const canPickEffort = Boolean(docAuthorState.actor && isCliProviderId(docAuthorState.actor.entry.provider));
     docAuthorEffortEl.disabled = !canPickEffort || !docAuthorState.effortOptions.length || locked;
   }
+  applyDeliverablesFieldHighlights();
 
   const sameIdentity = Boolean(execAuthorChoice?.identity && execReviewerChoice?.identity
     && execAuthorChoice.identity === execReviewerChoice.identity);
   const canRunExec = Boolean(resolved.length && execAuthorChoice && execReviewerChoice && !sameIdentity);
   if (typeof setSupplementalNavHighlights === "function") {
-    setSupplementalNavHighlights((!running && !deliverablesExecPendingStart && canRunExec)
-      ? [
-        "execTemplate",
-        "execAuthor",
-        "execAuthorModel",
-        "execAuthorEffort",
-        "execReviewer",
-        "execReviewerModel",
-        "execReviewerEffort",
-      ]
-      : []);
+    setSupplementalNavHighlights([]);
   }
 
   const execBtn = $("execAutopilot");
@@ -5260,6 +5454,7 @@ function renderDeliverables() {
         <span class="doc-chars">${escapeHtml(d.status)} · ${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
       </div>
       <div class="doc-actions">
+        <button class="doc-remove" type="button" title="${escapeHtml(t("ui.docRemove"))}">×</button>
         <button class="del-copy" type="button" data-tooltip-key="t.deliverableCopy" data-tooltip-text="${escapeHtml(t("tip.deliverableCopy"))}">${escapeHtml(t("ui.copy"))}</button>
         ${d.status === "ready" ? `<button class="del-apply" type="button" data-tooltip-key="t.apply" data-tooltip-text="${escapeHtml(t("tip.apply"))}">${escapeHtml(t("ui.apply"))}</button>` : ""}
         <button class="del-packet${coachFocus ? " coach-focus-btn" : ""}" type="button" data-tooltip-key="t.deliverablePacket" data-tooltip-text="${escapeHtml(t("tip.deliverablePacket"))}">${escapeHtml(t("ui.packet"))}</button>
@@ -5401,6 +5596,46 @@ async function startExecutionAutopilot() {
 
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+function createCollapsibleText(content, { html = false } = {}) {
+  const wrap = document.createElement("div");
+  wrap.className = "kb-collapsible";
+
+  const body = document.createElement("div");
+  body.className = "kb-collapsible-text";
+  if (html) body.innerHTML = content || "";
+  else body.textContent = content || "";
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "kb-collapsible-toggle";
+  toggle.hidden = true;
+
+  const sync = () => {
+    const expanded = wrap.dataset.expanded === "true";
+    body.classList.toggle("expanded", expanded);
+    toggle.textContent = t(expanded ? "ui.showLess" : "ui.showMore");
+
+    const restoreExpanded = body.classList.contains("expanded");
+    if (restoreExpanded) body.classList.remove("expanded");
+    const overflow = body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1;
+    if (restoreExpanded) body.classList.add("expanded");
+
+    toggle.hidden = !overflow;
+    wrap.classList.toggle("has-toggle", overflow);
+    if (!overflow && expanded) wrap.dataset.expanded = "false";
+  };
+
+  toggle.addEventListener("click", () => {
+    wrap.dataset.expanded = wrap.dataset.expanded === "true" ? "false" : "true";
+    sync();
+  });
+
+  wrap.appendChild(body);
+  wrap.appendChild(toggle);
+  requestAnimationFrame(sync);
+  return wrap;
 }
 
 function formatTime(iso) {
@@ -5774,7 +6009,8 @@ function bindUi() {
     if (!row) return;
     const id = row.dataset.id;
     try {
-      if (event.target.closest(".del-copy")) await copyDeliverable(id);
+      if (event.target.closest(".doc-remove")) await api("POST", "/api/deliverables/remove", { id });
+      else if (event.target.closest(".del-copy")) await copyDeliverable(id);
       else if (event.target.closest(".del-apply")) await applyDeliverable(id);
       else if (event.target.closest(".del-packet")) await packetDeliverable(id);
       else if (event.target.closest(".del-write")) await writeDeliverable(id);
@@ -5782,29 +6018,26 @@ function bindUi() {
       showDeliverablesMsg(normalizeDeliverablesError(error), true);
     }
   });
-  const deliverablesInputs = [
-    "execSubtask",
-    "execTemplate",
-    "execAuthor",
-    "execAuthorModel",
-    "execAuthorEffort",
-    "execReviewer",
-    "execReviewerModel",
-    "execReviewerEffort",
-    "docTemplate",
-    "docAuthor",
-    "docAuthorModel",
-    "docAuthorEffort",
-  ];
-  for (const id of deliverablesInputs) {
-    $(id)?.addEventListener("change", () => {
-      ensureDeliverablesFormState();
+  for (const id of DELIVERABLES_FIELD_IDS) {
+    const el = $(id);
+    if (!el) continue;
+    const handleDeliverablesSelect = () => {
+      confirmDeliverablesFieldSelection(id);
       syncDeliverablesFormFromDom();
       const specs = roleSpecsForDeliverables();
       if (id === "execAuthor") resetRoleModelEffort(specs.execAuthor);
       if (id === "execReviewer") resetRoleModelEffort(specs.execReviewer);
       if (id === "docAuthor") resetRoleModelEffort(specs.docAuthor);
       renderDeliverables();
+    };
+    el.addEventListener("focus", () => {
+      deliverablesFieldArmed[id] = true;
+    });
+    el.addEventListener("change", handleDeliverablesSelect);
+    el.addEventListener("blur", () => {
+      if (!deliverablesFieldArmed[id]) return;
+      confirmDeliverablesFieldSelection(id);
+      applyDeliverablesFieldHighlights();
     });
   }
   $("generateDoc")?.addEventListener("click", () => {

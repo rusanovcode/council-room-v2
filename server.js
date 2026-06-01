@@ -1055,6 +1055,20 @@ function createHandoffPacket(body = {}) {
   return { ok: true, packet };
 }
 
+function removeDeliverable(body = {}) {
+  if (!state.run) throw new Error("No active run");
+  const removed = deliverables.remove(runDir(state.run.id), body.id);
+  addMessage({
+    role: "system",
+    name: "Council Room",
+    kind: "process",
+    text: `Deliverable ${removed.id} removed: ${removed.name}.`,
+    textRu: `Deliverable ${removed.id} removed: ${removed.name}.`,
+    subtaskId: removed.subtaskId,
+  });
+  return { ok: true, removed };
+}
+
 function previewDeliverableWrite(body = {}) {
   if (!state.run) throw new Error("No active run");
   return deliverables.previewWrite(runDir(state.run.id), body.id, body.targetPath, deliveryRoots());
@@ -1678,6 +1692,19 @@ async function router(req, res) {
       try {
         return sendJson(res, 200, { ok: true, text: deliverables.readContent(runDir(state.run.id), body.id) });
       } catch (error) {
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/deliverables/remove") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      try {
+        const result = removeDeliverable(body);
+        broadcast();
+        return sendJson(res, 200, { ...result, state: publicState() });
+      } catch (error) {
+        broadcast();
         return sendJson(res, 400, { error: error.message });
       }
     }

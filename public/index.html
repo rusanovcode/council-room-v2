@@ -184,15 +184,15 @@
         <!-- Phase 6b: per-chat agent editor. Populated when an agent chip is
              clicked; lets you reassign the backend / model / effort of that agent.
              Pinned at the very top of the right column. -->
-        <section id="agentEditorPanel" class="providers-panel agent-editor-panel">
+        <details id="agentEditorPanel" class="providers-panel agent-editor-panel">
+          <summary>
+            <span class="agent-editor-title" id="agentEditorTitle" data-i18n="ui.agentsHeader">Агенты обсуждения</span>
+            <span class="help" data-tooltip-key="t.addAgent">?</span>
+          </summary>
           <div class="providers-body">
-            <div class="agent-editor-head">
-              <span class="agent-editor-title" id="agentEditorTitle" data-i18n="ui.agentsHeader">Агенты обсуждения</span>
-              <span class="help" data-tooltip-key="t.addAgent">?</span>
-            </div>
             <div id="agentEditorBody"></div>
           </div>
-        </section>
+        </details>
 
         <!-- Filesystem-scan toggle: standalone field directly under the agent
              editor so it's visually part of the "how agents run" group. -->
@@ -226,7 +226,7 @@
           </div>
         </details>
 
-        <details id="registeredModelsPanel" class="providers-panel" open>
+        <details id="registeredModelsPanel" class="providers-panel">
           <summary>
             <span data-i18n="ui.registeredModels">Зарегистрированные модели</span>
             <span class="help" data-tooltip-key="t.registeredModels">?</span>
@@ -236,7 +236,7 @@
           </div>
         </details>
 
-        <details id="settingsDetails" class="providers-panel" open>
+        <details id="settingsDetails" class="providers-panel">
           <summary>
             <span data-i18n="ui.settings">Настройки</span>
             <span class="help" data-tooltip-key="t.agentSettings">?</span>
@@ -251,28 +251,30 @@
             </select>
           </label>
           <div id="legacyAgents">
-          <label>
-            <span data-i18n="ui.codexModel">Модель Codex</span>
-            <span class="help" data-tooltip-key="t.model">?</span>
-            <select id="codexModel">
-              <option value="">auto</option>
-              <option value="gpt-5.5">gpt-5.5</option>
-              <option value="gpt-5.4">gpt-5.4</option>
-              <option value="gpt-5.4-mini">gpt-5.4-mini</option>
-              <option value="gpt-5.3-codex">gpt-5.3-codex</option>
-            </select>
-          </label>
-          <label>
-            <span data-i18n="ui.codexEffort">Codex effort</span>
-            <span class="help" data-tooltip-key="t.effort">?</span>
-            <select id="codexEffort">
-              <option value="auto">auto</option>
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-              <option value="xhigh">xhigh</option>
-            </select>
-          </label>
+          <div class="settings-pair-row">
+            <label>
+              <span data-i18n="ui.codexModel">Модель Codex</span>
+              <span class="help" data-tooltip-key="t.model">?</span>
+              <select id="codexModel">
+                <option value="">auto</option>
+                <option value="gpt-5.5">gpt-5.5</option>
+                <option value="gpt-5.4">gpt-5.4</option>
+                <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                <option value="gpt-5.3-codex">gpt-5.3-codex</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="ui.codexEffort">Codex effort</span>
+              <span class="help" data-tooltip-key="t.effort">?</span>
+              <select id="codexEffort">
+                <option value="auto">auto</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="xhigh">xhigh</option>
+              </select>
+            </label>
+          </div>
           <div class="account-row">
             <span class="account-label" data-i18n="ui.codexAccount">Codex — аккаунт</span>
             <span class="help" data-tooltip-key="t.account">?</span>
@@ -285,31 +287,33 @@
               <option value="2">акк 2</option>
             </select>
           </div>
-          <label>
-            <span data-i18n="ui.claudeModel">Модель Claude</span>
-            <span class="help" data-tooltip-key="t.model">?</span>
-            <select id="claudeModel">
-              <option value="">auto</option>
-              <option value="opus">opus (alias)</option>
-              <option value="sonnet">sonnet (alias)</option>
-              <option value="haiku">haiku (alias)</option>
-              <option value="claude-opus-4-7">claude-opus-4-7</option>
-              <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-              <option value="claude-haiku-4-5">claude-haiku-4-5</option>
-            </select>
-          </label>
-          <label>
-            <span data-i18n="ui.claudeEffort">Claude effort</span>
-            <span class="help" data-tooltip-key="t.effort">?</span>
-            <select id="claudeEffort">
-              <option value="auto">auto</option>
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-              <option value="xhigh">xhigh</option>
-              <option value="max">max</option>
-            </select>
-          </label>
+          <div class="settings-pair-row">
+            <label>
+              <span data-i18n="ui.claudeModel">Модель Claude</span>
+              <span class="help" data-tooltip-key="t.model">?</span>
+              <select id="claudeModel">
+                <option value="">auto</option>
+                <option value="opus">opus (alias)</option>
+                <option value="sonnet">sonnet (alias)</option>
+                <option value="haiku">haiku (alias)</option>
+                <option value="claude-opus-4-7">claude-opus-4-7</option>
+                <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+                <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="ui.claudeEffort">Claude effort</span>
+              <span class="help" data-tooltip-key="t.effort">?</span>
+              <select id="claudeEffort">
+                <option value="auto">auto</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="xhigh">xhigh</option>
+                <option value="max">max</option>
+              </select>
+            </label>
+          </div>
           <div class="account-row">
             <span class="account-label" data-i18n="ui.claudeAccount">Claude — аккаунт</span>
             <span class="help" data-tooltip-key="t.account">?</span>
@@ -335,38 +339,44 @@
           <div class="providers-body">
             <div id="deliverablesList"></div>
             <div id="deliverablesExecForm" class="deliverables-form">
-              <label class="deliverables-field">
-                <span data-i18n="ui.execSubtaskLabel">Resolved subtask</span>
-                <select id="execSubtask"></select>
-              </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.execTemplateLabel">Template</span>
-                <select id="execTemplate"></select>
-              </label>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.execSubtaskLabel">Resolved subtask</span>
+                  <select id="execSubtask"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.execTemplateLabel">Template</span>
+                  <select id="execTemplate"></select>
+                </label>
+              </div>
               <label class="deliverables-field">
                 <span data-i18n="ui.execAuthorLabel">Author</span>
                 <select id="execAuthor"></select>
               </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.agentModel">Model</span>
-                <select id="execAuthorModel"></select>
-              </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.agentEffort">Effort</span>
-                <select id="execAuthorEffort"></select>
-              </label>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentModel">Model</span>
+                  <select id="execAuthorModel"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentEffort">Effort</span>
+                  <select id="execAuthorEffort"></select>
+                </label>
+              </div>
               <label class="deliverables-field">
                 <span data-i18n="ui.execReviewerLabel">Reviewer</span>
                 <select id="execReviewer"></select>
               </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.agentModel">Model</span>
-                <select id="execReviewerModel"></select>
-              </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.agentEffort">Effort</span>
-                <select id="execReviewerEffort"></select>
-              </label>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentModel">Model</span>
+                  <select id="execReviewerModel"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentEffort">Effort</span>
+                  <select id="execReviewerEffort"></select>
+                </label>
+              </div>
               <button id="execAutopilot" class="ghost small" type="button" data-i18n="ui.execAutopilot">Execution autopilot</button>
             </div>
             <div id="deliverablesDocForm" class="deliverables-form">
@@ -374,22 +384,26 @@
                 <span data-i18n="ui.docFormTitle">Doc: one author, no review loop</span>
                 <span class="help" data-tooltip-key="t.docForm">?</span>
               </div>
-              <label class="deliverables-field">
-                <span data-i18n="ui.docTemplateLabel">Doc template</span>
-                <select id="docTemplate"></select>
-              </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.docAuthorLabel">Doc author</span>
-                <select id="docAuthor"></select>
-              </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.agentModel">Model</span>
-                <select id="docAuthorModel"></select>
-              </label>
-              <label class="deliverables-field">
-                <span data-i18n="ui.agentEffort">Effort</span>
-                <select id="docAuthorEffort"></select>
-              </label>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.docTemplateLabel">Doc template</span>
+                  <select id="docTemplate"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.docAuthorLabel">Doc author</span>
+                  <select id="docAuthor"></select>
+                </label>
+              </div>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentModel">Model</span>
+                  <select id="docAuthorModel"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentEffort">Effort</span>
+                  <select id="docAuthorEffort"></select>
+                </label>
+              </div>
               <button id="generateDoc" class="ghost small" type="button" data-i18n="ui.generateDoc">Doc</button>
             </div>
             <span id="deliverablesMsg" class="providers-msg"></span>
