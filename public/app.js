@@ -164,6 +164,8 @@ const STRINGS = {
     "ui.agentNoKey": "нет ключа",
     "tip.agentChip": "{prov} · {model} — {status}. Inline-бэкенд участника. Цвет: зелёный — ключ прошёл живой тест (или Ollama/CLI); жёлтый — ключ задан, но не проверен; серый — ключа нет.",
     "ui.toggleStatement": "Развернуть / свернуть текст постановки подзадачи",
+    "ui.expandText": "Ещё",
+    "ui.collapseText": "Скрыть",
     "ui.checkUpdates": "Обновления",
     "ui.checkUpdatesTitle": "Проверить обновления на GitHub",
     "ui.updateTitle": "Обновление",
@@ -570,6 +572,8 @@ const STRINGS = {
     "ui.agentNoKey": "no key",
     "tip.agentChip": "{prov} · {model} — {status}. Inline agent backend. Colour: green — key passed a live test (or Ollama/CLI); amber — key set but unverified; grey — no key.",
     "ui.toggleStatement": "Expand / collapse the subtask statement",
+    "ui.expandText": "More",
+    "ui.collapseText": "Less",
     "ui.checkUpdates": "Updates",
     "ui.checkUpdatesTitle": "Check for updates on GitHub",
     "ui.updateTitle": "Update",
@@ -1161,6 +1165,7 @@ function savePanelOpen() { try { localStorage.setItem(PANELS_KEY, JSON.stringify
 function saveCoachPinned() { try { localStorage.setItem("council-room-v2.coachPinned", String(coachPinned)); } catch {} }
 let showTrashedMsgs = false; // header toggle: reveal the response bin
 let previewSubtaskId = null;
+const expandedRunIds = new Set();
 
 function openPreview(id) {
   previewSubtaskId = id;
@@ -1169,6 +1174,50 @@ function openPreview(id) {
 function closePreview() {
   previewSubtaskId = null;
   render();
+}
+
+function makeRunRow(run, actions) {
+  const li = document.createElement("li");
+  const body = document.createElement("div");
+  body.className = "run-main";
+
+  const topic = document.createElement("div");
+  topic.className = "run-topic";
+  topic.textContent = run.topic || "";
+  if (expandedRunIds.has(run.id)) topic.classList.add("expanded");
+  body.appendChild(topic);
+
+  const toggle = document.createElement("button");
+  toggle.className = "run-toggle";
+  toggle.type = "button";
+  toggle.hidden = true;
+  toggle.textContent = expandedRunIds.has(run.id) ? t("ui.collapseText") : t("ui.expandText");
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (expandedRunIds.has(run.id)) expandedRunIds.delete(run.id);
+    else expandedRunIds.add(run.id);
+    renderRuns();
+  });
+
+  li.appendChild(body);
+  if (actions) {
+    actions.appendChild(toggle);
+    li.appendChild(actions);
+  } else {
+    body.appendChild(toggle);
+  }
+  return li;
+}
+
+function syncRunRowToggle(li) {
+  const topic = li.querySelector(".run-topic");
+  const toggle = li.querySelector(".run-toggle");
+  if (!topic || !toggle) return;
+  const wasExpanded = topic.classList.contains("expanded");
+  if (wasExpanded) topic.classList.remove("expanded");
+  const hasOverflow = topic.scrollHeight > topic.clientHeight + 1;
+  if (wasExpanded) topic.classList.add("expanded");
+  toggle.hidden = !hasOverflow;
 }
 
 function parseStatusFromAgent(text) {
@@ -1470,17 +1519,21 @@ function renderRuns() {
   const list = $("runList");
   list.innerHTML = "";
   for (const run of active) {
-    const li = document.createElement("li");
-    if (run.id === currentState.activeRunId) li.classList.add("active");
-    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><span class="run-actions">`
+    const actions = document.createElement("span");
+    actions.className = "run-actions";
+    actions.innerHTML = `<span class="run-action-buttons">`
       + `<button class="archive-run" title="${escapeHtml(t("ui.toArchive"))}">🗄</button>`
-      + `<button class="trash-run" title="${escapeHtml(t("ui.toTrash"))}">×</button></span>`;
+      + `<button class="trash-run" title="${escapeHtml(t("ui.toTrash"))}">×</button>`
+      + `</span>`;
+    const li = makeRunRow(run, actions);
+    if (run.id === currentState.activeRunId) li.classList.add("active");
     li.addEventListener("click", (event) => {
       if (event.target.classList.contains("archive-run")) { flashThenAct(li, "rgba(255,202,40,0.5)", () => api("POST", "/api/runs/archive", { runId: run.id })); return; }
       if (event.target.classList.contains("trash-run")) { flashThenAct(li, "rgba(239,83,80,0.45)", () => api("POST", "/api/runs/trash", { runId: run.id })); return; }
       api("POST", "/api/runs/switch", { runId: run.id });
     });
     list.appendChild(li);
+    syncRunRowToggle(li);
   }
 
   // Chat archive panel — restore back to active, or send onward to the trash.
@@ -1508,11 +1561,14 @@ function fillRunBin(listEl, runs, { trash: withTrash }) {
     return;
   }
   for (const run of runs) {
-    const li = document.createElement("li");
+    const actions = document.createElement("span");
+    actions.className = "run-actions";
+    actions.innerHTML = `<span class="run-action-buttons">`
+      + `<button class="restore-run" title="${escapeHtml(t("ui.restore"))}">↩</button>`
+      + (withTrash ? `<button class="trash-run" title="${escapeHtml(t("ui.toTrash"))}">×</button>` : "")
+      + `</span>`;
+    const li = makeRunRow(run, actions);
     li.classList.add("archived-row");
-    let actions = `<button class="restore-run" title="${escapeHtml(t("ui.restore"))}">↩</button>`;
-    if (withTrash) actions += `<button class="trash-run" title="${escapeHtml(t("ui.toTrash"))}">×</button>`;
-    li.innerHTML = `<span>${escapeHtml(run.topic)}</span><span class="run-actions">${actions}</span>`;
     li.querySelector(".restore-run").addEventListener("click", (event) => {
       event.stopPropagation();
       api("POST", "/api/runs/restore", { runId: run.id });
@@ -1523,6 +1579,7 @@ function fillRunBin(listEl, runs, { trash: withTrash }) {
       flashThenAct(li, "rgba(239,83,80,0.45)", () => api("POST", "/api/runs/trash", { runId: run.id }));
     });
     listEl.appendChild(li);
+    syncRunRowToggle(li);
   }
 }
 
@@ -2140,10 +2197,15 @@ function renderProviderStatsPanel() {
   const profiles = (currentState?.settings?.profiles) || [];
   const nonCli = profiles.filter((p) => !isCliProviderId(p.provider || ""));
   const toggle = panel.querySelector(".psp-toggle");
+  const inlineToggle = $("toggleProviderStatsInline");
   const summaryText = panel.querySelector(".psp-summary-text");
   const isOpen = panelOpen.providerStats;
   panel.classList.toggle("psp-open", isOpen);
   if (toggle) toggle.querySelector(".psp-arrow").textContent = isOpen ? "▴" : "▾";
+  if (inlineToggle) {
+    inlineToggle.textContent = isOpen ? "▴" : "▾";
+    inlineToggle.title = UI_LANG === "en" ? "Agents" : "Агенты";
+  }
   if (summaryText) {
     const cnt = nonCli.length;
     summaryText.textContent = UI_LANG === "en" ? `Agents${cnt ? " · " + cnt : ""}` : `Агенты${cnt ? " · " + cnt : ""}`;
@@ -2230,7 +2292,6 @@ function connectedAgents() {
   const list = (currentState.settings && currentState.settings.profiles) || [];
   const creds = (currentState.providers && currentState.providers.credentials) || {};
   const validated = (currentState.providers && currentState.providers.validated) || {};
-  const usage = (currentState.providers && currentState.providers.usage) || {};
   return list.map((p) => {
     let prov, present, ok;
     if (isCliProviderId(p.provider)) {
@@ -2246,20 +2307,13 @@ function connectedAgents() {
       ok = Boolean(validated[p.id]); // green only when the key passed a live test
     }
     const model = p.model || (isCliProviderId(p.provider) ? "auto" : "—");
-    const u = usage[p.id];
-    const spentK = u && u.totalTokens ? u.totalTokens / 1000 : 0;
     // Same colour scheme as the API-key field check: verified → green, key
     // present but unverified → amber, no key → grey. Mirrors the account-button
     // token buckets so the public build looks identical.
     const tok = ok ? "tok-green" : (present ? "tok-yellow" : "tok-unknown");
     const status = ok ? "ok" : (present ? "unverified" : "nokey");
-    return { id: p.id, name: p.label || prov, prov, model, present, ok, status, spentK, tok };
+    return { id: p.id, name: p.label || prov, prov, model, present, ok, status, tok };
   });
-}
-
-function fmtSpentK(k) {
-  if (!k) return "";
-  return ` · Σ${k >= 10 ? Math.round(k) : k.toFixed(1)}K`;
 }
 
 // Render the connected-agent chips, styled like the switch-module account
@@ -2283,12 +2337,13 @@ function renderConnectedAgents() {
     const chip = document.createElement("span");
     chip.className = `acct-btn agent-chip ${a.tok}${a.present ? "" : " unauthorized"}`;
     chip.dataset.profileId = a.id;
-    const spent = fmtSpentK(a.spentK);
-    chip.innerHTML = `${escapeHtml(a.name)}${spent ? `<span class="agent-spend">${escapeHtml(spent)}</span>` : ""}`;
+    chip.textContent = a.name;
     const statusText = a.status === "ok" ? t("ui.agentReady") : (a.status === "unverified" ? t("ui.agentUnverified") : t("ui.agentNoKey"));
-    chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: statusText })
-      + (a.spentK ? ` · ~${a.spentK.toFixed(1)}K tok` : "");
-    chip.addEventListener("click", () => openProfilesPanel(a.id));
+    chip.dataset.tooltipText = t("tip.agentChip", { prov: a.prov, model: a.model, status: statusText });
+    chip.addEventListener("click", () => {
+      openProfilesPanel(a.id);
+      highlightRegisteredModelRow(a.id);
+    });
     const af = agentChipFlash.get(a.id);
     if (af) {
       const opacity = Math.max(0, 1 - (Date.now() - af.at) / 5000);
@@ -2314,6 +2369,19 @@ function openProfilesPanel(profileId) {
   row.scrollIntoView({ behavior: "smooth", block: "nearest" });
   row.classList.add("profile-row-flash");
   setTimeout(() => row.classList.remove("profile-row-flash"), 1200);
+}
+
+function highlightRegisteredModelRow(profileId) {
+  if (!profileId) return;
+  const panel = $("registeredModelsPanel");
+  if (panel) panel.open = true;
+  const row = document.querySelector(`#registeredModelsList .rm-row[data-id="${CSS.escape(profileId)}"]`);
+  if (!row) return;
+  row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  row.classList.remove("rm-row-flash");
+  void row.offsetWidth;
+  row.classList.add("rm-row-flash");
+  setTimeout(() => row.classList.remove("rm-row-flash"), 4000);
 }
 
 function renderSwitcher() {
@@ -2354,6 +2422,7 @@ function renderSwitcher() {
   }
 
   renderConnectedAgents();
+  renderProviderStatsPanel();
 
   // Switch-module account buttons (login/failover) — full build only. Colour =
   // remaining-token bucket; click → authorize that account.
@@ -2992,7 +3061,8 @@ function presetById(id) {
 function providerOptions() {
   const info = currentState.providers || {};
   // Returns objects {id, label} so the dropdown shows readable names.
-  const opts = (info.presets || []).map((p) => ({ id: p.id, label: p.label || p.id }));
+  const opts = [{ id: "", label: UI_LANG === "ru" ? "— выбрать —" : "— choose —" }]
+    .concat((info.presets || []).map((p) => ({ id: p.id, label: p.label || p.id })));
   // "openai-compatible" is a raw type for custom endpoints not in the preset list.
   // "ollama" is already a preset — don't add it again.
   opts.push({ id: "openai-compatible", label: "OpenAI-compatible (custom)" });
@@ -3015,11 +3085,11 @@ function renderProfileRow(p) {
   const preset = presetById(p.provider);
   const creds = (currentState.providers && currentState.providers.credentials) || {};
   const validated = (currentState.providers && currentState.providers.validated) || {};
-  const selectedRef = String(p.credentialRef || (preset ? preset.credentialRef : "") || "").trim();
+  const selectedRef = String(p.credentialRef || "").trim();
   const discoveredOrImported = isOpenrouter && selectedRef
     && (knownOpenrouterRefs().includes(selectedRef) || Boolean(openrouterImportedKeys[selectedRef]));
   const profileKeyPresent = Boolean(creds[p.id]) || discoveredOrImported;
-  const needsKey = !cli && p.provider !== "ollama" && (preset ? preset.needsKey : true);
+  const needsKey = Boolean(p.provider) && !cli && p.provider !== "ollama" && (preset ? preset.needsKey : true);
   const keyBadge = needsKey && !profileKeyPresent
     ? `<span class="key-badge miss">${t("ui.keyMissing")}</span>`
     : "";
@@ -3027,7 +3097,7 @@ function renderProfileRow(p) {
   if (isOpenrouter && !openrouterCatalog.loaded && !openrouterCatalog.loading) {
     fetchOpenrouterCatalog().then(() => renderProviders());
   }
-  const ollamaModels = isOllama ? (ollamaModelsCache[p.baseUrl || (preset && preset.baseUrl) || "http://localhost:11434/v1"] || null) : null;
+  const ollamaModels = isOllama ? (ollamaModelsCache[p.baseUrl || "http://localhost:11434/v1"] || null) : null;
   let modelWidget;
   if (cli) {
     modelWidget = `<input class="p-model" value="${escapeHtml(p.model || "")}" placeholder="auto">`;
@@ -3053,7 +3123,7 @@ function renderProfileRow(p) {
     if (p.provider !== "ollama") {
       if (isOpenrouter) {
         const refList = knownOpenrouterRefs();
-        const selectedRefValue = p.credentialRef || (preset ? preset.credentialRef : "");
+        const selectedRefValue = p.credentialRef || "";
         const refOpts = [
           ...(!selectedRefValue || refList.includes(selectedRefValue) ? [] : [selectedRefValue]),
           ...refList,
@@ -3067,7 +3137,7 @@ function renderProfileRow(p) {
           </span>
         </label>`;
       } else {
-        fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || (preset ? preset.credentialRef : ""))}" placeholder="MY_API_KEY"></label>`;
+        fields += `<label class="p-field"><span>${t("ui.profileCredRef")} ${helpIcon("profileCredRef")}</span><input class="p-credref" value="${escapeHtml(p.credentialRef || "")}" placeholder="MY_API_KEY"></label>`;
       }
       // Three states for the ✓: green = key passed a live test (verified);
       // amber = key present but not yet verified; none = no key. Placeholder
@@ -3086,7 +3156,7 @@ function renderProfileRow(p) {
     }
     fields += `<label class="p-field${isOpenrouter || isOllama ? " p-field-wide p-field-inline-model" : ""}"><span>${t("ui.profileModel")} ${helpIcon("profileModel")}</span>${modelWidget}</label>`;
     if (showBaseUrl) {
-      fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || (preset ? preset.baseUrl : ""))}" placeholder="https://.../v1"></label>`;
+      fields += `<label class="p-field"><span>${t("ui.profileBaseUrl")} ${helpIcon("profileBaseUrl")}</span><input class="p-baseurl" value="${escapeHtml(p.baseUrl || "")}" placeholder="https://.../v1"></label>`;
     }
   }
   return `<div class="profile-row" data-id="${escapeHtml(p.id)}">
@@ -3148,7 +3218,7 @@ function renderProviders() {
   if (!list) return;
   list.innerHTML = newProfiles.length
     ? newProfiles.map(renderProfileRow).join("")
-    : `<div class="reg-hint muted small">${escapeHtml(t("ui.noNewProfiles"))}</div>`;
+    : "";
   refreshProvidersFieldTooltips();
   // "Применить" hidden until at least one new profile exists.
   const applyBtn = $("applyProvidersBtn");
@@ -3519,16 +3589,15 @@ function syncProvidersFromDOM() {
 }
 
 function makeBlankProfile() {
-  const apiMode = (currentState.providers && currentState.providers.mode) === "api";
-  const useOllama = ollamaDetect && ollamaDetect.detected;
-  const provider = (apiMode || useOllama) ? "ollama" : "cli-codex";
-  const p = { id: `p${Date.now().toString(36)}`, label: "", provider, model: "" };
-  if (isCliProviderId(provider)) {
-    p.account = "acc1";
-  } else if (provider === "ollama" && useOllama) {
-    p.baseUrl = ollamaDetect.baseUrl;
-  }
-  return p;
+  return {
+    id: `p${Date.now().toString(36)}`,
+    label: "",
+    provider: "",
+    model: "",
+    account: "acc1",
+    credentialRef: "",
+    baseUrl: "",
+  };
 }
 
 function profileDuplicateKey(p) {
@@ -4251,6 +4320,11 @@ function bindUi() {
     if (panelOpen.switcherStats) loadStats();
   });
   $("toggleProviderStats")?.addEventListener("click", () => {
+    panelOpen.providerStats = !panelOpen.providerStats;
+    savePanelOpen();
+    renderProviderStatsPanel();
+  });
+  $("toggleProviderStatsInline")?.addEventListener("click", () => {
     panelOpen.providerStats = !panelOpen.providerStats;
     savePanelOpen();
     renderProviderStatsPanel();

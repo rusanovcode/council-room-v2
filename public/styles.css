@@ -159,6 +159,38 @@ html, body {
   font-size: 13px;
   position: relative;
 }
+.run-list li { align-items: flex-start; }
+.run-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.run-topic {
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.run-topic.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+.run-list li .run-toggle {
+  align-self: flex-end;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 11px;
+}
+.run-list li .run-toggle:hover { text-decoration: underline; }
+.run-list li.active .run-toggle { color: rgba(255, 255, 255, 0.92); }
+.run-list li.active .run-toggle:hover { color: white; }
 .subtask-list li .subtask-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subtask-list li .subtask-actions {
   display: none;
@@ -208,7 +240,19 @@ html, body {
 }
 .delete-run:hover { color: var(--red); }
 .archive-run:hover, .restore-run:hover { color: var(--accent); }
-.run-list li .run-actions { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+.run-list li .run-actions {
+  flex: none;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.run-list li .run-action-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
 .trash-run {
   background: transparent;
   border: none;
@@ -354,6 +398,7 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   margin-left: auto;
 }
 .switcher-module-box { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; }
+.switcher-agents-box { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; }
 .switcher-left { display: inline-flex; align-items: center; gap: 6px; cursor: help; min-width: 0; }
 .switcher-left #switcherStatusText { overflow: hidden; line-height: 1.2; }
 .switcher-dot {
@@ -424,8 +469,13 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
 /* Phase 5: connected-agent chips (Profiles & roles), same pill style as the
    account buttons. Public build shows only these; full build shows them too. */
 .switcher-agents { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; gap: 3px; align-items: center; }
+.switcher-agents-toggle {
+  align-self: center;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+}
 .agent-chip { cursor: pointer; }
-.agent-chip .agent-spend { opacity: 0.7; font-weight: 600; margin-left: 2px; }
 .agent-no-reg { font-size: 11px; color: var(--muted); padding: 2px 6px; border: 1px dashed var(--border); border-radius: 3px; cursor: pointer; white-space: nowrap; }
 .agent-no-reg:hover { color: var(--text); border-color: var(--accent); }
 .profile-row-flash { animation: profileFlash 1.2s ease-out; }
@@ -1712,6 +1762,38 @@ button.square {
 .rm-row.rm-fallback .rm-prov-badge { border-color: var(--orange); color: var(--orange); }
 .rm-row.rm-fail td { background: rgba(255,80,80,0.06); }
 .rm-row.rm-fail .rm-prov-badge { border-color: var(--red); color: var(--red); }
+.rm-row.rm-row-flash td {
+  animation: rmRowFlashBorder 4s ease-out;
+}
+.rm-row.rm-row-flash td:first-child {
+  box-shadow:
+    inset 2px 0 0 rgba(255, 184, 77, 0.95),
+    inset 0 2px 0 rgba(255, 184, 77, 0.95),
+    inset 0 -2px 0 rgba(255, 184, 77, 0.95);
+}
+.rm-row.rm-row-flash td:not(:first-child):not(:last-child) {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 184, 77, 0.95),
+    inset 0 -2px 0 rgba(255, 184, 77, 0.95);
+}
+.rm-row.rm-row-flash td:last-child {
+  box-shadow:
+    inset -2px 0 0 rgba(255, 184, 77, 0.95),
+    inset 0 2px 0 rgba(255, 184, 77, 0.95),
+    inset 0 -2px 0 rgba(255, 184, 77, 0.95);
+}
+@keyframes rmRowFlashBorder {
+  0%, 50% {
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 184, 77, 0.95),
+      0 0 14px rgba(255, 184, 77, 0.28);
+  }
+  100% {
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 184, 77, 0),
+      0 0 14px rgba(255, 184, 77, 0);
+  }
+}
 .rm-status { display: inline-block; margin-left: 6px; font-size: 10px; line-height: 1.2; color: var(--muted); }
 .rm-status-primary { color: var(--green); }
 .rm-status-fallback { color: var(--orange); }
