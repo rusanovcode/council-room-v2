@@ -1194,6 +1194,53 @@ button.square {
 #openSubtaskModal .modal-box {
   width: 760px;
 }
+.apply-target-box {
+  width: 720px;
+}
+.apply-target-field {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  margin-top: 10px;
+}
+.apply-target-field > span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 30px;
+}
+.apply-target-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.apply-target-picker-row > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.apply-target-browse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 92px;
+  height: 30px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .apply-target-field {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .apply-target-field > span {
+    line-height: 1.3;
+  }
+}
 .modal-box textarea#subtaskTitleInput {
   min-height: 180px;
   max-height: min(58vh, 520px);
@@ -2072,14 +2119,23 @@ button.square {
   min-width: 0;
 }
 .doc-row.doc-row-flash {
-  animation: docRowAddedFlash 4s ease-out forwards;
+  border-radius: 4px;
+  animation: docRowAddedFlash 8s ease-out forwards;
 }
 .doc-row.doc-row-remove-flash {
   animation: docRowRemoveFlash 4s ease-out forwards;
 }
 @keyframes docRowAddedFlash {
-  0%, 50% { background: rgba(78, 195, 138, 0.28); }
-  100% { background: transparent; }
+  0%, 62.5% {
+    box-shadow:
+      inset 0 0 0 2px rgba(70, 232, 90, 0.95),
+      0 0 14px rgba(70, 232, 90, 0.38);
+  }
+  100% {
+    box-shadow:
+      inset 0 0 0 2px rgba(70, 232, 90, 0),
+      0 0 14px rgba(70, 232, 90, 0);
+  }
 }
 @keyframes docRowRemoveFlash {
   0%, 50% { background: rgba(231, 92, 92, 0.30); }
@@ -2111,6 +2167,10 @@ button.square {
   min-width: 0;
 }
 .deliverable-row .doc-main .doc-name { min-width: 0; }
+.deliverable-remove-inline {
+  flex: 0 0 auto;
+  margin-left: 2px;
+}
 .deliverable-row .doc-actions {
   margin-left: auto;
   display: flex;
@@ -2193,6 +2253,41 @@ button.square {
 #deliverablesMsg {
   display: block;
   margin-top: 6px;
+}
+#deliverablesMsg:not(:empty) {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+#deliverablesMsg.exec-status-pulse {
+  animation: execStatusOrangePulse 3s ease-out infinite;
+}
+#deliverablesMsg.exec-status-pass-flash {
+  animation: execStatusPassFlash 4s ease-out 1;
+}
+@keyframes execStatusOrangePulse {
+  0%, 33% {
+    background: rgba(255, 142, 60, 0.42);
+    box-shadow: 0 0 14px rgba(255, 142, 60, 0.30);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 14px rgba(255, 142, 60, 0);
+  }
+}
+@keyframes execStatusPassFlash {
+  0%, 50% {
+    border-color: rgba(70, 232, 90, 0.95);
+    box-shadow:
+      inset 0 0 0 1px rgba(70, 232, 90, 0.78),
+      0 0 14px rgba(70, 232, 90, 0.42);
+  }
+  100% {
+    border-color: rgba(70, 232, 90, 0);
+    box-shadow:
+      inset 0 0 0 1px rgba(70, 232, 90, 0),
+      0 0 14px rgba(70, 232, 90, 0);
+  }
 }
 .doc-add { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .doc-add-row { display: flex; gap: 6px; align-items: center; }

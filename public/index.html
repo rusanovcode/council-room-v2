@@ -494,6 +494,29 @@
       </div>
     </div>
 
+    <!-- Modal: apply deliverable target path -->
+    <div id="applyTargetModal" class="modal hidden">
+      <div class="modal-box apply-target-box">
+        <h3 data-i18n="ui.applyTargetTitle">Apply document</h3>
+        <label class="apply-target-field">
+          <span data-i18n="ui.applyTargetNameLabel">File name</span>
+          <input id="applyTargetNameInput" type="text" spellcheck="false" />
+        </label>
+        <label class="apply-target-field">
+          <span data-i18n="ui.applyTargetPathLabel">Target path</span>
+          <div class="apply-target-picker-row">
+            <input id="applyTargetPathInput" type="text" spellcheck="false" />
+            <button id="applyTargetBrowse" class="ghost apply-target-browse" type="button" data-i18n="ui.browse">Browse...</button>
+          </div>
+        </label>
+        <div id="applyTargetMsg" class="providers-msg"></div>
+        <div class="modal-actions">
+          <button id="applyTargetCancel" class="ghost" type="button" data-i18n="ui.cancel">Cancel</button>
+          <button id="applyTargetConfirm" class="primary" type="button" data-i18n="ui.apply">Apply</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal: add a debate agent (auto / manual) -->
     <div id="addAgentModal" class="modal hidden">
       <div class="modal-box">

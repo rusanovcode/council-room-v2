@@ -42,6 +42,11 @@ const STRINGS = {
     "ui.write": "Write",
     "ui.targetPathPrompt": "Путь для записи внутри рабочей папки:",
     "ui.applyTargetPathPrompt": "Абсолютный путь для Apply:",
+    "ui.applyTargetTitle": "Применить документ",
+    "ui.applyTargetNameLabel": "Название файла",
+    "ui.applyTargetPathLabel": "Путь записи",
+    "ui.browse": "Обзор...",
+    "ui.saveDialogUnavailable": "Проводник недоступен: {error}",
     "ui.applyAbsoluteRequired": "Для Apply нужен абсолютный путь.",
     "ui.targetPathFileRequired": "Путь должен указывать на файл, а не папку; добавьте имя файла, например phase13_checklist.md.",
     "ui.targetPathUnset": "путь не задан",
@@ -531,6 +536,11 @@ const STRINGS = {
     "ui.write": "Write",
     "ui.targetPathPrompt": "Write path inside the workspace:",
     "ui.applyTargetPathPrompt": "Absolute target path for Apply:",
+    "ui.applyTargetTitle": "Apply document",
+    "ui.applyTargetNameLabel": "File name",
+    "ui.applyTargetPathLabel": "Target path",
+    "ui.browse": "Browse...",
+    "ui.saveDialogUnavailable": "File browser unavailable: {error}",
     "ui.applyAbsoluteRequired": "Apply requires an absolute target path.",
     "ui.targetPathFileRequired": "Target must be a file path, not a folder; add a filename, e.g. phase13_checklist.md.",
     "ui.targetPathUnset": "target path not set",
@@ -1255,7 +1265,14 @@ function connectEvents() {
       const prevExec = currentState && currentState.execAutopilot
         ? { ...currentState.execAutopilot }
         : null;
+      const prevState = currentState;
+      const prevDocumentIds = new Set(((prevState?.run && prevState.run.documents) || []).map((d) => d.id));
+      const prevDeliverableIds = new Set(((prevState?.run && prevState.run.deliverables) || []).map((d) => d.id));
       currentState = JSON.parse(event.data);
+      if (prevState) {
+        flashNewDocumentFromState(prevDocumentIds, currentState);
+        flashNewDeliverableFromState(prevDeliverableIds, currentState);
+      }
       updateExecRunProgressFromState(prevExec, currentState.execAutopilot);
       render();
     } catch (error) {
@@ -4652,6 +4669,8 @@ async function applyParticipants() {
 // ---- Phase 6b: attached documents ----------------------------------------
 const docFlashIds = new Set();
 const docRemoveFlashIds = new Set();
+const deliverableFlashIds = new Set();
+const DOC_CREATED_FLASH_MS = 8000;
 
 function showDocMsg(text, isError) {
   const el = $("docMsg");
@@ -4695,10 +4714,22 @@ function renderDocuments() {
 
 function flashNewDocumentFromState(beforeIds, nextState) {
   const docs = (nextState?.run && nextState.run.documents) || [];
-  const added = docs.find((d) => d && d.id && !beforeIds.has(d.id));
-  if (!added) return;
-  docFlashIds.add(added.id);
-  setTimeout(() => { docFlashIds.delete(added.id); renderDocuments(); }, 4000);
+  const added = docs.filter((d) => d && d.id && !beforeIds.has(d.id));
+  if (!added.length) return;
+  for (const doc of added) {
+    docFlashIds.add(doc.id);
+    setTimeout(() => { docFlashIds.delete(doc.id); renderDocuments(); }, DOC_CREATED_FLASH_MS);
+  }
+}
+
+function flashNewDeliverableFromState(beforeIds, nextState) {
+  const items = (nextState?.run && nextState.run.deliverables) || [];
+  const added = items.filter((d) => d && d.id && !beforeIds.has(d.id));
+  if (!added.length) return;
+  for (const item of added) {
+    deliverableFlashIds.add(item.id);
+    setTimeout(() => { deliverableFlashIds.delete(item.id); renderDeliverables(); }, DOC_CREATED_FLASH_MS);
+  }
 }
 
 function loadDocFileIntoForm(file) {
@@ -4713,12 +4744,22 @@ function loadDocFileIntoForm(file) {
   reader.readAsText(file);
 }
 
-function showDeliverablesMsg(text, isError, { sticky = false, timeoutMs = 5000 } = {}) {
+function showDeliverablesMsg(text, isError, { sticky = false, timeoutMs = 5000, effect = "" } = {}) {
   const el = $("deliverablesMsg");
   if (!el) return;
   const safeText = String(text || "");
+  const effectClass = String(effect || "").replace(/[^A-Za-z0-9_-]/g, "");
+  const classes = ["providers-msg"];
+  if (safeText) classes.push(isError ? "err" : "ok");
+  if (safeText && effectClass) {
+    if (!el.classList.contains(effectClass)) {
+      el.classList.remove(effectClass);
+      void el.offsetWidth;
+    }
+    classes.push(effectClass);
+  }
   el.textContent = safeText;
-  el.className = `providers-msg ${safeText ? (isError ? "err" : "ok") : ""}`;
+  el.className = classes.join(" ");
   clearTimeout(showDeliverablesMsg._t);
   if (sticky || !safeText) {
     showDeliverablesMsg._sticky = Boolean(sticky && safeText);
@@ -4963,6 +5004,13 @@ function targetPathDirectoryPart(targetPath) {
   return clean.slice(0, slash);
 }
 
+function targetPathFilePart(targetPath) {
+  const clean = String(targetPath || "").trim().replace(/[\\/]+$/g, "");
+  if (!clean) return "";
+  const slash = Math.max(clean.lastIndexOf("/"), clean.lastIndexOf("\\"));
+  return slash < 0 ? clean : clean.slice(slash + 1);
+}
+
 function pathJoinForPrompt(dir, filename) {
   const base = String(dir || "").trim();
   const leaf = String(filename || "").trim();
@@ -5008,6 +5056,24 @@ function isLikelyFileTargetPath(targetPath) {
   return /^[^.].*\.[^.]+$/.test(leaf);
 }
 
+function ensureMarkdownFileName(fileName) {
+  const clean = String(fileName || "").trim().replace(/[\\/]+/g, "_");
+  if (!clean) return "deliverable.md";
+  if (/^[^.].*\.[^.]+$/.test(clean)) return clean;
+  return `${clean.replace(/\.+$/g, "") || "deliverable"}.md`;
+}
+
+function normalizeApplyTargetPath(targetPath, fileName) {
+  const cleanPath = String(targetPath || "").trim();
+  const cleanName = ensureMarkdownFileName(fileName);
+  if (!cleanPath) return "";
+  if (/[\\/]$/.test(cleanPath)) return pathJoinForPrompt(cleanPath, cleanName);
+  if (!isLikelyFileTargetPath(cleanPath)) {
+    return pathJoinForPrompt(cleanPath, cleanName);
+  }
+  return cleanPath;
+}
+
 function promptDeliverableTargetPath(id, { requireAbsolute = false } = {}) {
   const initial = knownDeliverableTargetPath(id) || derivedDeliverableTargetPath(id);
   const promptText = requireAbsolute ? t("ui.applyTargetPathPrompt") : t("ui.targetPathPrompt");
@@ -5021,6 +5087,116 @@ function promptDeliverableTargetPath(id, { requireAbsolute = false } = {}) {
   }
   rememberDeliverableTargetPath(id, input);
   return input;
+}
+
+function defaultApplyTargetPath(id) {
+  const known = knownDeliverableTargetPath(id);
+  if (known) return known;
+  const derived = derivedDeliverableTargetPath(id);
+  if (!derived || isAbsoluteTargetPath(derived)) return derived;
+  return pathJoinForPrompt(currentState?.deliveryRoot || currentState?.workdir || "", derived);
+}
+
+function showApplyTargetMsg(text, isError) {
+  const el = $("applyTargetMsg");
+  if (!el) return;
+  el.textContent = String(text || "");
+  el.className = `providers-msg ${text ? (isError ? "err" : "ok") : ""}`;
+}
+
+function openApplyTargetDialog(id) {
+  const modal = $("applyTargetModal");
+  const nameInput = $("applyTargetNameInput");
+  const pathInput = $("applyTargetPathInput");
+  const browseBtn = $("applyTargetBrowse");
+  const cancelBtn = $("applyTargetCancel");
+  const confirmBtn = $("applyTargetConfirm");
+  if (!modal || !nameInput || !pathInput || !browseBtn || !cancelBtn || !confirmBtn) {
+    return Promise.resolve(promptDeliverableTargetPath(id, { requireAbsolute: true }));
+  }
+  const initial = defaultApplyTargetPath(id);
+  nameInput.value = targetPathFilePart(initial) || defaultDeliverableFileName(deliverableById(id));
+  pathInput.value = initial;
+  showApplyTargetMsg("", false);
+  modal.classList.remove("hidden");
+  setTimeout(() => nameInput.focus(), 0);
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      modal.classList.add("hidden");
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+      browseBtn.onclick = null;
+      nameInput.oninput = null;
+      nameInput.onkeydown = null;
+      pathInput.oninput = null;
+      pathInput.onkeydown = null;
+      modal.onclick = null;
+      browseBtn.disabled = false;
+      confirmBtn.disabled = false;
+    };
+    const finish = (value) => {
+      cleanup();
+      resolve(value);
+    };
+    const syncPathFromName = () => {
+      const fileName = ensureMarkdownFileName(nameInput.value);
+      if (!fileName) return;
+      const dir = targetPathDirectoryPart(pathInput.value) || currentState?.deliveryRoot || currentState?.workdir || "";
+      pathInput.value = pathJoinForPrompt(dir, fileName);
+    };
+    const syncNameFromPath = () => {
+      if (!isLikelyFileTargetPath(pathInput.value)) return;
+      const fileName = targetPathFilePart(pathInput.value);
+      if (fileName) nameInput.value = fileName;
+    };
+    const confirmValue = () => {
+      const targetPath = normalizeApplyTargetPath(pathInput.value, nameInput.value);
+      if (!targetPath) {
+        finish("");
+        return;
+      }
+      pathInput.value = targetPath;
+      nameInput.value = targetPathFilePart(targetPath) || ensureMarkdownFileName(nameInput.value);
+      if (!isAbsoluteTargetPath(targetPath)) {
+        showApplyTargetMsg(t("ui.applyAbsoluteRequired"), true);
+        return;
+      }
+      rememberDeliverableTargetPath(id, targetPath);
+      finish(targetPath);
+    };
+    cancelBtn.onclick = () => finish("");
+    confirmBtn.onclick = confirmValue;
+    nameInput.oninput = syncPathFromName;
+    pathInput.oninput = syncNameFromPath;
+    nameInput.onkeydown = (event) => {
+      if (event.key === "Enter") confirmValue();
+      if (event.key === "Escape") finish("");
+    };
+    pathInput.onkeydown = nameInput.onkeydown;
+    modal.onclick = (event) => {
+      if (event.target === modal) finish("");
+    };
+    browseBtn.onclick = async () => {
+      browseBtn.disabled = true;
+      showApplyTargetMsg("", false);
+      try {
+        const result = await api("POST", "/api/dialog/save-path", {
+          defaultPath: String(pathInput.value || initial || "").trim(),
+        });
+        if (result?.path) {
+          pathInput.value = result.path;
+          nameInput.value = targetPathFilePart(result.path) || nameInput.value;
+          rememberDeliverableTargetPath(id, result.path);
+        }
+      } catch (error) {
+        showApplyTargetMsg(t("ui.saveDialogUnavailable", { error: normalizeDeliverablesError(error) }), true);
+      } finally {
+        browseBtn.disabled = false;
+        pathInput.focus();
+      }
+    };
+  });
 }
 
 function confirmDeliverableWritePreview(preview, { allowExternal = false } = {}) {
@@ -5491,7 +5667,7 @@ function renderDeliverablesExecStatus() {
   const exec = currentState?.execAutopilot || null;
   if (exec?.running || deliverablesExecPendingStart) {
     const n = currentExecIteration(exec);
-    showDeliverablesMsg(execPhaseStatusText(exec, n), false, { sticky: true });
+    showDeliverablesMsg(execPhaseStatusText(exec, n), false, { sticky: true, effect: "exec-status-pulse" });
     return true;
   }
   if (!exec) return false;
@@ -5501,7 +5677,11 @@ function renderDeliverablesExecStatus() {
   if (deliverablesExecFinalShown === finalKey && !showDeliverablesMsg._sticky) return false;
   let text = "";
   let isError = false;
-  if (reason === "review-pass") text = t("ui.execStatusPass");
+  let effect = "";
+  if (reason === "review-pass") {
+    text = t("ui.execStatusPass");
+    effect = "exec-status-pass-flash";
+  }
   else if (reason === "review-fail-budget") { text = t("ui.execStatusFail"); isError = true; }
   else if (reason === "user-stop") { text = t("ui.execStatusStopped"); isError = true; }
   else {
@@ -5509,7 +5689,7 @@ function renderDeliverablesExecStatus() {
     text = t("ui.execStatusError", { reason: normalizeDeliverablesError(cleanReason) || cleanReason });
     isError = true;
   }
-  showDeliverablesMsg(text, isError, { sticky: true });
+  showDeliverablesMsg(text, isError, { sticky: true, effect });
   deliverablesExecFinalShown = finalKey;
   return true;
 }
@@ -5681,13 +5861,13 @@ function renderDeliverables() {
   const coachFocusId = coachReady?.id || "";
   list.innerHTML = items.map((d) => {
     const coachFocus = Boolean(coachFocusId && d.id === coachFocusId);
-    return `<div class="doc-row deliverable-row${d.stale ? " stale" : ""}${coachFocus ? " coach-focus" : ""}" data-id="${escapeHtml(d.id)}">
+    return `<div class="doc-row deliverable-row${deliverableFlashIds.has(d.id) ? " doc-row-flash" : ""}${d.stale ? " stale" : ""}${coachFocus ? " coach-focus" : ""}" data-id="${escapeHtml(d.id)}">
       <div class="doc-main">
         <span class="doc-name" title="${escapeHtml(d.name)}">${escapeHtml(deliverableLabel(d))}</span>
         <span class="doc-chars">${escapeHtml(d.status)} · ${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
+        <button class="doc-remove deliverable-remove-inline" type="button" title="${escapeHtml(t("ui.docRemove"))}">×</button>
       </div>
       <div class="doc-actions">
-        <button class="doc-remove" type="button" title="${escapeHtml(t("ui.docRemove"))}">×</button>
         <button class="del-copy" type="button" data-tooltip-key="t.deliverableCopy" data-tooltip-text="${escapeHtml(t("tip.deliverableCopy"))}">${escapeHtml(t("ui.copy"))}</button>
         ${d.status === "ready" ? `<button class="del-apply" type="button" data-tooltip-key="t.apply" data-tooltip-text="${escapeHtml(t("tip.apply"))}">${escapeHtml(t("ui.apply"))}</button>` : ""}
         <button class="del-packet${coachFocus ? " coach-focus-btn" : ""}" type="button" data-tooltip-key="t.deliverablePacket" data-tooltip-text="${escapeHtml(t("tip.deliverablePacket"))}">${escapeHtml(t("ui.packet"))}</button>
@@ -5728,7 +5908,7 @@ async function writeDeliverable(id) {
 }
 
 async function applyDeliverable(id) {
-  const targetPath = promptDeliverableTargetPath(id, { requireAbsolute: true });
+  const targetPath = await openApplyTargetDialog(id);
   if (!targetPath) return;
   const preview = (await api("POST", "/api/deliverables/apply-preview", { id, targetPath, allowExternal: true })).preview;
   const ok = confirmDeliverableWritePreview(preview, { allowExternal: true });
@@ -5761,7 +5941,15 @@ async function startDocFromForm(subtaskIdOverride = "") {
   const payload = { subtaskId, template: deliverablesForm.docTemplate };
   if (author.kind === "local") payload.author = "local";
   else payload.author = author.payload;
+  const beforeDocumentIds = new Set(((currentState?.run && currentState.run.documents) || []).map((d) => d.id));
+  const beforeDeliverableIds = new Set(((currentState?.run && currentState.run.deliverables) || []).map((d) => d.id));
   const result = await api("POST", "/api/deliverables/create", payload);
+  if (result?.state) {
+    flashNewDocumentFromState(beforeDocumentIds, result.state);
+    flashNewDeliverableFromState(beforeDeliverableIds, result.state);
+    currentState = result.state;
+    render();
+  }
   if (result && result.document) showDeliverablesMsg(t("ui.deliverableCreated", { name: result.document.name }), false);
 }
 

@@ -330,6 +330,7 @@ function publicState() {
       switcher: { ...switcherStatus, statsVersion, pingResults: switcherPingResults },
       providers: providersInfo(),
       workdir: WORKDIR,
+      deliveryRoot: ROOT,
       port: PORT,
       cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
       updateStatus: state.updateStatus,
@@ -370,6 +371,7 @@ function publicState() {
     providers: providersInfo(),
     deliverableTemplates: templates.list(),
     workdir: WORKDIR,
+    deliveryRoot: ROOT,
     port: PORT,
     cli: { codex: cli.describeCodex(), claude: cli.describeClaude() },
     updateStatus: state.updateStatus,
@@ -1106,6 +1108,61 @@ function previewDeliverableApply(body = {}) {
   });
 }
 
+function windowsSavePathDialog(body = {}) {
+  return new Promise((resolve, reject) => {
+    if (process.platform !== "win32") {
+      reject(new Error("Native save dialog is only available on Windows"));
+      return;
+    }
+    const defaultPath = String(body.defaultPath || "").trim();
+    const initialDirectory = defaultPath && path.isAbsolute(defaultPath) ? path.dirname(defaultPath) : ROOT;
+    const fileName = defaultPath ? path.basename(defaultPath) : "deliverable.md";
+    const script = [
+      "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+      "Add-Type -AssemblyName System.Windows.Forms",
+      "$dlg = New-Object System.Windows.Forms.SaveFileDialog",
+      "$dlg.Title = 'Choose deliverable target path'",
+      "$dlg.Filter = 'Markdown (*.md)|*.md|Text (*.txt)|*.txt|All files (*.*)|*.*'",
+      "$dlg.InitialDirectory = [Environment]::GetEnvironmentVariable('CRV2_SAVE_INITIAL_DIR', 'Process')",
+      "$dlg.FileName = [Environment]::GetEnvironmentVariable('CRV2_SAVE_FILE_NAME', 'Process')",
+      "$dlg.OverwritePrompt = $false",
+      "$result = $dlg.ShowDialog()",
+      "if ($result -eq [System.Windows.Forms.DialogResult]::OK) {",
+      "  [Console]::WriteLine((ConvertTo-Json @{ ok = $true; path = $dlg.FileName } -Compress))",
+      "} else {",
+      "  [Console]::WriteLine((ConvertTo-Json @{ ok = $false; path = '' } -Compress))",
+      "}",
+    ].join("; ");
+    execFile("powershell.exe", [
+      "-NoProfile",
+      "-STA",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      script,
+    ], {
+      env: {
+        ...process.env,
+        CRV2_SAVE_INITIAL_DIR: initialDirectory,
+        CRV2_SAVE_FILE_NAME: fileName,
+      },
+      windowsHide: false,
+      timeout: 120000,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(String(stderr || error.message || "Save dialog failed").trim()));
+        return;
+      }
+      try {
+        const data = JSON.parse(String(stdout || "{}").trim() || "{}");
+        resolve({ ok: Boolean(data.ok), path: String(data.path || "") });
+      } catch {
+        reject(new Error("Save dialog returned invalid response"));
+      }
+    });
+  });
+}
+
 function writeDeliverable(body = {}) {
   if (!state.run) throw new Error("No active run");
   if (body.confirm !== true && body.confirm !== "I understand what and where") {
@@ -1722,6 +1779,15 @@ async function router(req, res) {
       const body = await readBody(req);
       try {
         return sendJson(res, 200, { ok: true, preview: previewDeliverableApply(body) });
+      } catch (error) {
+        return sendJson(res, 400, { error: error.message });
+      }
+    }
+
+    if (method === "POST" && pathname === "/api/dialog/save-path") {
+      const body = await readBody(req);
+      try {
+        return sendJson(res, 200, await windowsSavePathDialog(body));
       } catch (error) {
         return sendJson(res, 400, { error: error.message });
       }
