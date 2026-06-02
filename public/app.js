@@ -5847,9 +5847,15 @@ function renderDeliverables() {
       || localWithoutSummary;
   }
   renderDeliverablesExecStatus();
+  // Show only artifacts belonging to the subtask selected in this panel
+  // (deliverablesForm.subtaskId). Other subtasks' deliverables stay out of the
+  // list so the user is not confused by, e.g., a previous phase's checklist.
+  // Fallback to all items only when no subtask is selected (no resolved subtasks).
+  const selectedSubtaskId = deliverablesForm.subtaskId || "";
+  const visibleItems = selectedSubtaskId ? items.filter((d) => d.subtaskId === selectedSubtaskId) : items;
   const badge = $("deliverablesCount");
-  if (badge) badge.textContent = items.length ? t("ui.deliverableBadge", { n: items.length }) : "";
-  if (!items.length) {
+  if (badge) badge.textContent = visibleItems.length ? t("ui.deliverableBadge", { n: visibleItems.length }) : "";
+  if (!visibleItems.length) {
     list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.deliverablesEmpty"))}</div>`;
     return;
   }
@@ -5859,7 +5865,7 @@ function renderDeliverables() {
     ? readyDeliverableForCoach(allSubtasks, items)
     : null;
   const coachFocusId = coachReady?.id || "";
-  list.innerHTML = items.map((d) => {
+  list.innerHTML = visibleItems.map((d) => {
     const coachFocus = Boolean(coachFocusId && d.id === coachFocusId);
     return `<div class="doc-row deliverable-row${deliverableFlashIds.has(d.id) ? " doc-row-flash" : ""}${d.stale ? " stale" : ""}${coachFocus ? " coach-focus" : ""}" data-id="${escapeHtml(d.id)}">
       <div class="doc-main">
