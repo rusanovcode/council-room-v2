@@ -5869,7 +5869,7 @@ function renderDeliverables() {
       </div>
       <div class="doc-actions">
         <button class="del-copy" type="button" data-tooltip-key="t.deliverableCopy" data-tooltip-text="${escapeHtml(t("tip.deliverableCopy"))}">${escapeHtml(t("ui.copy"))}</button>
-        ${d.status === "ready" ? `<button class="del-apply" type="button" data-tooltip-key="t.apply" data-tooltip-text="${escapeHtml(t("tip.apply"))}">${escapeHtml(t("ui.apply"))}</button>` : ""}
+        ${["ready", "delivered"].includes(d.status) ? `<button class="del-apply" type="button" data-tooltip-key="t.apply" data-tooltip-text="${escapeHtml(t("tip.apply"))}">${escapeHtml(t("ui.apply"))}</button>` : ""}
         <button class="del-packet${coachFocus ? " coach-focus-btn" : ""}" type="button" data-tooltip-key="t.deliverablePacket" data-tooltip-text="${escapeHtml(t("tip.deliverablePacket"))}">${escapeHtml(t("ui.packet"))}</button>
         <button class="del-write" type="button" data-tooltip-key="t.deliverableWrite" data-tooltip-text="${escapeHtml(t("tip.deliverableWrite"))}">${escapeHtml(t("ui.write"))}</button>
       </div>
