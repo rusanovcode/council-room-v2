@@ -469,6 +469,7 @@ const STRINGS = {
     "tip.agentModel2": "Модель выбранного бэкенда. По умолчанию — самая дешёвая (экономия токенов). Для CLI — из списка; для сетевого провайдера — точная строка модели.|||Codex: gpt-5.4-mini (дёшево) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
     "tip.agentEffort2": "Усилие рассуждения (только для подписочных CLI). По умолчанию low — дёшево и быстро. Выше — дороже и медленнее, но тщательнее. У сетевых провайдеров такой ручки нет.|||low — быстрый черновой проход; high/xhigh/max — для сложных спорных мест.",
     "ui.documents": "Документы",
+    "ui.docTokenHint": "💡 Расход токенов растёт с каждым вложением — документы идут в промт каждого агента каждый раунд. Лучше переносить ключевые факты из документов прямо в постановку подзадачи, а вложения держать минимальными.",
     "ui.docAddFile": "+ Файл",
     "ui.docAdd": "Добавить",
     "ui.docNamePlaceholder": "Имя (опц.)",
@@ -482,7 +483,7 @@ const STRINGS = {
     "ui.docCharsBadge": "{docs} док · {chars} симв.",
     "ui.docChars": "{n} симв.",
     "ui.docBudgetNote": "В промт идёт до ~{n} символов суммарно (дальше — усечение). Экономь токены.",
-    "tip.documents": "Приложенные текстовые документы этого чата — справочный материал, который кладётся в промт каждого раунда секцией ATTACHED DOCUMENTS. В отличие от сканирования файлов, это явно переданный тобой источник, поэтому разрешён даже в изолированном режиме. В промт идёт до ~12000 символов суммарно (дальше усечение) — следи за расходом.|||Прикладываешь спецификацию API или кусок лога → агенты ссылаются на него в дебате, не угадывая.",
+    "tip.documents": "Приложенные текстовые документы этого чата — справочный материал, который кладётся в промт каждого раунда секцией ATTACHED DOCUMENTS. В отличие от сканирования файлов, это явно переданный тобой источник, поэтому разрешён даже в изолированном режиме. В промт идёт до ~24000 символов суммарно (дальше усечение). Документы вшиваются в промт каждого агента каждый раунд — чем больше вложений, тем выше расход токенов. Рекомендация: переноси ключевые факты из документов прямо в постановку подзадачи, а вложения держи минимальными.|||Прикладываешь спецификацию API или кусок лога → агенты ссылаются на него в дебате, не угадывая.",
   },
   en: {
     "ui.newChat": "+ New chat",
@@ -949,6 +950,7 @@ const STRINGS = {
     "tip.agentModel2": "The chosen backend's model. Defaults to the cheapest (token economy). For CLI — from a list; for a network provider — the exact model string.|||Codex: gpt-5.4-mini (cheap) … gpt-5.5. Claude: haiku … opus. DeepSeek: deepseek-chat.",
     "tip.agentEffort2": "Reasoning effort (subscription CLI only). Defaults to low — cheap and fast. Higher = pricier and slower but more thorough. Network providers have no such knob.|||low — a quick draft pass; high/xhigh/max — for hard contested points.",
     "ui.documents": "Documents",
+    "ui.docTokenHint": "💡 Token spend grows with every attachment — documents go into every agent's prompt each round. Prefer moving the key facts from the documents into the subtask statement itself and keep attachments minimal.",
     "ui.docAddFile": "+ File",
     "ui.docAdd": "Add",
     "ui.docNamePlaceholder": "Name (opt.)",
@@ -962,7 +964,7 @@ const STRINGS = {
     "ui.docCharsBadge": "{docs} doc · {chars} chars",
     "ui.docChars": "{n} chars",
     "ui.docBudgetNote": "Up to ~{n} chars total go into the prompt (truncated beyond that). Mind the tokens.",
-    "tip.documents": "Text documents attached to this chat — reference material injected into every round's prompt as an ATTACHED DOCUMENTS section. Unlike filesystem scanning, this is a source you explicitly provided, so it's allowed even in isolated mode. Up to ~12000 chars total go into the prompt (truncated beyond) — watch the spend.|||Attach an API spec or a log snippet → agents cite it in the debate instead of guessing.",
+    "tip.documents": "Text documents attached to this chat — reference material injected into every round's prompt as an ATTACHED DOCUMENTS section. Unlike filesystem scanning, this is a source you explicitly provided, so it's allowed even in isolated mode. Up to ~24000 chars total go into the prompt (truncated beyond). Documents are injected into every agent's prompt every round — more attachments means higher token spend. Recommendation: move the essential facts from the documents into the subtask statement itself and keep attachments minimal.|||Attach an API spec or a log snippet → agents cite it in the debate instead of guessing.",
   },
 };
 
@@ -2467,6 +2469,17 @@ function focusAgentEditorPanel() {
     return;
   }
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function collapseRightColumnPanels() {
+  const rightCol = document.querySelector(".col.right");
+  if (!rightCol) return;
+  for (const child of rightCol.children) {
+    if (child instanceof HTMLDetailsElement && child.classList.contains("providers-panel")) {
+      child.open = false;
+    }
+  }
+  rightCol.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function isIsoDateOnly(value) {
@@ -6039,6 +6052,7 @@ function bindUi() {
   });
 
   $("runRound").addEventListener("click", async () => {
+    collapseRightColumnPanels();
     const guidance = $("guidance").value.trim();
     $("guidance").value = "";
     await api("POST", "/api/round", { guidance });
@@ -6058,6 +6072,7 @@ function bindUi() {
     if (currentState.autopilot?.running) {
       await api("POST", "/api/autopilot/stop", {});
     } else {
+      collapseRightColumnPanels();
       const autoResolve = $("autoResolve").checked;
       const guidance = $("guidance").value.trim();
       $("guidance").value = "";

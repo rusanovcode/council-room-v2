@@ -206,8 +206,119 @@
           </div>
         </section>
 
-        <!-- Phase 5: configurable provider profiles + debate roles. Pinned to the
-             top of the right column so it stays reachable while the column scrolls. -->
+        <details id="deliverablesPanel" class="providers-panel">
+          <summary>
+            <span data-i18n="ui.deliverables">Deliverables</span>
+            <span class="help" data-tooltip-key="t.deliverables">?</span>
+            <span id="deliverablesCount" class="mode-badge"></span>
+          </summary>
+          <div class="providers-body">
+            <div id="deliverablesList"></div>
+            <div id="deliverablesExecForm" class="deliverables-form">
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.execSubtaskLabel">Resolved subtask</span>
+                  <select id="execSubtask"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.execTemplateLabel">Template</span>
+                  <select id="execTemplate"></select>
+                </label>
+              </div>
+              <label class="deliverables-field">
+                <span data-i18n="ui.execAuthorLabel">Author</span>
+                <select id="execAuthor"></select>
+              </label>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentModel">Model</span>
+                  <select id="execAuthorModel"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentEffort">Effort</span>
+                  <select id="execAuthorEffort"></select>
+                </label>
+              </div>
+              <label class="deliverables-field">
+                <span data-i18n="ui.execReviewerLabel">Reviewer</span>
+                <select id="execReviewer"></select>
+              </label>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentModel">Model</span>
+                  <select id="execReviewerModel"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentEffort">Effort</span>
+                  <select id="execReviewerEffort"></select>
+                </label>
+              </div>
+              <button id="execAutopilot" class="ghost small" type="button" data-i18n="ui.execAutopilot">Execution autopilot</button>
+            </div>
+            <div id="deliverablesDocForm" class="deliverables-form">
+              <div class="deliverables-form-head">
+                <span data-i18n="ui.docFormTitle">Doc: one author, no review loop</span>
+                <span class="help" data-tooltip-key="t.docForm">?</span>
+              </div>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.docTemplateLabel">Doc template</span>
+                  <select id="docTemplate"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.docAuthorLabel">Doc author</span>
+                  <select id="docAuthor"></select>
+                </label>
+              </div>
+              <div class="deliverables-pair-row">
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentModel">Model</span>
+                  <select id="docAuthorModel"></select>
+                </label>
+                <label class="deliverables-field">
+                  <span data-i18n="ui.agentEffort">Effort</span>
+                  <select id="docAuthorEffort"></select>
+                </label>
+              </div>
+              <button id="generateDoc" class="ghost small" type="button" data-i18n="ui.generateDoc">Doc</button>
+            </div>
+            <span id="deliverablesMsg" class="providers-msg"></span>
+          </div>
+        </details>
+
+        <!-- Phase 6b: per-chat attached reference documents (fed into the prompt). -->
+        <details id="documentsPanel" class="providers-panel">
+          <summary>
+            <span data-i18n="ui.documents">Документы</span>
+            <span class="help" data-tooltip-key="t.documents">?</span>
+            <span id="docsCount" class="mode-badge"></span>
+          </summary>
+          <div class="providers-body">
+            <div class="doc-hint muted small" data-i18n="ui.docTokenHint">💡 Расход токенов растёт с каждым вложением — документы идут в промт каждого агента каждый раунд. Лучше переносить ключевые факты из документов прямо в постановку подзадачи, а вложения держать минимальными.</div>
+            <div id="documentsList"></div>
+            <div class="doc-add">
+              <input id="docFile" type="file" accept=".txt,.md,.markdown,.json,.csv,.log,.js,.ts,.jsx,.tsx,.py,.html,.css,.yml,.yaml,.xml,.ini,.cfg,.sh,.sql" hidden />
+              <div class="doc-add-row">
+                <button id="docFileBtn" class="ghost small" type="button" data-i18n="ui.docAddFile">+ Файл</button>
+                <input id="docName" type="text" data-i18n-placeholder="ui.docNamePlaceholder" placeholder="Имя (опц.)" />
+              </div>
+              <textarea id="docText" rows="2" data-i18n-placeholder="ui.docPastePlaceholder" placeholder="…или вставь текст документа"></textarea>
+              <input id="docLocalPath" class="doc-local-path" type="text" data-i18n-placeholder="ui.docPathPlaceholder" placeholder="Локальный путь к файлу (опц.)" />
+              <div class="doc-add-actions">
+                <button id="docAdd" class="primary small" type="button" data-i18n="ui.docAdd">Добавить</button>
+                <span id="docMsg" class="providers-msg"></span>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <header class="col-head kb-head">
+          <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
+          <span id="kbUpdated" class="muted small"></span>
+          <span class="help" data-tooltip-key="t.knowledgeBase">?</span>
+        </header>
+        <div id="kbSections" class="kb-sections"></div>
+        <!-- Phase 5: configurable provider profiles + debate roles. -->
         <details id="providersDetails" class="providers-panel">
           <summary>
             <span data-i18n="ui.providersPanel">Регистрация агентов</span>
@@ -330,117 +441,6 @@
           </div><!-- /.providers-body -->
         </details>
 
-        <details id="deliverablesPanel" class="providers-panel">
-          <summary>
-            <span data-i18n="ui.deliverables">Deliverables</span>
-            <span class="help" data-tooltip-key="t.deliverables">?</span>
-            <span id="deliverablesCount" class="mode-badge"></span>
-          </summary>
-          <div class="providers-body">
-            <div id="deliverablesList"></div>
-            <div id="deliverablesExecForm" class="deliverables-form">
-              <div class="deliverables-pair-row">
-                <label class="deliverables-field">
-                  <span data-i18n="ui.execSubtaskLabel">Resolved subtask</span>
-                  <select id="execSubtask"></select>
-                </label>
-                <label class="deliverables-field">
-                  <span data-i18n="ui.execTemplateLabel">Template</span>
-                  <select id="execTemplate"></select>
-                </label>
-              </div>
-              <label class="deliverables-field">
-                <span data-i18n="ui.execAuthorLabel">Author</span>
-                <select id="execAuthor"></select>
-              </label>
-              <div class="deliverables-pair-row">
-                <label class="deliverables-field">
-                  <span data-i18n="ui.agentModel">Model</span>
-                  <select id="execAuthorModel"></select>
-                </label>
-                <label class="deliverables-field">
-                  <span data-i18n="ui.agentEffort">Effort</span>
-                  <select id="execAuthorEffort"></select>
-                </label>
-              </div>
-              <label class="deliverables-field">
-                <span data-i18n="ui.execReviewerLabel">Reviewer</span>
-                <select id="execReviewer"></select>
-              </label>
-              <div class="deliverables-pair-row">
-                <label class="deliverables-field">
-                  <span data-i18n="ui.agentModel">Model</span>
-                  <select id="execReviewerModel"></select>
-                </label>
-                <label class="deliverables-field">
-                  <span data-i18n="ui.agentEffort">Effort</span>
-                  <select id="execReviewerEffort"></select>
-                </label>
-              </div>
-              <button id="execAutopilot" class="ghost small" type="button" data-i18n="ui.execAutopilot">Execution autopilot</button>
-            </div>
-            <div id="deliverablesDocForm" class="deliverables-form">
-              <div class="deliverables-form-head">
-                <span data-i18n="ui.docFormTitle">Doc: one author, no review loop</span>
-                <span class="help" data-tooltip-key="t.docForm">?</span>
-              </div>
-              <div class="deliverables-pair-row">
-                <label class="deliverables-field">
-                  <span data-i18n="ui.docTemplateLabel">Doc template</span>
-                  <select id="docTemplate"></select>
-                </label>
-                <label class="deliverables-field">
-                  <span data-i18n="ui.docAuthorLabel">Doc author</span>
-                  <select id="docAuthor"></select>
-                </label>
-              </div>
-              <div class="deliverables-pair-row">
-                <label class="deliverables-field">
-                  <span data-i18n="ui.agentModel">Model</span>
-                  <select id="docAuthorModel"></select>
-                </label>
-                <label class="deliverables-field">
-                  <span data-i18n="ui.agentEffort">Effort</span>
-                  <select id="docAuthorEffort"></select>
-                </label>
-              </div>
-              <button id="generateDoc" class="ghost small" type="button" data-i18n="ui.generateDoc">Doc</button>
-            </div>
-            <span id="deliverablesMsg" class="providers-msg"></span>
-          </div>
-        </details>
-
-        <!-- Phase 6b: per-chat attached reference documents (fed into the prompt). -->
-        <details id="documentsPanel" class="providers-panel">
-          <summary>
-            <span data-i18n="ui.documents">Документы</span>
-            <span class="help" data-tooltip-key="t.documents">?</span>
-            <span id="docsCount" class="mode-badge"></span>
-          </summary>
-          <div class="providers-body">
-            <div id="documentsList"></div>
-            <div class="doc-add">
-              <input id="docFile" type="file" accept=".txt,.md,.markdown,.json,.csv,.log,.js,.ts,.jsx,.tsx,.py,.html,.css,.yml,.yaml,.xml,.ini,.cfg,.sh,.sql" hidden />
-              <div class="doc-add-row">
-                <button id="docFileBtn" class="ghost small" type="button" data-i18n="ui.docAddFile">+ Файл</button>
-                <input id="docName" type="text" data-i18n-placeholder="ui.docNamePlaceholder" placeholder="Имя (опц.)" />
-              </div>
-              <textarea id="docText" rows="2" data-i18n-placeholder="ui.docPastePlaceholder" placeholder="…или вставь текст документа"></textarea>
-              <input id="docLocalPath" class="doc-local-path" type="text" data-i18n-placeholder="ui.docPathPlaceholder" placeholder="Локальный путь к файлу (опц.)" />
-              <div class="doc-add-actions">
-                <button id="docAdd" class="primary small" type="button" data-i18n="ui.docAdd">Добавить</button>
-                <span id="docMsg" class="providers-msg"></span>
-              </div>
-            </div>
-          </div>
-        </details>
-
-        <header class="col-head kb-head">
-          <h2><span data-i18n="ui.knowledgeBase">База знаний</span></h2>
-          <span id="kbUpdated" class="muted small"></span>
-          <span class="help" data-tooltip-key="t.knowledgeBase">?</span>
-        </header>
-        <div id="kbSections" class="kb-sections"></div>
       </aside>
     </main>
 
