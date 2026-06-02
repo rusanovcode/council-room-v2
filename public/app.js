@@ -482,6 +482,14 @@ const STRINGS = {
     "ui.docAdded": "Документ добавлен ✓",
     "ui.docCharsBadge": "{docs} док · {chars} симв.",
     "ui.docChars": "{n} симв.",
+    "ui.docSharedLabel": "Общий для всего чата (во все подзадачи)",
+    "ui.docGroupShared": "Общие (во все подзадачи)",
+    "ui.docGroupSubtask": "Этой подзадачи",
+    "ui.docGroupLibrary": "Библиотека",
+    "ui.docLibraryHint": "не идут в промт",
+    "ui.docToShared": "Сделать общим (во все подзадачи)",
+    "ui.docToSubtask": "Привязать к активной подзадаче",
+    "ui.docToLibrary": "В библиотеку (убрать из промта)",
     "ui.docBudgetNote": "В промт идёт до ~{n} символов суммарно (дальше — усечение). Экономь токены.",
     "tip.documents": "Приложенные текстовые документы этого чата — справочный материал, который кладётся в промт каждого раунда секцией ATTACHED DOCUMENTS. В отличие от сканирования файлов, это явно переданный тобой источник, поэтому разрешён даже в изолированном режиме. В промт идёт до ~24000 символов суммарно (дальше усечение). Документы вшиваются в промт каждого агента каждый раунд — чем больше вложений, тем выше расход токенов. Рекомендация: переноси ключевые факты из документов прямо в постановку подзадачи, а вложения держи минимальными.|||Прикладываешь спецификацию API или кусок лога → агенты ссылаются на него в дебате, не угадывая.",
   },
@@ -963,6 +971,14 @@ const STRINGS = {
     "ui.docAdded": "Document added ✓",
     "ui.docCharsBadge": "{docs} doc · {chars} chars",
     "ui.docChars": "{n} chars",
+    "ui.docSharedLabel": "Shared across the chat (all subtasks)",
+    "ui.docGroupShared": "Shared (all subtasks)",
+    "ui.docGroupSubtask": "This subtask",
+    "ui.docGroupLibrary": "Library",
+    "ui.docLibraryHint": "not injected into the prompt",
+    "ui.docToShared": "Make shared (all subtasks)",
+    "ui.docToSubtask": "Attach to the active subtask",
+    "ui.docToLibrary": "Move to library (remove from prompt)",
     "ui.docBudgetNote": "Up to ~{n} chars total go into the prompt (truncated beyond that). Mind the tokens.",
     "tip.documents": "Text documents attached to this chat — reference material injected into every round's prompt as an ATTACHED DOCUMENTS section. Unlike filesystem scanning, this is a source you explicitly provided, so it's allowed even in isolated mode. Up to ~24000 chars total go into the prompt (truncated beyond). Documents are injected into every agent's prompt every round — more attachments means higher token spend. Recommendation: move the essential facts from the documents into the subtask statement itself and keep attachments minimal.|||Attach an API spec or a log snippet → agents cite it in the debate instead of guessing.",
   },
@@ -4650,18 +4666,31 @@ function renderDocuments() {
   const list = $("documentsList");
   if (!list) return;
   const docs = (currentState.run && currentState.run.documents) || [];
-  const total = docs.reduce((s, d) => s + (d.chars || 0), 0);
+  const activeId = currentState.run?.activeSubtask?.id || "";
+  const shared = docs.filter((d) => d.scope === "shared");
+  const mine = docs.filter((d) => d.scope === "subtask" && d.subtaskId === activeId);
+  const library = docs.filter((d) => d.scope === "library" || (d.scope === "subtask" && d.subtaskId !== activeId));
+  const inPrompt = shared.concat(mine);
+  const promptTotal = inPrompt.reduce((s, d) => s + (d.chars || 0), 0);
   const badge = $("docsCount");
-  if (badge) badge.textContent = docs.length ? t("ui.docCharsBadge", { docs: docs.length, chars: total }) : "";
+  if (badge) badge.textContent = inPrompt.length ? t("ui.docCharsBadge", { docs: inPrompt.length, chars: promptTotal }) : "";
   if (!docs.length) {
     list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.docEmpty"))}</div>`;
     return;
   }
-  list.innerHTML = docs.map((d) => `<div class="doc-row${docFlashIds.has(d.id) ? " doc-row-flash" : ""}${docRemoveFlashIds.has(d.id) ? " doc-row-remove-flash" : ""}" data-id="${escapeHtml(d.id)}">
+  const scopeBtn = (scope, label) => `<button class="doc-scope" type="button" data-scope="${scope}" title="${escapeHtml(label)}">${scope === "shared" ? "⇪" : scope === "subtask" ? "＋" : "⊘"}</button>`;
+  const row = (d, btns) => `<div class="doc-row${docFlashIds.has(d.id) ? " doc-row-flash" : ""}${docRemoveFlashIds.has(d.id) ? " doc-row-remove-flash" : ""}" data-id="${escapeHtml(d.id)}">
     <span class="doc-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</span>
     <span class="doc-chars">${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
+    ${btns || ""}
     <button class="doc-remove" type="button" title="${escapeHtml(t("ui.docRemove"))}"${docRemoveFlashIds.has(d.id) ? " disabled" : ""}>×</button>
-  </div>`).join("");
+  </div>`;
+  const head = (label, hint) => `<div class="doc-group-head">${escapeHtml(label)}${hint ? ` <span class="muted small">${escapeHtml(hint)}</span>` : ""}</div>`;
+  const out = [];
+  if (shared.length) out.push(head(t("ui.docGroupShared")) + shared.map((d) => row(d, scopeBtn("library", t("ui.docToLibrary")))).join(""));
+  if (activeId && mine.length) out.push(head(t("ui.docGroupSubtask")) + mine.map((d) => row(d, scopeBtn("shared", t("ui.docToShared")))).join(""));
+  if (library.length) out.push(head(t("ui.docGroupLibrary"), t("ui.docLibraryHint")) + library.map((d) => row(d, (activeId ? scopeBtn("subtask", t("ui.docToSubtask")) : "") + scopeBtn("shared", t("ui.docToShared")))).join(""));
+  list.innerHTML = out.join("");
 }
 
 function flashNewDocumentFromState(beforeIds, nextState) {
@@ -6210,6 +6239,7 @@ function bindUi() {
     try {
       const endpoint = localPath ? "/api/documents/add-path" : "/api/documents/add";
       const payload = localPath ? { name: $("docName").value.trim(), path: localPath } : { name, text };
+      if ($("docShared")?.checked) payload.scope = "shared";
       const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!r.ok) { const j = await r.json().catch(() => ({})); showDocMsg(j.error || `error ${r.status}`, true); return; }
       const nextState = await r.json().catch(() => null);
@@ -6219,10 +6249,17 @@ function bindUi() {
         renderDocuments();
       }
       $("docText").value = ""; $("docName").value = ""; $("docLocalPath").value = "";
+      if ($("docShared")) $("docShared").checked = false;
       showDocMsg(t("ui.docAdded"), false);
     } catch (e) { showDocMsg(e.message, true); }
   });
   $("documentsList")?.addEventListener("click", (event) => {
+    const sc = event.target.closest(".doc-scope");
+    if (sc) {
+      const id = sc.closest(".doc-row")?.dataset.id;
+      if (id) api("POST", "/api/documents/scope", { id, scope: sc.dataset.scope });
+      return;
+    }
     const rm = event.target.closest(".doc-remove");
     if (!rm) return;
     const id = rm.closest(".doc-row")?.dataset.id;

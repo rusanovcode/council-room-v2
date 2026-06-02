@@ -2051,6 +2051,21 @@ button.square {
   border: 1px solid var(--border); border-radius: 6px;
   background: var(--panel-2); line-height: 1.35;
 }
+.doc-group-head {
+  margin: 6px 0 2px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+}
+.doc-group-head:first-child { margin-top: 0; }
+.doc-scope {
+  flex: 0 0 auto; border: 1px solid var(--border); background: var(--panel-2);
+  color: var(--muted); border-radius: 4px; cursor: pointer; line-height: 1;
+  padding: 1px 5px; font-size: 12px;
+}
+.doc-scope:hover { color: var(--text); border-color: var(--accent); }
+.doc-shared-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted); margin-top: 4px;
+}
 .doc-row {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px;

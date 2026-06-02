@@ -464,7 +464,7 @@ async function runRound({ guidance = "" } = {}) {
     const domain = domains.getProfile(activeDomainId);
     ensureQuestionsMigrated(dir, active.id);
     const kbSnapshot = knowledge.snapshotForPrompt(dir, domain.sections, { subtaskId: active.id });
-    const documentsSnapshot = documents.snapshotForPrompt(dir);
+    const documentsSnapshot = documents.snapshotForPrompt(dir, active.id);
     const language = state.run.settings.language || "ru";
 
     // Resolve the debate participants (2..5). Legacy / Phase-5 two-slot settings
@@ -872,7 +872,7 @@ function deliverableContext(dir, subtask, participants, customPrompt = "", extra
     kb,
     kbDigest: deliverables.kbDigest(kb),
     kbSnapshot: knowledge.snapshotForPrompt(dir, domain.sections, { subtaskId: subtask.id }),
-    documentsSnapshot: documents.snapshotForPrompt(dir),
+    documentsSnapshot: documents.snapshotForPrompt(dir, subtask.id),
     recentTurns: recentTurnsForSubtask(state.run.id, subtask.id, Math.max(4, participants.length * 2)),
     language: state.run.settings.language || "ru",
     customPrompt,
@@ -953,7 +953,7 @@ function storeDeliverable({ dir, tpl, subtask, text, author, reviewer, status = 
     status,
     text,
   });
-  const doc = documents.add(dir, item.name, text);
+  const doc = documents.add(dir, item.name, text, { scope: "subtask", subtaskId: subtask.id });
   addMessage({
     role: author ? "agent" : "system",
     name: author ? `${author.label} · deliverable` : "Council Room",
@@ -1056,7 +1056,7 @@ function createHandoffPacket(body = {}) {
   const dir = runDir(state.run.id);
   const packet = deliverables.makePacket(dir, body.id, body.targetPath, deliveryRoots());
   const text = deliverables.readContent(dir, packet.id);
-  documents.add(dir, packet.name, text);
+  documents.add(dir, packet.name, text, { scope: packet.subtaskId ? "subtask" : "shared", subtaskId: packet.subtaskId });
   addMessage({
     role: "system",
     name: "Council Room",
@@ -1849,7 +1849,10 @@ async function router(req, res) {
       if (!state.run) return sendJson(res, 400, { error: "No active run" });
       const body = await readBody(req);
       if (!body.text || !String(body.text).trim()) return sendJson(res, 400, { error: "Empty document" });
-      documents.add(runDir(state.run.id), body.name, body.text);
+      const dir = runDir(state.run.id);
+      const active = subtasks.activeSubtask(dir);
+      const scope = body.scope === "shared" ? "shared" : undefined;
+      documents.add(dir, body.name, body.text, { scope, subtaskId: active && active.id });
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -1863,7 +1866,26 @@ async function router(req, res) {
       } catch (e) {
         return sendJson(res, 400, { error: e.message });
       }
-      documents.add(runDir(state.run.id), body.name || item.name, item.text);
+      const dir = runDir(state.run.id);
+      const active = subtasks.activeSubtask(dir);
+      const scope = body.scope === "shared" ? "shared" : undefined;
+      documents.add(dir, body.name || item.name, item.text, { scope, subtaskId: active && active.id });
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    // Re-scope a document: shared (chat-wide) / subtask (active) / library (not in prompt).
+    if (method === "POST" && pathname === "/api/documents/scope") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      const dir = runDir(state.run.id);
+      let subtaskId = "";
+      if (body.scope === "subtask") {
+        subtaskId = body.subtaskId || (subtasks.activeSubtask(dir) || {}).id || "";
+        if (!subtaskId) return sendJson(res, 400, { error: "No active subtask to scope to" });
+      }
+      const ok = documents.setScope(dir, body.id, body.scope, subtaskId);
+      if (!ok) return sendJson(res, 400, { error: "Document not found or invalid scope" });
       broadcast();
       return sendJson(res, 200, publicState());
     }
