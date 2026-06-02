@@ -473,7 +473,10 @@ const STRINGS = {
     "ui.docAdd": "Добавить",
     "ui.docNamePlaceholder": "Имя (опц.)",
     "ui.docPastePlaceholder": "…или вставь текст документа",
+    "ui.docPathPlaceholder": "Локальный путь к файлу (опц.)",
     "ui.docEmpty": "Документов нет. Приложи текстовый файл или вставь текст — он попадёт в контекст агентов на раунде.",
+    "ui.docDropHint": "Перетащи текстовый файл сюда или вставь текст",
+    "ui.docPathNeedsFile": "Укажи путь к локальному текстовому файлу",
     "ui.docRemove": "Удалить документ",
     "ui.docAdded": "Документ добавлен ✓",
     "ui.docCharsBadge": "{docs} док · {chars} симв.",
@@ -950,7 +953,10 @@ const STRINGS = {
     "ui.docAdd": "Add",
     "ui.docNamePlaceholder": "Name (opt.)",
     "ui.docPastePlaceholder": "…or paste document text",
+    "ui.docPathPlaceholder": "Local file path (optional)",
     "ui.docEmpty": "No documents. Attach a text file or paste text — it goes into the agents' context for the round.",
+    "ui.docDropHint": "Drop a text file here or paste text",
+    "ui.docPathNeedsFile": "Enter a local text file path",
     "ui.docRemove": "Remove document",
     "ui.docAdded": "Document added ✓",
     "ui.docCharsBadge": "{docs} doc · {chars} chars",
@@ -2420,12 +2426,59 @@ function statsHourlyLimitFill(utilization) {
   return { remaining, style: ` style="--limit-fill:${remaining}%;--limit-color:${color}"` };
 }
 
+function statsAccountKeyForBackend(backend) {
+  const provider = backend?.provider || "";
+  const tool = provider === "cli-codex" ? "codex" : provider === "cli-claude" ? "claude" : "";
+  if (!tool) return "";
+  const account = backend.account === "acc2" || Number(backend.account) === 2 ? "acc2" : "acc1";
+  return `${tool}:${account}`;
+}
+
+function selectedStatsAccountKeys() {
+  const list = Array.isArray(participantsDraft) && participantsDraft.length
+    ? participantsDraft
+    : (currentState?.settings?.participants || []);
+  const selected = list.find((p) => p.key === selectedAgentKey);
+  const key = statsAccountKeyForBackend(selected?.backend);
+  return key ? new Set([key]) : new Set();
+}
+
+function refreshStatsLimitSelection() {
+  if (panelOpen.switcherStats && statsTab === "limits") renderStatsPanel();
+}
+
+function focusAgentEditorPanel() {
+  const panel = $("agentEditorPanel");
+  const rightCol = document.querySelector(".col.right");
+  if (!panel) return;
+  panel.open = true;
+  panel.classList.remove("agent-editor-flash");
+  void panel.offsetWidth;
+  panel.classList.add("agent-editor-flash");
+  clearTimeout(focusAgentEditorPanel._flashTimer);
+  focusAgentEditorPanel._flashTimer = setTimeout(() => panel.classList.remove("agent-editor-flash"), 4000);
+  if (rightCol) {
+    for (const child of rightCol.children) {
+      if (child instanceof HTMLDetailsElement && child.classList.contains("providers-panel")) {
+        child.open = child === panel;
+      }
+    }
+    rightCol.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function isIsoDateOnly(value) {
   const s = String(value || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(`${s}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return false;
-  return d.toISOString().slice(0, 10) === s;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  const utc = new Date(Date.UTC(y, mo - 1, d));
+  return utc.getUTCFullYear() === y && utc.getUTCMonth() === mo - 1 && utc.getUTCDate() === d;
 }
 
 function formatIsoDateToDisplay(value) {
@@ -2452,8 +2505,9 @@ function displayDateToIso(value) {
 
 function addDaysToIsoDate(value, days) {
   if (!isIsoDateOnly(value)) return "";
-  const d = new Date(`${value}T00:00:00`);
-  d.setDate(d.getDate() + Number(days || 0));
+  const [y, m, day] = value.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, day));
+  d.setUTCDate(d.getUTCDate() + Number(days || 0));
   return d.toISOString().slice(0, 10);
 }
 
@@ -2567,14 +2621,16 @@ function renderStatsPanel() {
   }
   const accData = (a) => statsData?.[a.tool]?.[a.id];
   const noDataNote = (a) => a.tool === "codex" ? escapeHtml(t("ui.codexNoData")) : escapeHtml(t("ui.noData"));
+  const selectedAccs = selectedStatsAccountKeys();
+  const accClass = (a, extra = "") => `stats-acc${extra}${selectedAccs.has(`${a.tool}:${a.id}`) ? " stats-acc-selected" : ""}`;
 
   if (statsTab === "limits") {
     body = accs.map((a) => {
       const w = accData(a)?.windows;
-      if (!w) return `<div class="stats-acc"><b>${escapeHtml(a.label)}</b> <span class="muted small">${noDataNote(a)}</span></div>`;
+      if (!w) return `<div class="${accClass(a)}"><b>${escapeHtml(a.label)}</b> <span class="muted small">${noDataNote(a)}</span></div>`;
       const fh = w.fiveHour, sd = w.sevenDay;
       const fill = statsHourlyLimitFill(fh?.utilization);
-      return `<div class="stats-acc stats-acc-limit"${fill.style}><b>${escapeHtml(a.label)}</b>
+      return `<div class="${accClass(a, " stats-acc-limit")}"${fill.style}><b>${escapeHtml(a.label)}</b>
         <div>${escapeHtml(t("ui.hourlyReset"))}: <b>${fh ? fmtCountdown(fh.resetsAt) : "—"}</b> ${fh ? `(${escapeHtml(t("ui.used"))} ${fh.utilization}%)` : ""}</div>
         <div>${escapeHtml(t("ui.weeklyReset"))}: <b>${sd ? fmtDateTime(sd.resetsAt) : "—"}</b> ${sd ? `(${escapeHtml(t("ui.used"))} ${sd.utilization}%)` : ""}</div>
         <div class="muted small">${escapeHtml(t("ui.windowStart"))}: ${fh ? fmtDateTime(fh.startsAt) : "—"}</div></div>`;
@@ -2995,7 +3051,7 @@ function renderSettings() {
       const newBtn = document.createElement("button");
       newBtn.type = "button";
       newBtn.id = "newProfileBtn";
-      newBtn.textContent = uiLang === "en" ? "+ New profile" : "+ Новый профиль";
+      newBtn.textContent = uiLang === "en" ? "+ New" : "+ Новый";
       newBtn.title = "Create a custom discussion profile (a system prompt that defines how the agents think)";
       newBtn.style.cssText = "font-size:12px;white-space:nowrap;cursor:pointer";
       newBtn.addEventListener("click", openProfileBuilder);
@@ -3012,7 +3068,7 @@ function renderSettings() {
     const lbl = $("discussionModeLabel");
     if (lbl) lbl.textContent = uiLang === "en" ? "Mode:" : "Режим:";
     const newBtn = $("newProfileBtn");
-    if (newBtn) newBtn.textContent = uiLang === "en" ? "+ New profile" : "+ Новый профиль";
+    if (newBtn) newBtn.textContent = uiLang === "en" ? "+ New" : "+ Новый";
     // Always sync option labels so language changes and newly added profiles both apply.
     const opts = currentState.domains || [];
     if (opts.length) {
@@ -4465,15 +4521,17 @@ function bindAgentEditor() {
     renderAgentChips();
     renderAgentEditor();
     renderNextStep();
+    refreshStatsLimitSelection();
   });
-  q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); });
+  q(".ag-model")?.addEventListener("change", (e) => { p.backend.model = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); refreshStatsLimitSelection(); });
   q(".ag-model")?.addEventListener("input", (e) => { p.backend.model = e.target.value; p._confirmed = false; });
-  q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); });
+  q(".ag-effort")?.addEventListener("change", (e) => { p.backend.effort = e.target.value; p._confirmed = false; renderAgentChips(); renderAgentEditor(); refreshStatsLimitSelection(); });
   q(".ag-apply")?.addEventListener("click", async () => {
     p._confirmed = true; // only confirm the agent currently open in the editor
     await applyParticipants();
     renderAgentChips();
     renderAgentEditor();
+    refreshStatsLimitSelection();
   });
   q(".ag-remove")?.addEventListener("click", () => removeAgent(key));
 }
@@ -4563,6 +4621,9 @@ async function applyParticipants() {
 }
 
 // ---- Phase 6b: attached documents ----------------------------------------
+const docFlashIds = new Set();
+const docRemoveFlashIds = new Set();
+
 function showDocMsg(text, isError) {
   const el = $("docMsg");
   if (!el) return;
@@ -4583,11 +4644,31 @@ function renderDocuments() {
     list.innerHTML = `<div class="muted small">${escapeHtml(t("ui.docEmpty"))}</div>`;
     return;
   }
-  list.innerHTML = docs.map((d) => `<div class="doc-row" data-id="${escapeHtml(d.id)}">
+  list.innerHTML = docs.map((d) => `<div class="doc-row${docFlashIds.has(d.id) ? " doc-row-flash" : ""}${docRemoveFlashIds.has(d.id) ? " doc-row-remove-flash" : ""}" data-id="${escapeHtml(d.id)}">
     <span class="doc-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</span>
     <span class="doc-chars">${escapeHtml(t("ui.docChars", { n: d.chars }))}</span>
-    <button class="doc-remove" type="button" title="${escapeHtml(t("ui.docRemove"))}">×</button>
+    <button class="doc-remove" type="button" title="${escapeHtml(t("ui.docRemove"))}"${docRemoveFlashIds.has(d.id) ? " disabled" : ""}>×</button>
   </div>`).join("");
+}
+
+function flashNewDocumentFromState(beforeIds, nextState) {
+  const docs = (nextState?.run && nextState.run.documents) || [];
+  const added = docs.find((d) => d && d.id && !beforeIds.has(d.id));
+  if (!added) return;
+  docFlashIds.add(added.id);
+  setTimeout(() => { docFlashIds.delete(added.id); renderDocuments(); }, 4000);
+}
+
+function loadDocFileIntoForm(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    $("docText").value = String(reader.result || "");
+    if (!$("docName").value.trim()) $("docName").value = file.name;
+    $("docLocalPath").value = "";
+  };
+  reader.onerror = () => showDocMsg(t("ui.docEmpty"), true);
+  reader.readAsText(file);
 }
 
 function showDeliverablesMsg(text, isError, { sticky = false, timeoutMs = 5000 } = {}) {
@@ -6083,30 +6164,46 @@ function bindUi() {
     selectedAgentKey = key;
     renderAgentChips();
     renderAgentEditor();
+    focusAgentEditorPanel();
+    refreshStatsLimitSelection();
   });
 
   // Phase 6b: attached documents (file upload read as text, or pasted).
   $("docFileBtn")?.addEventListener("click", () => $("docFile")?.click());
   $("docFile")?.addEventListener("change", (event) => {
     const f = event.target.files && event.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      $("docText").value = String(reader.result || "");
-      if (!$("docName").value.trim()) $("docName").value = f.name;
-    };
-    reader.onerror = () => showDocMsg(t("ui.docEmpty"), true);
-    reader.readAsText(f);
+    if (f) loadDocFileIntoForm(f);
     event.target.value = ""; // allow re-selecting the same file
+  });
+  $("docText")?.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    $("docText").classList.add("doc-drop-active");
+  });
+  $("docText")?.addEventListener("dragleave", () => $("docText").classList.remove("doc-drop-active"));
+  $("docText")?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    $("docText").classList.remove("doc-drop-active");
+    const f = event.dataTransfer?.files && event.dataTransfer.files[0];
+    if (f) loadDocFileIntoForm(f);
   });
   $("docAdd")?.addEventListener("click", async () => {
     const text = $("docText").value;
-    if (!text.trim()) { showDocMsg(t("ui.docEmpty"), true); return; }
+    const localPath = $("docLocalPath").value.trim();
     const name = $("docName").value.trim() || "document";
+    if (!text.trim() && !localPath) { showDocMsg(t("ui.docEmpty"), true); return; }
+    const beforeIds = new Set(((currentState?.run && currentState.run.documents) || []).map((d) => d.id));
     try {
-      const r = await fetch("/api/documents/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, text }) });
+      const endpoint = localPath ? "/api/documents/add-path" : "/api/documents/add";
+      const payload = localPath ? { name: $("docName").value.trim(), path: localPath } : { name, text };
+      const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!r.ok) { const j = await r.json().catch(() => ({})); showDocMsg(j.error || `error ${r.status}`, true); return; }
-      $("docText").value = ""; $("docName").value = "";
+      const nextState = await r.json().catch(() => null);
+      if (nextState) {
+        flashNewDocumentFromState(beforeIds, nextState);
+        currentState = nextState;
+        renderDocuments();
+      }
+      $("docText").value = ""; $("docName").value = ""; $("docLocalPath").value = "";
       showDocMsg(t("ui.docAdded"), false);
     } catch (e) { showDocMsg(e.message, true); }
   });
@@ -6114,7 +6211,13 @@ function bindUi() {
     const rm = event.target.closest(".doc-remove");
     if (!rm) return;
     const id = rm.closest(".doc-row")?.dataset.id;
-    if (id) api("POST", "/api/documents/remove", { id });
+    if (!id || docRemoveFlashIds.has(id)) return;
+    docRemoveFlashIds.add(id);
+    renderDocuments();
+    setTimeout(() => {
+      docRemoveFlashIds.delete(id);
+      api("POST", "/api/documents/remove", { id });
+    }, 4000);
   });
   $("deliverablesList")?.addEventListener("click", async (event) => {
     const row = event.target.closest(".deliverable-row");

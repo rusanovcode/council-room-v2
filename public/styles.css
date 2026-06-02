@@ -618,6 +618,9 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--mono); font-si
   position: relative;
   overflow: hidden;
 }
+.stats-acc.stats-acc-selected {
+  box-shadow: 0 0 0 2px var(--orange) inset;
+}
 .stats-acc > * { position: relative; z-index: 1; }
 .stats-acc-limit::before {
   content: "";
@@ -1188,8 +1191,13 @@ button.square {
   width: 560px;
   max-width: calc(100vw - 32px);
 }
+#openSubtaskModal .modal-box {
+  width: 760px;
+}
 .modal-box textarea#subtaskTitleInput {
-  min-height: 52px;
+  min-height: 180px;
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
   resize: vertical;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
@@ -1488,6 +1496,9 @@ button.square {
 }
 /* Settings reuses the collapsible providers-panel look but is NOT sticky. */
 .col.right > #settingsDetails { margin: 0 8px 8px; }
+#documentsPanel { margin-bottom: 6px; }
+.kb-head { margin-top: 6px; }
+.col.right > .kb-head { position: static; }
 .col.right .providers-body > label,
 .col.right .providers-body > .doc-add,
 .col.right .providers-body > .deliverables-form,
@@ -1507,6 +1518,25 @@ button.square {
 .providers-panel > summary::-webkit-details-marker { display: none; }
 .providers-panel > summary::before { content: "▸"; color: var(--muted); }
 .providers-panel[open] > summary::before { content: "▾"; }
+.agent-editor-panel.agent-editor-flash {
+  animation: agentEditorFlash 4s ease-out forwards;
+}
+@keyframes agentEditorFlash {
+  0%, 50% { box-shadow: 0 0 0 2px var(--orange); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+#discussionModeRow {
+  flex-wrap: wrap;
+}
+#discussionModeSelect {
+  flex: 1 1 150px !important;
+  min-width: 0 !important;
+  max-width: 100%;
+}
+#newProfileBtn {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
 .mode-badge {
   margin-left: auto;
   font-size: 10.5px;
@@ -2021,9 +2051,37 @@ button.square {
   padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px;
   min-width: 0;
 }
+.doc-row.doc-row-flash {
+  animation: docRowAddedFlash 4s ease-out forwards;
+}
+.doc-row.doc-row-remove-flash {
+  animation: docRowRemoveFlash 4s ease-out forwards;
+}
+@keyframes docRowAddedFlash {
+  0%, 50% { background: rgba(78, 195, 138, 0.28); }
+  100% { background: transparent; }
+}
+@keyframes docRowRemoveFlash {
+  0%, 50% { background: rgba(231, 92, 92, 0.30); }
+  100% { background: transparent; }
+}
 .doc-row:last-child { border-bottom: none; }
 .doc-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-chars { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.doc-add textarea#docText {
+  min-height: 46px;
+  border-style: dashed;
+}
+.doc-add textarea#docText.doc-drop-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+  background: rgba(91, 157, 255, 0.08);
+}
+.doc-local-path {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 11px;
+}
 .deliverable-row { flex-wrap: wrap; align-items: flex-start; row-gap: 4px; }
 .deliverable-row .doc-main {
   display: flex;

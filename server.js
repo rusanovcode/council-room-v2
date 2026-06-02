@@ -26,6 +26,13 @@ const usage = require("./lib/usage");
 const orquota = require("./lib/orquota");
 const { inferScopeMode } = require("./lib/scope-mode");
 
+const DOC_PATH_MAX_BYTES = 2 * 1024 * 1024;
+const DOC_PATH_EXTS = new Set([
+  ".txt", ".md", ".markdown", ".json", ".csv", ".log",
+  ".js", ".ts", ".jsx", ".tsx", ".py", ".html", ".css",
+  ".yml", ".yaml", ".xml", ".ini", ".cfg", ".sh", ".sql",
+]);
+
 // OpenRouter key pool: every OPENROUTER_API_KEY* env var that is set (a key = a
 // separate account = a separate free daily quota). Scales to any number of keys.
 function orRefIndex(ref) { return ref === "OPENROUTER_API_KEY" ? 1 : (Number(ref.split("_").pop()) || 0); }
@@ -759,6 +766,11 @@ function stopAutopilot(reason) {
   }
 }
 
+function previewSubtaskTitle(title, max = 160) {
+  const clean = String(title || "").replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
 // Local summary on auto-resolve — no extra agent call (token economy).
 function buildLocalSummary(dir, subtask) {
   const domain = domains.getProfile(state.run.settings?.discussionMode ?? state.settings.discussionMode ?? "code");
@@ -1359,6 +1371,21 @@ function readBody(req) {
   });
 }
 
+function readLocalDocumentPath(inputPath) {
+  let raw = String(inputPath || "").trim().replace(/^["']|["']$/g, "");
+  if (!raw) throw new Error("path required");
+  if (/^file:\/\//i.test(raw)) raw = url.fileURLToPath(raw);
+  if (!path.isAbsolute(raw)) throw new Error("use an absolute local file path");
+  const ext = path.extname(raw).toLowerCase();
+  if (!DOC_PATH_EXTS.has(ext)) throw new Error(`unsupported file type: ${ext || "(no extension)"}`);
+  const st = fs.statSync(raw);
+  if (!st.isFile()) throw new Error("path is not a file");
+  if (st.size > DOC_PATH_MAX_BYTES) throw new Error(`file is too large (${st.size} bytes, max ${DOC_PATH_MAX_BYTES})`);
+  const text = fs.readFileSync(raw, "utf8");
+  if (!text.trim()) throw new Error("Empty document");
+  return { name: path.basename(raw), text };
+}
+
 function serveStatic(req, res) {
   const parsed = url.parse(req.url);
   let pathname = parsed.pathname || "/";
@@ -1478,8 +1505,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-open",
-        text: `Subtask opened: ${subtask.title} (id ${subtask.id}, mode ${subtask.mode}).`,
-        textRu: `Открыта подзадача: ${subtask.title} (id ${subtask.id}, mode ${subtask.mode}).`,
+        text: `Subtask opened: ${previewSubtaskTitle(subtask.title)} (id ${subtask.id}, mode ${subtask.mode}, ${subtask.title.length} chars).`,
+        textRu: `Открыта подзадача: ${previewSubtaskTitle(subtask.title)} (id ${subtask.id}, mode ${subtask.mode}, ${subtask.title.length} знаков).`,
         subtaskId: subtask.id,
       });
       broadcast();
@@ -1532,8 +1559,8 @@ async function router(req, res) {
         role: "system",
         name: "Council Room",
         kind: "subtask-edit",
-        text: `Subtask ${edited.id} edited: title="${edited.title}", mode=${edited.mode}.`,
-        textRu: `Подзадача ${edited.id} отредактирована: title="${edited.title}", mode=${edited.mode}.`,
+        text: `Subtask ${edited.id} edited: title="${previewSubtaskTitle(edited.title)}", mode=${edited.mode}, ${edited.title.length} chars.`,
+        textRu: `Подзадача ${edited.id} отредактирована: title="${previewSubtaskTitle(edited.title)}", mode=${edited.mode}, ${edited.title.length} знаков.`,
         subtaskId: edited.id,
       });
       broadcast();
@@ -1823,6 +1850,20 @@ async function router(req, res) {
       const body = await readBody(req);
       if (!body.text || !String(body.text).trim()) return sendJson(res, 400, { error: "Empty document" });
       documents.add(runDir(state.run.id), body.name, body.text);
+      broadcast();
+      return sendJson(res, 200, publicState());
+    }
+
+    if (method === "POST" && pathname === "/api/documents/add-path") {
+      if (!state.run) return sendJson(res, 400, { error: "No active run" });
+      const body = await readBody(req);
+      let item;
+      try {
+        item = readLocalDocumentPath(body.path);
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
+      documents.add(runDir(state.run.id), body.name || item.name, item.text);
       broadcast();
       return sendJson(res, 200, publicState());
     }

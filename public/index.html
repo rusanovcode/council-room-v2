@@ -425,7 +425,8 @@
                 <button id="docFileBtn" class="ghost small" type="button" data-i18n="ui.docAddFile">+ Файл</button>
                 <input id="docName" type="text" data-i18n-placeholder="ui.docNamePlaceholder" placeholder="Имя (опц.)" />
               </div>
-              <textarea id="docText" rows="3" data-i18n-placeholder="ui.docPastePlaceholder" placeholder="…или вставь текст документа"></textarea>
+              <textarea id="docText" rows="2" data-i18n-placeholder="ui.docPastePlaceholder" placeholder="…или вставь текст документа"></textarea>
+              <input id="docLocalPath" class="doc-local-path" type="text" data-i18n-placeholder="ui.docPathPlaceholder" placeholder="Локальный путь к файлу (опц.)" />
               <div class="doc-add-actions">
                 <button id="docAdd" class="primary small" type="button" data-i18n="ui.docAdd">Добавить</button>
                 <span id="docMsg" class="providers-msg"></span>
@@ -468,7 +469,7 @@
         <label>
           <span data-i18n="ui.title">Постановка подзадачи</span>
           <span class="help" data-tooltip-key="t.subtaskTitle">?</span>
-          <textarea id="subtaskTitleInput" rows="2"></textarea>
+          <textarea id="subtaskTitleInput" rows="8"></textarea>
         </label>
         <label>
           <span data-i18n="ui.mode">Режим</span>
