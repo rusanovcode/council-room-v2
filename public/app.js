@@ -39,7 +39,6 @@ const STRINGS = {
     "ui.copy": "Копировать",
     "ui.apply": "Применить",
     "ui.packet": "Packet",
-    "ui.write": "Write",
     "ui.targetPathPrompt": "Путь для записи внутри рабочей папки:",
     "ui.applyTargetPathPrompt": "Абсолютный путь для Apply:",
     "ui.applyTargetTitle": "Применить документ",
@@ -53,7 +52,6 @@ const STRINGS = {
     "ui.confirmWriteNew": "Создать новый файл?\n\n{path}\n\nБудет записано ровно содержимое deliverable.",
     "ui.confirmOverwrite": "Файл уже существует. Разрешить overwrite?\n\n{path}\n\nБудет создан .bak backup. Diff preview:\n{diff}",
     "ui.applyExternalWarning": "ВНИМАНИЕ: запись будет выполнена ВНЕ папки приложения Council Room.",
-    "ui.writeDone": "Записано: {path}",
     "ui.applyDone": "Применено: {path}",
     "ui.applyOpenNextConfirm": "Apply завершён.\n\nОткрыть следующую подзадачу в этом чате?\nШаблон: {template}\nПуть: {path}",
     "ui.nextSubtaskPrompt": "Название следующей подзадачи:",
@@ -87,6 +85,15 @@ const STRINGS = {
     "ui.editSubtask": "Редактировать подзадачу",
     "ui.openSubtaskHint": "Подзадача становится активной. Предыдущая (если была открыта) переходит в ожидание (pending).",
     "ui.title": "Постановка подзадачи",
+    "ui.openPromptFile": "Открыть документ",
+    "ui.attachPromptFile": "Прикрепить документ",
+    "ui.addDocumentUrl": "Добавить ссылку",
+    "ui.documentUrlPlaceholder": "Прямая ссылка на документ",
+    "ui.promptFileOpened": "Текст открыт: {name} ({n} симв.)",
+    "ui.promptFileQueued": "Вложение готово: {name} ({n} симв.)",
+    "ui.promptFilesQueued": "Вложений к подзадаче: {n}",
+    "ui.documentUrlAdded": "Ссылка добавлена в постановку",
+    "ui.promptFileReadError": "Не удалось прочитать файл: {error}",
     "ui.mode": "Режим",
     "ui.scopeProposalSubtask": "Подзадача на предложение scope (предложить scope вместо block при пустом Files-in-Scope)",
     "ui.scopeModeNormal": "normal",
@@ -141,16 +148,19 @@ const STRINGS = {
     "tip.openSubtaskModal": "Подзадача становится активной — следующий «▶ Запустить раунд» будет уже по ней.\nПредыдущая активная (если была) переходит в ожидание (pending) — её можно вернуть кликом в списке.\nПока по подзадаче не было раундов, её название и режим можно редактировать (✎) или удалить (×).|||открыл подзадачу «выбрать stop-condition» по ошибке вместо «выбрать UI терминалов» — пока не запускал раунд, можешь нажать ✎ и переписать название.",
     "tip.subtaskScopeProposal": "Помечает подзадачу как proposal/scoping. В strict-scope и при пустом Files-in-Scope агенты не должны блокироваться — они должны предложить минимальный scope через KB-patch.|||Название не содержит слово scope, но эта подзадача именно на определение границ файлов — включи флаг.",
     "tip.subtaskTitle": "Одно короткое предложение — что именно дебатируем. Не общая тема, а конкретный вопрос с ожидаемым ответом.|||плохо: «autopilot». Лучше: «выбрать stop-condition для autopilot». Идеально: «stop-condition: stale×2 или token<25% — что приоритетнее?»",
+    "tip.openPromptFile": "Открывает текстовый файл и копирует его содержимое прямо в поле «Постановка подзадачи». Это не создаёт отдельного вложения: текст становится частью самой задачи, поэтому агенты увидят его как основной запрос.|||Если в поле уже есть текст, содержимое файла добавится ниже через пустую строку. Подходят .txt, .md, .json, .log и другие текстовые файлы.",
+    "tip.attachPromptFile": "Прикрепляет текстовый файл как документ чата для этой подзадачи. Текст НЕ вставляется в постановку; файл попадёт в секцию ATTACHED DOCUMENTS промта каждого раунда по этой подзадаче. Это полезно для справочных материалов, но увеличивает расход токенов в каждом раунде.|||Сначала выбери файл, затем нажми «Открыть» в модалке подзадачи. Вложение будет привязано именно к новой подзадаче после её создания.",
+    "tip.documentUrlField": "Поле для прямой ссылки на документ: Obsidian, GitHub, Google Docs, локальный file:// или любой другой URL. Council Room не скачивает документ по ссылке автоматически; ссылка будет вставлена в постановку, чтобы агенты видели адрес источника.",
+    "tip.addDocumentUrl": "Добавляет ссылку из поля в постановку подзадачи отдельной строкой. Используй это, когда документ доступен по URL и его не нужно копировать целиком в задачу.|||Для приватных документов убедись, что агент или оператор, который будет работать дальше, имеет доступ к этой ссылке.",
     "tip.knowledgeBase": "Единая база собранных правил по этому чату.\nАгенты добавляют пункты через строку KB-patch: в конце ответа. Можно править вручную.\nСнапшот KB шлётся в каждый промт вместо растущей истории.|||Codex в ответе пишет «KB-patch: prohibitions: не использовать PowerShell для codex CLI». Сервер парсит и кладёт в секцию Запреты. В следующем раунде эта строка уже в промте обоих.",
     "tip.resolve": "Закрыть активную подзадачу. Она исчезает из ленты, остаётся в стеке как закрытая (resolved).|||оба агента сообщили Статус: готова к закрытию (Status: resolve), KB пополнен 3 пунктами — жмёшь «Закрыть», вводишь короткое резюме («stop = stale×2 OR token<25%»).",
     "tip.freeze": "Заморозить подзадачу с причиной. Не закрыта, но временно не дебатируется.|||подзадача «выбор UI-библиотеки» — ждёт пока пользователь сравнит варианты. Причина: «жду решения пользователя по vanilla vs preact».",
     "tip.runRound": "Один синхронный раунд: Codex и Claude отвечают параллельно ПО АКТИВНОЙ подзадаче.\nРеализацию не запускает, файлы не меняет (read-only debate).|||жмёшь «▶ Запустить раунд». Через 30-90 секунд в ленте два новых сообщения: Codex и Claude, каждое заканчивается хвостом «New facts / risks / alternatives / Status / KB-patch».",
     "tip.generateDoc": "Doc-path: один агент, без review-петли. По шагам: 1) выбери resolved подзадачу; 2) в Doc-блоке выбери шаблон и автора; 3) нажми Doc. Текст попадёт в ленту и в документы чата, вне чата ничего не пишется. Для цикла черновик→review→правки используй автопилот выше.|||После консенсуса: выбери resolved подзадачу в панели Deliverables, в Doc-блоке поставь checklist и автора, затем нажми Doc.",
-    "tip.deliverables": "Панель превращает консенсус в deliverable. Автопилот: шаблон + author + reviewer из общего пула (label · account · model · effort), далее цикл draft→review до PASS/лимита. Doc: один автор без review. Готовые версии можно забрать через Copy / Apply / Packet / Write.|||Типовой поток: resolve → в автопилоте выбери checklist, author и reviewer (разные identity) → дождись PASS/halted → доставь результат.",
+    "tip.deliverables": "Панель превращает консенсус в deliverable. Автопилот: шаблон + author + reviewer из общего пула (label · account · model · effort), далее цикл draft→review до PASS/лимита. Doc: один автор без review. Готовые версии можно забрать через Copy / Apply / Packet.|||Типовой поток: resolve → в автопилоте выбери checklist, author и reviewer (разные identity) → дождись PASS/halted → доставь результат.",
     "tip.apply": "Apply записывает выбранный deliverable в указанный target path (можно вне папки приложения) только после явного подтверждения, затем может открыть следующую подзадачу в текущем чате. Task tracking внешнего проекта Apply не трогает.|||Выбери абсолютный путь, проверь preview/diff в confirm, подтверди запись, затем при желании открой next subtask.",
     "tip.deliverableCopy": "Копирует текст deliverable в буфер обмена.",
-    "tip.deliverablePacket": "Создаёт handoff-packet внутри папки Council Room по указанному пути.",
-    "tip.deliverableWrite": "Write записывает deliverable только внутри папки Council Room.",
+    "tip.deliverablePacket": "Создаёт НЕ целевой файл, а отдельный handoff-packet внутри Council Room. В packet попадает: имя deliverable, выбранный target path, режим new/overwrite, diff-preview если файл уже есть, инструкция оператору и полный текст deliverable внутри markdown-блока. Это удобно, когда ты не хочешь сразу писать файл наружу, а хочешь передать другому агенту/оператору готовый пакет для ручного применения.|||Если нужно прямо сохранить в C:\\AI\\game_agent\\docs\\... — используй Apply. Если нужно только скопировать текст — Copy. Packet нужен для безопасной передачи с контекстом и diff, но сам внешний файл не меняет.",
     "tip.docForm": "Doc-блок — ускоренный путь: один author генерирует deliverable без reviewer и без PASS/FAIL-петли. Автопилот выше — это полный цикл с author+reviewer и итерациями.|||Нужен быстрый итоговый summary или checklist без ревью — используй Doc-блок. Нужен контроль качества через PASS/FAIL — запускай автопилот.",
     "tip.trace": "Служебные сообщения (запуск CLI, KB-патчи и т.п.).\nСкрыты из обычной ленты, чтобы не засорять её.|||«Раунд 3 (subtask st_5a625327): запуск Codex и Claude параллельно. Codex prompt 1842 chars, Claude prompt 1842 chars.» — техническая запись, не для чтения.",
     "tip.msgTrash": "Показать/скрыть удалённые ответы агентов.\nОтвет в корзине скрыт из ленты и не передаётся агентам в контекст следующего раунда — но не удаляется, его можно восстановить.|||ошибочный или шумный ответ убираешь в корзину кнопкой 🗑 на карточке; передумал — открываешь корзину и жмёшь «Восстановить».",
@@ -194,7 +204,7 @@ const STRINGS = {
     "coach.delivered.title": "Документ готов к передаче",
     "coach.delivered.body": "Документ «{template}» готов. 1) Packet → {targetPath} (или Copy). 2) Примени его в целевом проекте через его operator-сессию. 3) Отметь задачу выполненной в том проекте.",
     "coach.allDone.title": "Все подзадачи закрыты",
-    "coach.allDone.body": "Консенсус собран — все подзадачи закрыты. Следующий шаг: справа в панели «Deliverables» сгенерировать документ — «Doc» на закрытой подзадаче (один агент) или «Execution autopilot» (author пишет черновик → reviewer проверяет Review: PASS/FAIL). Готовый документ доставляется кнопками Copy / Apply / Packet / Write.",
+    "coach.allDone.body": "Консенсус собран — все подзадачи закрыты. Следующий шаг: справа в панели «Deliverables» сгенерировать документ — «Doc» на закрытой подзадаче (один агент) или «Execution autopilot» (author пишет черновик → reviewer проверяет Review: PASS/FAIL). Готовый документ доставляется кнопками Copy / Apply / Packet.",
     "coach.runRound.title": "Готов к следующему раунду",
     "coach.runRound.body": "Можешь запустить ещё раунд или закрыть подзадачу, если решение собрано. В Knowledge Base уже добавлено: {kbCount} пункт(а).",
     "coach.runRound.action": "Запустить раунд",
@@ -222,6 +232,7 @@ const STRINGS = {
     "ui.toArchive": "В архив",
     "ui.toTrash": "В корзину",
     "ui.restore": "Восстановить",
+    "ui.reopen": "Переоткрыть",
     "ui.previewBanner": "Просмотр (только чтение): {title}",
     "ui.closePreview": "Закрыть просмотр",
     "ui.confirmEmptyTrash": "Очистить корзину подзадач? Удалённые безвозвратно исчезнут.",
@@ -533,7 +544,6 @@ const STRINGS = {
     "ui.copy": "Copy",
     "ui.apply": "Apply",
     "ui.packet": "Packet",
-    "ui.write": "Write",
     "ui.targetPathPrompt": "Write path inside the workspace:",
     "ui.applyTargetPathPrompt": "Absolute target path for Apply:",
     "ui.applyTargetTitle": "Apply document",
@@ -547,7 +557,6 @@ const STRINGS = {
     "ui.confirmWriteNew": "Create a new file?\n\n{path}\n\nExactly the deliverable content will be written.",
     "ui.confirmOverwrite": "The file already exists. Allow overwrite?\n\n{path}\n\nA .bak backup will be created. Diff preview:\n{diff}",
     "ui.applyExternalWarning": "WARNING: this write will go OUTSIDE the Council Room app folder.",
-    "ui.writeDone": "Wrote: {path}",
     "ui.applyDone": "Applied: {path}",
     "ui.applyOpenNextConfirm": "Apply completed.\n\nOpen the next subtask in this chat?\nTemplate: {template}\nPath: {path}",
     "ui.nextSubtaskPrompt": "Next subtask title:",
@@ -581,6 +590,15 @@ const STRINGS = {
     "ui.editSubtask": "Edit subtask",
     "ui.openSubtaskHint": "This subtask becomes active. The previous active one (if any) moves to pending.",
     "ui.title": "Subtask statement",
+    "ui.openPromptFile": "Open document",
+    "ui.attachPromptFile": "Attach document",
+    "ui.addDocumentUrl": "Add link",
+    "ui.documentUrlPlaceholder": "Direct document link",
+    "ui.promptFileOpened": "Text opened: {name} ({n} chars)",
+    "ui.promptFileQueued": "Attachment ready: {name} ({n} chars)",
+    "ui.promptFilesQueued": "Subtask attachments: {n}",
+    "ui.documentUrlAdded": "Link added to statement",
+    "ui.promptFileReadError": "Could not read file: {error}",
     "ui.mode": "Mode",
     "ui.scopeProposalSubtask": "Scope-proposal subtask (propose scope instead of blocking on empty Files-in-Scope)",
     "ui.scopeModeNormal": "normal",
@@ -635,16 +653,19 @@ const STRINGS = {
     "tip.openSubtaskModal": "The subtask becomes active — the next “▶ Run round” will target it.\nThe previous active one (if any) moves to pending — you can return to it by clicking it in the list.\nUntil any round has been run, the title and mode are editable (✎) and the subtask can be deleted (×).|||you opened “pick stop-condition” by mistake instead of “pick terminal UI” — while no round has run yet, click ✎ and rewrite the title.",
     "tip.subtaskScopeProposal": "Marks this subtask as scope-definition/proposal. In strict-scope mode with empty Files-in-Scope, agents should propose a minimal scope via KB-patch instead of blocking.|||Title does not mention scope clearly, but this round must define file boundaries first — turn this on.",
     "tip.subtaskTitle": "One short sentence — what specifically you're debating. Not a broad topic, but a concrete question with an expected answer.|||bad: “autopilot”. Better: “pick stop-condition for autopilot”. Best: “stop-condition: stale×2 or token<25% — which takes priority?”",
+    "tip.openPromptFile": "Opens a text file and copies its contents directly into the Subtask statement field. This does not create a separate attachment: the text becomes part of the main task request that agents see.|||If the field already has text, the file content is appended below it with a blank line. Works best with .txt, .md, .json, .log, and other text files.",
+    "tip.attachPromptFile": "Attaches a text file as a chat document scoped to this subtask. The text is NOT inserted into the statement; it is injected into each round prompt as ATTACHED DOCUMENTS for this subtask. Useful for reference material, but it increases token use every round.|||Choose the file first, then press Open in the subtask modal. The attachment is bound to the new subtask after it is created.",
+    "tip.documentUrlField": "Direct document link field: Obsidian, GitHub, Google Docs, local file://, or another URL. Council Room does not automatically download the document from this link; the URL is inserted into the statement so agents can see the source address.",
+    "tip.addDocumentUrl": "Adds the URL from the field into the subtask statement as a separate line. Use this when the document is available by link and does not need to be copied in full.|||For private documents, make sure the next agent or operator has access to the link.",
     "tip.knowledgeBase": "Single accumulator of agreed rules for this chat.\nAgents add items via the KB-patch: line at the end of their answer. Editable manually.\nKB snapshot is sent in every prompt instead of a growing transcript.|||Codex ends its answer with “KB-patch: prohibitions: don't use PowerShell for codex CLI”. The server parses it and pushes into the Prohibitions section. Next round both agents see this line in the prompt.",
     "tip.resolve": "Resolve the active subtask. It disappears from the feed, stays in the stack as resolved.|||both agents returned Status: resolve, KB got 3 new items — you click Resolve and type a short summary (“stop = stale×2 OR token<25%”).",
     "tip.freeze": "Freeze the subtask with a reason. Not closed, but paused from debate.|||subtask “pick UI library” — waiting for the user to compare options. Reason: “awaiting user decision on vanilla vs preact”.",
     "tip.runRound": "One synchronous round: Codex and Claude answer in parallel ON THE ACTIVE subtask.\nDoes not run implementation, does not modify files (read-only debate).|||click ▶ Run round. After 30-90 seconds, two new messages appear: Codex and Claude, each ending with “New facts / risks / alternatives / Status / KB-patch”.",
     "tip.generateDoc": "Doc path: one agent, no review loop. Steps: 1) choose a resolved subtask; 2) in the Doc block pick template and author; 3) press Doc. The result is added to the feed and chat documents; nothing is written outside chat. For draft→review→revise, use execution autopilot above.|||After consensus: pick the resolved subtask in Deliverables, set checklist + author in the Doc block, then press Doc.",
-    "tip.deliverables": "This panel turns consensus into deliverables. Autopilot uses template + author + reviewer from the full pool (label · account · model · effort), then runs draft→review iterations until PASS or budget stop. Doc is a one-author/no-review shortcut. Final versions can be delivered via Copy / Apply / Packet / Write.|||Typical flow: resolve → in autopilot pick checklist, author, reviewer (different identity) → wait for PASS/halted → deliver the result.",
+    "tip.deliverables": "This panel turns consensus into deliverables. Autopilot uses template + author + reviewer from the full pool (label · account · model · effort), then runs draft→review iterations until PASS or budget stop. Doc is a one-author/no-review shortcut. Final versions can be delivered via Copy / Apply / Packet.|||Typical flow: resolve → in autopilot pick checklist, author, reviewer (different identity) → wait for PASS/halted → deliver the result.",
     "tip.apply": "Apply writes the selected deliverable to a chosen target path (can be outside the app folder) only under explicit confirmation, then can open the next subtask in the current chat. It does not modify the target project's own task tracking.|||Pick an absolute path, inspect preview/diff in confirm, approve the write, then optionally open the next subtask.",
     "tip.deliverableCopy": "Copy the deliverable text to clipboard.",
-    "tip.deliverablePacket": "Create a handoff packet inside the Council Room workspace at the chosen path.",
-    "tip.deliverableWrite": "Write keeps changes inside the Council Room workspace only.",
+    "tip.deliverablePacket": "Creates a separate handoff packet, not the target file itself. The packet includes the deliverable name, chosen target path, new/overwrite mode, diff preview when the file already exists, operator instructions, and the full deliverable text in a markdown block. Use it when you do not want to write outside immediately, but want to hand another agent/operator a complete manual-apply package.|||To save directly to C:\\AI\\game_agent\\docs\\..., use Apply. To only copy the text, use Copy. Packet is for safe handoff with context and diff; it does not change the external target file.",
     "tip.docForm": "Doc block is the fast path: one author generates a deliverable with no reviewer and no PASS/FAIL loop. Autopilot above is the full cycle with author+reviewer and iterations.|||Need a quick summary/checklist without review — use the Doc block. Need quality control via PASS/FAIL — run autopilot.",
     "tip.trace": "System messages (CLI launch, KB patches, etc.).\nHidden from the main feed to keep it clean.|||“Round 3 (subtask st_5a625327): Codex and Claude launched in parallel. Codex prompt 1842 chars, Claude prompt 1842 chars.” — a technical record, not for reading.",
     "tip.msgTrash": "Show/hide trashed agent responses.\nA trashed response is hidden from the feed and excluded from the context sent to the agents next round — but not deleted, it can be restored.|||trash a wrong or noisy answer with the 🗑 button on its card; changed your mind — open the bin and hit «Restore».",
@@ -688,7 +709,7 @@ const STRINGS = {
     "coach.delivered.title": "Deliverable ready to hand off",
     "coach.delivered.body": "Deliverable “{template}” is ready. 1) Packet → {targetPath} (or Copy). 2) Apply it in the target project via its operator session. 3) Mark the task done in that project.",
     "coach.allDone.title": "All subtasks resolved",
-    "coach.allDone.body": "Consensus is in — all subtasks resolved. Next step: in the «Deliverables» panel on the right, generate a document — «Doc» on a resolved subtask (one agent) or «Execution autopilot» (author drafts → reviewer returns Review: PASS/FAIL). Deliver it with Copy / Apply / Packet / Write.",
+    "coach.allDone.body": "Consensus is in — all subtasks resolved. Next step: in the «Deliverables» panel on the right, generate a document — «Doc» on a resolved subtask (one agent) or «Execution autopilot» (author drafts → reviewer returns Review: PASS/FAIL). Deliver it with Copy / Apply / Packet.",
     "coach.runRound.title": "Ready for next round",
     "coach.runRound.body": "You can run another round or resolve the subtask if the decision is collected. Knowledge Base already has {kbCount} item(s).",
     "coach.runRound.action": "Run round",
@@ -716,6 +737,7 @@ const STRINGS = {
     "ui.toArchive": "Archive",
     "ui.toTrash": "To trash",
     "ui.restore": "Restore",
+    "ui.reopen": "Re-open",
     "ui.previewBanner": "Preview (read-only): {title}",
     "ui.closePreview": "Close preview",
     "ui.confirmEmptyTrash": "Empty the subtask trash? Deleted items are gone for good.",
@@ -1924,6 +1946,9 @@ function renderSubtaskRow(st, context) {
     ));
     if (st.status === "resolved") {
       right.appendChild(makeIconBtn("subtask-doc", t("ui.generateDoc"), t("tip.generateDoc").split("|||")[0], () => generateDeliverableForSubtask(st)));
+      right.appendChild(makeIconBtn("subtask-reopen", "↻", t("ui.reopen"), () => {
+        if (confirm(t("ui.confirmReopen"))) api("POST", "/api/subtasks/reopen", { id: st.id });
+      }));
     }
     right.appendChild(makeIconBtn("subtask-archive", "🗄", t("ui.toArchive"), () => flashThenAct(li, "rgba(255,202,40,0.5)", () => api("POST", "/api/subtasks/archive", { id: st.id }))));
     right.appendChild(makeIconBtn("subtask-delete", "×", t("ui.toTrash"), () => flashThenAct(li, "rgba(239,83,80,0.45)", () => api("POST", "/api/subtasks/trash", { id: st.id }))));
@@ -1943,8 +1968,8 @@ function renderSubtaskRow(st, context) {
       li.style.cursor = "pointer";
       li.addEventListener("click", (event) => {
         if (event.target.closest("button")) return;
-        if (st.status === "resolved" && !confirm(t("ui.confirmReopen"))) return;
-        api("POST", "/api/subtasks/reopen", { id: st.id });
+        if (st.status === "resolved") openPreview(st.id);
+        else api("POST", "/api/subtasks/reopen", { id: st.id });
       });
     }
   } else {
@@ -2092,6 +2117,9 @@ function renderConversation() {
   // whatever response they're reading.
   const stick = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
   const prevScrollTop = target.scrollTop;
+  const tracePanel = $("trace");
+  const traceStick = trace.scrollHeight - trace.scrollTop - trace.clientHeight < 80;
+  const prevTraceScrollTop = trace.scrollTop;
   target.innerHTML = "";
   trace.innerHTML = "";
   const messages = currentState.run?.messages || [];
@@ -2187,6 +2215,9 @@ function renderConversation() {
   }
   // Stick to the bottom only if the user was already there; otherwise keep their place.
   target.scrollTop = stick ? target.scrollHeight : prevScrollTop;
+  if (tracePanel?.open) {
+    trace.scrollTop = traceStick ? trace.scrollHeight : prevTraceScrollTop;
+  }
 }
 
 function renderKnowledge() {
@@ -5620,6 +5651,10 @@ function deliverableLabel(d) {
   return `${d.template} v${d.version}${d.stale ? ` · ${t("ui.deliverableStale")}` : ""}`;
 }
 
+function canApplyDeliverable(d) {
+  return ["ready", "delivered", "halted"].includes(String(d?.status || ""));
+}
+
 function execAutopilotRunToken(execState = null) {
   if (!execState || !execState.startedAt) return "";
   return `${execState.subtaskId || ""}|${execState.startedAt}`;
@@ -5714,8 +5749,11 @@ function renderDeliverables() {
     deliverablesForm.docTemplate = templateIds.has("summary") ? "summary" : (templates[0] || {}).id || "";
   }
   const subtaskIds = new Set(resolved.map((s) => s.id));
+  const latestResolvedSubtaskId = (resolved[0] || {}).id || "";
   if (!subtaskIds.has(deliverablesForm.subtaskId)) {
-    deliverablesForm.subtaskId = (resolved[0] || {}).id || "";
+    deliverablesForm.subtaskId = latestResolvedSubtaskId;
+  } else if (!deliverablesFieldTouched.execSubtask && latestResolvedSubtaskId && deliverablesForm.subtaskId !== latestResolvedSubtaskId) {
+    deliverablesForm.subtaskId = latestResolvedSubtaskId;
   }
   if (!deliverablesActorPool.some((o) => o.id === deliverablesForm.execAuthor)) {
     deliverablesForm.execAuthor = actorIdForBackend(preferred.execAuthor, deliverablesActorPool) || (deliverablesActorPool[0] || {}).id || "";
@@ -5875,9 +5913,8 @@ function renderDeliverables() {
       </div>
       <div class="doc-actions">
         <button class="del-copy" type="button" data-tooltip-key="t.deliverableCopy" data-tooltip-text="${escapeHtml(t("tip.deliverableCopy"))}">${escapeHtml(t("ui.copy"))}</button>
-        ${["ready", "delivered"].includes(d.status) ? `<button class="del-apply" type="button" data-tooltip-key="t.apply" data-tooltip-text="${escapeHtml(t("tip.apply"))}">${escapeHtml(t("ui.apply"))}</button>` : ""}
+        ${canApplyDeliverable(d) ? `<button class="del-apply" type="button" data-tooltip-key="t.apply" data-tooltip-text="${escapeHtml(t("tip.apply"))}">${escapeHtml(t("ui.apply"))}</button>` : ""}
         <button class="del-packet${coachFocus ? " coach-focus-btn" : ""}" type="button" data-tooltip-key="t.deliverablePacket" data-tooltip-text="${escapeHtml(t("tip.deliverablePacket"))}">${escapeHtml(t("ui.packet"))}</button>
-        <button class="del-write" type="button" data-tooltip-key="t.deliverableWrite" data-tooltip-text="${escapeHtml(t("tip.deliverableWrite"))}">${escapeHtml(t("ui.write"))}</button>
       </div>
     </div>`;
   }).join("");
@@ -5885,8 +5922,35 @@ function renderDeliverables() {
 
 async function copyDeliverable(id) {
   const result = await api("POST", "/api/deliverables/content", { id });
-  await navigator.clipboard.writeText(result.text || "");
+  await copyTextToClipboard(result.text || "");
   showDeliverablesMsg(t("ui.copy"), false);
+}
+
+async function copyTextToClipboard(text) {
+  let clipboardError = null;
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      clipboardError = error;
+    }
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    if (document.execCommand?.("copy")) return;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+  throw clipboardError || new Error("Clipboard copy failed");
 }
 
 async function packetDeliverable(id) {
@@ -5895,22 +5959,6 @@ async function packetDeliverable(id) {
   const result = await api("POST", "/api/deliverables/packet", { id, targetPath });
   rememberDeliverableTargetPath(id, targetPath);
   showDeliverablesMsg(t("ui.packetDone", { name: result.packet.name }), false);
-}
-
-async function writeDeliverable(id) {
-  const targetPath = promptDeliverableTargetPath(id);
-  if (!targetPath) return;
-  const preview = (await api("POST", "/api/deliverables/preview-write", { id, targetPath })).preview;
-  const ok = confirmDeliverableWritePreview(preview, { allowExternal: false });
-  if (!ok) return;
-  const result = await api("POST", "/api/deliverables/write", {
-    id,
-    targetPath,
-    allowOverwrite: Boolean(preview.exists),
-    confirm: true,
-  });
-  rememberDeliverableTargetPath(id, result.result.targetPath);
-  showDeliverablesMsg(t("ui.writeDone", { path: result.result.targetPath }), false);
 }
 
 async function applyDeliverable(id) {
@@ -6075,16 +6123,90 @@ function formatTime(iso) {
   }
 }
 
+let pendingSubtaskPromptAttachments = [];
+
 function autoGrowTextarea(el) {
   el.style.height = "auto";
   el.style.height = `${Math.max(52, el.scrollHeight)}px`;
+}
+
+function showSubtaskPromptFileMsg(text, isError = false) {
+  const msg = $("subtaskPromptFileMsg");
+  if (!msg) return;
+  msg.textContent = String(text || "");
+  msg.className = text ? `small ${isError ? "err" : "ok"}` : "muted small";
+}
+
+function appendSubtaskStatementText(text) {
+  const titleInput = $("subtaskTitleInput");
+  const incoming = String(text || "");
+  if (!titleInput || !incoming) return;
+  const current = titleInput.value.trimEnd();
+  titleInput.value = current ? `${current}\n\n${incoming}` : incoming;
+  autoGrowTextarea(titleInput);
+  titleInput.focus();
+}
+
+async function openSubtaskPromptFile(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    appendSubtaskStatementText(text);
+    showSubtaskPromptFileMsg(t("ui.promptFileOpened", { name: file.name || "file", n: text.length }), false);
+  } catch (error) {
+    showSubtaskPromptFileMsg(t("ui.promptFileReadError", { error: error.message || String(error) }), true);
+  }
+}
+
+async function queueSubtaskPromptAttachment(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    pendingSubtaskPromptAttachments.push({ name: file.name || "document", text });
+    const count = pendingSubtaskPromptAttachments.length;
+    showSubtaskPromptFileMsg(count > 1
+      ? t("ui.promptFilesQueued", { n: count })
+      : t("ui.promptFileQueued", { name: file.name || "document", n: text.length }), false);
+  } catch (error) {
+    showSubtaskPromptFileMsg(t("ui.promptFileReadError", { error: error.message || String(error) }), true);
+  }
+}
+
+function addSubtaskDocumentUrlToStatement() {
+  const input = $("subtaskDocumentUrlInput");
+  const url = String(input?.value || "").trim();
+  if (!url) return false;
+  appendSubtaskStatementText(`Document link: ${url}`);
+  input.value = "";
+  showSubtaskPromptFileMsg(t("ui.documentUrlAdded"), false);
+  return true;
+}
+
+async function attachPendingSubtaskDocuments(subtaskId) {
+  const pending = pendingSubtaskPromptAttachments.slice();
+  pendingSubtaskPromptAttachments = [];
+  for (const item of pending) {
+    await api("POST", "/api/documents/add", {
+      name: item.name,
+      text: item.text,
+      subtaskId,
+    });
+  }
 }
 
 function openSubtaskModal({ editId = "", title = "", mode = "STANDARD", scopeMode = "normal" } = {}) {
   const modal = $("openSubtaskModal");
   modal.dataset.editId = editId;
   const titleInput = $("subtaskTitleInput");
+  const openFileInput = $("subtaskPromptOpenFileInput");
+  const attachFileInput = $("subtaskPromptAttachFileInput");
+  const documentUrlInput = $("subtaskDocumentUrlInput");
   titleInput.value = title;
+  pendingSubtaskPromptAttachments = [];
+  showSubtaskPromptFileMsg("", false);
+  if (openFileInput) openFileInput.value = "";
+  if (attachFileInput) attachFileInput.value = "";
+  if (documentUrlInput) documentUrlInput.value = "";
   $("subtaskModeInput").value = mode;
   $("subtaskScopeProposalInput").checked = scopeMode === "proposal";
   $("subtaskModalTitle").textContent = t(editId ? "ui.editSubtask" : "ui.openNewSubtask");
@@ -6211,6 +6333,27 @@ function bindUi() {
   });
 
   $("subtaskTitleInput").addEventListener("input", (event) => autoGrowTextarea(event.target));
+  $("openSubtaskPromptFile")?.addEventListener("click", () => $("subtaskPromptOpenFileInput")?.click());
+  $("subtaskPromptOpenFileInput")?.addEventListener("change", (event) => {
+    const file = event.target.files && event.target.files[0];
+    openSubtaskPromptFile(file).finally(() => {
+      event.target.value = "";
+    });
+  });
+  $("attachSubtaskPromptFile")?.addEventListener("click", () => $("subtaskPromptAttachFileInput")?.click());
+  $("subtaskPromptAttachFileInput")?.addEventListener("change", (event) => {
+    const file = event.target.files && event.target.files[0];
+    queueSubtaskPromptAttachment(file).finally(() => {
+      event.target.value = "";
+    });
+  });
+  $("addSubtaskDocumentUrl")?.addEventListener("click", addSubtaskDocumentUrlToStatement);
+  $("subtaskDocumentUrlInput")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addSubtaskDocumentUrlToStatement();
+    }
+  });
 
   $("openSubtask").addEventListener("click", () => {
     if (!currentState?.activeRunId) {
@@ -6261,6 +6404,7 @@ function bindUi() {
   });
   $("cancelSubtask").addEventListener("click", () => $("openSubtaskModal").classList.add("hidden"));
   $("confirmSubtask").addEventListener("click", async () => {
+    addSubtaskDocumentUrlToStatement();
     const title = $("subtaskTitleInput").value.trim();
     if (!title) return;
     const mode = $("subtaskModeInput").value;
@@ -6269,8 +6413,17 @@ function bindUi() {
     $("openSubtaskModal").classList.add("hidden");
     if (editId) {
       await api("POST", "/api/subtasks/edit", { id: editId, title, mode, scopeMode });
+      if (pendingSubtaskPromptAttachments.length) {
+        await attachPendingSubtaskDocuments(editId);
+      }
     } else {
-      await api("POST", "/api/subtasks/open", { title, mode, scopeMode });
+      const nextState = await api("POST", "/api/subtasks/open", { title, mode, scopeMode });
+      const opened = ((nextState?.run && nextState.run.subtasks) || []).find((s) => s.status === "open" && !s.bin);
+      if (opened && pendingSubtaskPromptAttachments.length) {
+        await attachPendingSubtaskDocuments(opened.id);
+      } else {
+        pendingSubtaskPromptAttachments = [];
+      }
     }
   });
 
@@ -6346,6 +6499,12 @@ function bindUi() {
     const traceLabelEl = $("toggleTrace").querySelector("[data-i18n='ui.trace']");
     const arrow = trace.open ? " ▴" : " ▾";
     $("toggleTrace").lastChild.textContent = arrow;
+    if (trace.open) {
+      setTimeout(() => {
+        const list = $("traceList");
+        if (list) list.scrollTop = list.scrollHeight;
+      }, 0);
+    }
   });
 
   $("toggleMsgTrash").addEventListener("click", () => {
@@ -6474,7 +6633,6 @@ function bindUi() {
       else if (event.target.closest(".del-copy")) await copyDeliverable(id);
       else if (event.target.closest(".del-apply")) await applyDeliverable(id);
       else if (event.target.closest(".del-packet")) await packetDeliverable(id);
-      else if (event.target.closest(".del-write")) await writeDeliverable(id);
     } catch (error) {
       showDeliverablesMsg(normalizeDeliverablesError(error), true);
     }

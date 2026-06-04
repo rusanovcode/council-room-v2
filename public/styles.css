@@ -15,6 +15,7 @@
 }
 
 * { box-sizing: border-box; }
+.hidden { display: none !important; }
 
 html, body {
   margin: 0;
@@ -1250,6 +1251,25 @@ button.square {
   font-size: 14px;
   line-height: 1.4;
 }
+.subtask-prompt-tools {
+  display: grid;
+  gap: 8px;
+  margin: -2px 0 10px;
+}
+.subtask-prompt-file-row,
+.subtask-prompt-link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+.subtask-prompt-link-row > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.subtask-prompt-file-row .small {
+  min-width: 0;
+}
 .modal-box h3 { margin: 0 0 10px; }
 .login-steps { margin: 0 0 4px; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; }
 .login-steps li { font-size: 13px; line-height: 1.45; color: var(--text); }
@@ -2181,8 +2201,7 @@ button.square {
 .doc-remove,
 .del-copy,
 .del-apply,
-.del-packet,
-.del-write {
+.del-packet {
   background: none; border: none; color: var(--muted);
   cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px; white-space: nowrap;
 }
@@ -2190,7 +2209,6 @@ button.square {
 .del-copy:hover { color: var(--green); }
 .del-apply:hover { color: var(--accent); }
 .del-packet:hover { color: var(--amber); }
-.del-write:hover { color: var(--accent); }
 .deliverable-row.stale .doc-name { color: var(--amber); }
 .deliverable-row.coach-focus {
   box-shadow: 0 0 0 1px var(--accent) inset;

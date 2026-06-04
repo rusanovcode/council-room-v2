@@ -147,6 +147,8 @@ const ROOMS_DIR = path.join(ROOT, "rooms");
 const PUBLIC_DIR = path.join(ROOT, "public");
 const PORT = Number(process.env.COUNCIL_ROOM_V2_PORT || 8788);
 const WORKDIR = process.env.COUNCIL_ROOM_V2_WORKDIR || path.dirname(ROOT);
+const EXEC_AUTOPILOT_DEFAULT_ITERATIONS = 4;
+const EXEC_AUTOPILOT_MAX_ITERATIONS = 8;
 
 fs.mkdirSync(ROOMS_DIR, { recursive: true });
 
@@ -386,8 +388,8 @@ function broadcast() {
 }
 
 // Live agent stdout/stderr → named "stream" SSE event (separate channel from state).
-function broadcastStream(agent, chunk, { subtaskId = "", round = 0, reset = false } = {}) {
-  const data = JSON.stringify({ agent, runId: state.run?.id || null, subtaskId, round, chunk: String(chunk || ""), reset });
+function broadcastStream(agent, chunk, { subtaskId = "", round = 0, reset = false, label = "" } = {}) {
+  const data = JSON.stringify({ agent, label, runId: state.run?.id || null, subtaskId, round, chunk: String(chunk || ""), reset });
   const payload = `event: stream\ndata: ${data}\n\n`;
   for (const res of sseClients) {
     try { res.write(payload); } catch {}
@@ -1234,7 +1236,7 @@ function prepareExecutionAutopilot(body = {}) {
   }
   if (!author || !reviewer) throw new Error("Author and reviewer participants are required");
   if (participantIdentity(author) === participantIdentity(reviewer)) throw new Error("Author and reviewer must be different");
-  const maxIterations = Math.max(1, Math.min(5, Number(body.maxIterations || 2)));
+  const maxIterations = Math.max(1, Math.min(EXEC_AUTOPILOT_MAX_ITERATIONS, Number(body.maxIterations || EXEC_AUTOPILOT_DEFAULT_ITERATIONS)));
   return { dir, subtask, tpl, participants, author, reviewer, maxIterations };
 }
 
@@ -1917,8 +1919,9 @@ async function router(req, res) {
       if (!body.text || !String(body.text).trim()) return sendJson(res, 400, { error: "Empty document" });
       const dir = runDir(state.run.id);
       const active = subtasks.activeSubtask(dir);
+      const subtaskId = String(body.subtaskId || (active && active.id) || "");
       const scope = body.scope === "shared" ? "shared" : undefined;
-      documents.add(dir, body.name, body.text, { scope, subtaskId: active && active.id });
+      documents.add(dir, body.name, body.text, { scope, subtaskId });
       broadcast();
       return sendJson(res, 200, publicState());
     }
@@ -1934,8 +1937,9 @@ async function router(req, res) {
       }
       const dir = runDir(state.run.id);
       const active = subtasks.activeSubtask(dir);
+      const subtaskId = String(body.subtaskId || (active && active.id) || "");
       const scope = body.scope === "shared" ? "shared" : undefined;
-      documents.add(dir, body.name || item.name, item.text, { scope, subtaskId: active && active.id });
+      documents.add(dir, body.name || item.name, item.text, { scope, subtaskId });
       broadcast();
       return sendJson(res, 200, publicState());
     }

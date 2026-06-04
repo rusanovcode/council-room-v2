@@ -472,6 +472,19 @@
           <span class="help" data-tooltip-key="t.subtaskTitle">?</span>
           <textarea id="subtaskTitleInput" rows="8"></textarea>
         </label>
+        <div class="subtask-prompt-tools">
+          <input id="subtaskPromptOpenFileInput" type="file" class="hidden" accept=".txt,.md,.markdown,.json,.jsonl,.log,.prompt,text/*" />
+          <input id="subtaskPromptAttachFileInput" type="file" class="hidden" accept=".txt,.md,.markdown,.json,.jsonl,.log,.prompt,text/*" />
+          <div class="subtask-prompt-file-row">
+            <button id="openSubtaskPromptFile" type="button" class="ghost small" data-i18n="ui.openPromptFile" data-tooltip-key="t.openPromptFile">Открыть документ</button>
+            <button id="attachSubtaskPromptFile" type="button" class="ghost small" data-i18n="ui.attachPromptFile" data-tooltip-key="t.attachPromptFile">Прикрепить документ</button>
+            <span id="subtaskPromptFileMsg" class="muted small"></span>
+          </div>
+          <div class="subtask-prompt-link-row">
+            <input id="subtaskDocumentUrlInput" type="url" data-i18n-placeholder="ui.documentUrlPlaceholder" placeholder="Прямая ссылка на документ" data-tooltip-key="t.documentUrlField" />
+            <button id="addSubtaskDocumentUrl" type="button" class="ghost small" data-i18n="ui.addDocumentUrl" data-tooltip-key="t.addDocumentUrl">Добавить ссылку</button>
+          </div>
+        </div>
         <label>
           <span data-i18n="ui.mode">Режим</span>
           <span class="help" data-tooltip-key="t.mode">?</span>

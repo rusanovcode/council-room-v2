@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "node server.js",
+    "cli": "node scripts/council-room-cli.js",
     "test": "node test/providers.test.js && node test/roles.test.js && node test/scope-mode.test.js && node test/subtasks.test.js && node test/documents.test.js && node test/round.integration.test.js"
   }
 }
