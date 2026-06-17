@@ -19,3 +19,5 @@ Thumbs.db
 
 # scratch / temp dumps
 tmp_*
+server-*.out.txt
+server-*.err.txt
